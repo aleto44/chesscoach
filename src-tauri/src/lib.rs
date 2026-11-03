@@ -71,6 +71,7 @@ pub fn run() {
             auth::auth_submit_code,
             auth::auth_cancel,
             auth::auth_logout,
+            auth::plan_usage,
             db::db_create_game,
             db::db_update_game,
             db::db_set_moves,

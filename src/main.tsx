@@ -7,6 +7,7 @@ import "./styles.css";
 import App from "./App";
 import { initAuth } from "./coach/auth";
 import { initBridge } from "./coach/bridge";
+import { initUsage } from "./coach/usage";
 import { initPersistence } from "./db";
 import { initOpponent } from "./game/opponent";
 import { bootstrap, initGameOverWatch } from "./game/session";
@@ -14,6 +15,7 @@ import { loadSettings } from "./settings";
 
 initBridge();
 initAuth();
+initUsage();
 initPersistence();
 initGameOverWatch();
 initOpponent();
@@ -28,7 +30,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 
 // Handle for poking at the running app from devtools.
 if (import.meta.env.DEV) {
-  Promise.all([import("./store"), import("./game/session")]).then(([store, session]) => {
-    Object.assign(window, { __cc: { store, session } });
-  });
+  Promise.all([import("./store"), import("./game/session"), import("./coach/auth"), import("./coach/usage")]).then(
+    ([store, session, auth, usage]) => Object.assign(window, { __cc: { store, session, auth, usage } }),
+  );
 }

@@ -8,6 +8,7 @@ import { useSettings } from "../settings";
 import { openTangent, useStore, type ChatItem } from "../store";
 import { Board } from "./Board";
 import { SignIn } from "./SignIn";
+import { UsageMeter } from "./UsageMeter";
 
 export function Chat() {
   const { chat, busy } = useStore();
@@ -33,6 +34,7 @@ export function Chat() {
       <header>
         <span className={`status ${busy ? "busy" : ""}`} />
         <strong>Coach</strong>
+        {auth.status === "signed-in" && <UsageMeter />}
         <span className="muted small" title="Change in Settings (⚙)">{activeModel ?? (coachModel || "default model")}</span>
         <span className="spacer" />
         {auth.status === "signed-in" && (

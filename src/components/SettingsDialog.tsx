@@ -5,6 +5,8 @@ import { MODEL_CHOICES, saveSetting, useSettings } from "../settings";
 import { newId, pushChat, useStore } from "../store";
 import { Modal } from "./GameDialogs";
 
+const CHOICES = [...MODEL_CHOICES, { value: "custom", label: "Custom…", hint: "Any model name or ID claude accepts" }];
+
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { coachModel, activeModel } = useSettings();
   const preset = MODEL_CHOICES.some((c) => c.value === coachModel);
@@ -26,21 +28,18 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="Settings" onClose={onClose}>
-      <div className="field">
+      <label className="field">
         <span>Coach model</span>
-        <div className="model-choices">
-          {[...MODEL_CHOICES, { value: "custom", label: "Custom", hint: "Any model name or ID claude accepts" }].map(
-            (c) => (
-              <label key={c.value} className={`model-choice ${choice === c.value ? "on" : ""}`}>
-                <input type="radio" name="model" checked={choice === c.value} onChange={() => setChoice(c.value)} />
-                <span>
-                  <strong>{c.label}</strong>
-                  <span className="muted"> · {c.hint}</span>
-                </span>
-              </label>
-            ),
-          )}
-        </div>
+        <select value={choice} onChange={(e) => setChoice(e.target.value)}>
+          {CHOICES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+        <span className="muted small">{CHOICES.find((c) => c.value === choice)?.hint}</span>
+      </label>
+      <div className="field">
         {choice === "custom" && (
           <input
             className="text-input"

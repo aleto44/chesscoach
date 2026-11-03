@@ -6,6 +6,7 @@ import { formatMoves } from "../chess/line";
 import { gameDescription, newId, pushChat, screen, updateChat, useStore } from "../store";
 import { useSettings } from "../settings";
 import { describeCall, handleTool } from "./tools";
+import { refreshUsageSoon } from "./usage";
 
 let streamingId: string | null = null;
 const stderrTail: string[] = [];
@@ -69,8 +70,12 @@ function onEvent(msg: any) {
       }
       break;
     }
+    case "rate_limit_event":
+      refreshUsageSoon();
+      break;
     case "result":
       finishTurn();
+      refreshUsageSoon();
       if (msg.is_error || msg.subtype !== "success") {
         pushChat({ kind: "system", id: newId("c"), error: true, text: `Coach error: ${msg.result ?? msg.subtype}` });
       }

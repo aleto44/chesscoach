@@ -3,10 +3,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
 import { hasBackend } from "../db";
+import { refreshUsage } from "./usage";
 
 export interface AuthState {
   status: "checking" | "signed-out" | "signing-in" | "signed-in";
   email: string | null;
+  /** e.g. "Pro", from the CLI's subscriptionType. */
+  plan: string | null;
   /** Sign-in page, in case the browser didn't open. */
   url: string | null;
   error: string | null;
@@ -18,6 +21,7 @@ export interface AuthState {
 export const useAuth = create<AuthState>(() => ({
   status: "checking",
   email: null,
+  plan: null,
   url: null,
   error: null,
   codeSent: false,
@@ -50,9 +54,11 @@ export function initAuth() {
 export async function checkAuth() {
   try {
     const s = await invoke<Record<string, any>>("auth_status");
+    if (s.loggedIn) refreshUsage();
     useAuth.setState({
       status: s.loggedIn ? "signed-in" : "signed-out",
       email: s.email ?? s.account?.email ?? null,
+      plan: s.subscriptionType ? s.subscriptionType[0].toUpperCase() + s.subscriptionType.slice(1) : null,
       url: null,
       codeSent: false,
     });

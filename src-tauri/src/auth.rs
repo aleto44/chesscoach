@@ -164,3 +164,26 @@ pub async fn auth_logout() -> Result<(), String> {
     .await
     .map_err(|e| e.to_string())?
 }
+
+/// Plan usage as the CLI reports it (`/usage` runs locally: no model call, no cost). Returns the
+/// text, e.g. "Current session: 24% used · resets Nov 3, 10:19pm (America/New_York)".
+#[tauri::command]
+pub async fn plan_usage(app: AppHandle) -> Result<String, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let out = claude_command()
+            .current_dir(dir)
+            .args(["-p", "--tools", "", "--output-format", "json", "/usage"])
+            .stdin(Stdio::null())
+            .output()
+            .map_err(|e| format!("could not run claude: {e}"))?;
+        let v: Value = serde_json::from_slice(&out.stdout)
+            .map_err(|_| format!("unexpected /usage output: {}", String::from_utf8_lossy(&out.stdout)))?;
+        v["result"]
+            .as_str()
+            .map(str::to_string)
+            .ok_or_else(|| "no result from /usage".to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
