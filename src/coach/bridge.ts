@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { formatMoves } from "../chess/line";
 import { gameDescription, newId, pushChat, screen, updateChat, useStore } from "../store";
+import { useSettings } from "../settings";
 import { describeCall, handleTool } from "./tools";
 
 let streamingId: string | null = null;
@@ -48,7 +49,10 @@ export function initBridge() {
 function onEvent(msg: any) {
   switch (msg.type) {
     case "system":
-      if (msg.subtype === "init") useStore.setState({ sessionId: msg.session_id });
+      if (msg.subtype === "init") {
+        useStore.setState({ sessionId: msg.session_id });
+        useSettings.setState({ activeModel: msg.model ?? null });
+      }
       break;
     case "stream_event": {
       const ev = msg.event;

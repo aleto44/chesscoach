@@ -3,11 +3,12 @@ import { resign } from "../game/session";
 import { useStore, boardMove, goto, step, openTangent, tangentPath, flip, canStudentMove, opponentLabel } from "../store";
 import { Board } from "./Board";
 import { GamesDialog, NewGameDialog } from "./GameDialogs";
+import { SettingsDialog } from "./SettingsDialog";
 
 /** Main board with the tangent breadcrumbs, step-through controls and move list. */
 export function BoardPanel() {
   const { game, gamePly, tangents, active, orientation, meta, opponentThinking } = useStore();
-  const [dialog, setDialog] = useState<"new" | "games" | null>(null);
+  const [dialog, setDialog] = useState<"new" | "games" | "settings" | null>(null);
   const tangent = active ? tangents[active] : null;
   const line = tangent ? tangent.line : game;
   const ply = tangent ? tangent.ply : gamePly;
@@ -28,9 +29,13 @@ export function BoardPanel() {
         {meta.studentColor !== "both" && !meta.result && game.sans.length > 0 && (
           <button onClick={() => confirm("Resign this game?") && resign()}>Resign</button>
         )}
+        <button className="icon" onClick={() => setDialog("settings")} title="Settings" aria-label="Settings">
+          ⚙
+        </button>
       </div>
       {dialog === "new" && <NewGameDialog onClose={() => setDialog(null)} />}
       {dialog === "games" && <GamesDialog onClose={() => setDialog(null)} />}
+      {dialog === "settings" && <SettingsDialog onClose={() => setDialog(null)} />}
 
       <nav className="crumbs">
         <button className={`crumb ${active ? "" : "current"}`} onClick={() => openTangent(null)}>

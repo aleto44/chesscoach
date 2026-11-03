@@ -61,6 +61,11 @@ CREATE TABLE chat_items (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX chat_items_game ON chat_items(game_id, seq);
+"#, r#"
+CREATE TABLE settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL                     -- JSON
+);
 "#];
 
 impl Db {
@@ -77,6 +82,48 @@ impl Db {
         }
         Ok(Self(Mutex::new(conn)))
     }
+
+    pub fn setting(&self, key: &str) -> Option<serde_json::Value> {
+        let conn = self.0.lock().unwrap();
+        let raw: Option<String> = conn
+            .query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0))
+            .optional()
+            .ok()
+            .flatten();
+        raw.and_then(|v| serde_json::from_str(&v).ok())
+    }
+}
+
+#[tauri::command]
+pub fn db_get_settings(db: State<Db>) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    let conn = db.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT key, value FROM settings").map_err(err)?;
+    let rows = stmt
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+        .map_err(err)?;
+    let mut out = serde_json::Map::new();
+    for row in rows {
+        let (key, value) = row.map_err(err)?;
+        out.insert(key, serde_json::from_str(&value).unwrap_or(serde_json::Value::Null));
+    }
+    Ok(out)
+}
+
+/// A null value deletes the setting (back to the default).
+#[tauri::command]
+pub fn db_set_setting(db: State<Db>, key: String, value: serde_json::Value) -> Result<(), String> {
+    let conn = db.0.lock().unwrap();
+    if value.is_null() {
+        conn.execute("DELETE FROM settings WHERE key = ?1", [key]).map_err(err)?;
+    } else {
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![key, value.to_string()],
+        )
+        .map_err(err)?;
+    }
+    Ok(())
 }
 
 #[derive(Deserialize)]

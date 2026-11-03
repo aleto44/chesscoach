@@ -4,6 +4,7 @@ import { formatMoves } from "../chess/line";
 import { logout, useAuth } from "../coach/auth";
 import { restartCoach, sendToCoach } from "../coach/bridge";
 import { hasBackend } from "../db";
+import { useSettings } from "../settings";
 import { openTangent, useStore, type ChatItem } from "../store";
 import { Board } from "./Board";
 import { SignIn } from "./SignIn";
@@ -11,6 +12,7 @@ import { SignIn } from "./SignIn";
 export function Chat() {
   const { chat, busy } = useStore();
   const auth = useAuth();
+  const { coachModel, activeModel } = useSettings();
   const signedIn = auth.status === "signed-in" || !hasBackend();
   const [draft, setDraft] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
@@ -31,6 +33,7 @@ export function Chat() {
       <header>
         <span className={`status ${busy ? "busy" : ""}`} />
         <strong>Coach</strong>
+        <span className="muted small" title="Change in Settings (⚙)">{activeModel ?? (coachModel || "default model")}</span>
         <span className="spacer" />
         {auth.status === "signed-in" && (
           <button onClick={() => confirm("Sign out of Claude?") && logout()} title={auth.email ?? "Signed in"}>

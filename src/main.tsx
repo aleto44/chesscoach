@@ -10,12 +10,14 @@ import { initBridge } from "./coach/bridge";
 import { initPersistence } from "./db";
 import { initOpponent } from "./game/opponent";
 import { bootstrap, initGameOverWatch } from "./game/session";
+import { loadSettings } from "./settings";
 
 initBridge();
 initAuth();
 initPersistence();
 initGameOverWatch();
 initOpponent();
+loadSettings().catch((e) => console.error("could not load settings", e));
 bootstrap().catch((e) => console.error("could not open the last game", e));
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

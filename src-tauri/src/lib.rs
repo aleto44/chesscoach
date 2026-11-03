@@ -20,6 +20,7 @@ fn coach_send(
     app: AppHandle,
     coach: State<Coach>,
     mcp: State<Mcp>,
+    db: State<db::Db>,
     text: String,
     resume: Option<String>,
 ) -> Result<(), String> {
@@ -29,7 +30,9 @@ fn coach_send(
             return Ok(());
         }
     }
-    let mut fresh = ClaudeCli::spawn(&app, &mcp.url, resume.as_deref())?;
+    let model = db.setting("coachModel");
+    let model = model.as_ref().and_then(|m| m.as_str()).filter(|m| !m.is_empty());
+    let mut fresh = ClaudeCli::spawn(&app, &mcp.url, resume.as_deref(), model)?;
     fresh.send(&text)?;
     *backend = Some(Box::new(fresh));
     Ok(())
@@ -75,6 +78,8 @@ pub fn run() {
             db::db_upsert_chat,
             db::db_list_games,
             db::db_load_game,
+            db::db_get_settings,
+            db::db_set_setting,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -19,7 +19,7 @@ pub struct ClaudeCli {
 }
 
 impl ClaudeCli {
-    pub fn spawn(app: &AppHandle, mcp_url: &str, resume: Option<&str>) -> Result<Self, String> {
+    pub fn spawn(app: &AppHandle, mcp_url: &str, resume: Option<&str>, model: Option<&str>) -> Result<Self, String> {
         let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
@@ -47,6 +47,9 @@ impl ClaudeCli {
             .stderr(Stdio::piped());
         if let Some(id) = resume {
             cmd.args(["--resume", id]);
+        }
+        if let Some(model) = model {
+            cmd.args(["--model", model]);
         }
 
         let mut child = cmd

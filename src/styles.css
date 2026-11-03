@@ -502,3 +502,43 @@ button.primary {
   overflow-wrap: anywhere;
   font-family: Consolas, monospace;
 }
+
+.small {
+  font-size: 12px;
+}
+
+button.icon {
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.model-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.model-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.model-choice.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.text-input {
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
