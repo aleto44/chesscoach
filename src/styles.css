@@ -1,0 +1,337 @@
+:root {
+  --bg: #f4f1ec;
+  --panel: #ffffff;
+  --text: #22201c;
+  --muted: #76706a;
+  --border: #e2ddd5;
+  --accent: #3d7a52;
+  --accent-soft: #e3f0e7;
+  --tangent: #4a6fa5;
+  --tangent-soft: #e6edf7;
+  --error: #b3412f;
+  --user-bubble: #ece7df;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1a18;
+    --panel: #24221f;
+    --text: #ebe6de;
+    --muted: #9a938a;
+    --border: #3a3733;
+    --accent: #6fbf8a;
+    --accent-soft: #263a2d;
+    --tangent: #7fa3d9;
+    --tangent-soft: #24303f;
+    --error: #e0806f;
+    --user-bubble: #2f2c28;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  height: 100%;
+}
+
+/* Board side */
+
+.board-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 24px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  width: min(100%, calc(100vh - 260px));
+  min-height: 32px;
+}
+
+.crumb {
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  color: var(--muted);
+}
+
+.crumb.current {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.sep {
+  color: var(--muted);
+}
+
+.return {
+  margin-left: auto;
+  border-color: var(--tangent);
+  color: var(--tangent);
+}
+
+.board-frame {
+  width: min(100%, calc(100vh - 260px));
+  padding: 4px;
+  border-radius: 6px;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+.board-frame.tangent {
+  background: var(--tangent);
+}
+
+.cg-board-wrap {
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.controls {
+  display: flex;
+  gap: 6px;
+  width: min(100%, calc(100vh - 260px));
+}
+
+.note {
+  width: min(100%, calc(100vh - 260px));
+  min-height: 1.5em;
+  color: var(--tangent);
+  font-style: italic;
+}
+
+.moves {
+  width: min(100%, calc(100vh - 260px));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  align-content: flex-start;
+}
+
+.moves.empty {
+  color: var(--muted);
+}
+
+.num {
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.mv {
+  border: none;
+  background: none;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+.mv.current {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+/* Chat side */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+}
+
+.chat header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.status.busy {
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.25;
+  }
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hint,
+.typing {
+  color: var(--muted);
+}
+
+.msg {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.msg.user {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--user-bubble);
+  padding: 8px 12px;
+  border-radius: 12px 12px 2px 12px;
+  white-space: pre-wrap;
+}
+
+.msg.coach p {
+  margin: 0 0 8px;
+}
+
+.msg.coach p:last-child {
+  margin-bottom: 0;
+}
+
+.msg.system {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.msg.system.error {
+  color: var(--error);
+}
+
+.tool {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: Consolas, monospace;
+}
+
+.tool.error {
+  color: var(--error);
+}
+
+.tool .detail {
+  white-space: pre-wrap;
+  margin: 2px 0 0 16px;
+}
+
+.tangent-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--tangent-soft);
+}
+
+.tangent-card.active {
+  border-color: var(--tangent);
+}
+
+.mini-board {
+  width: 140px;
+  height: 140px;
+  flex: none;
+  pointer-events: none;
+}
+
+.tangent-title {
+  font-weight: 600;
+}
+
+.tangent-moves {
+  font-size: 13px;
+  margin: 2px 0 6px;
+}
+
+.tangent-open {
+  font-size: 12px;
+  color: var(--tangent);
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.composer textarea {
+  flex: 1;
+  resize: none;
+  height: 64px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.composer button {
+  align-self: flex-end;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
