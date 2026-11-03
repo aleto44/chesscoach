@@ -1,0 +1,89 @@
+// Claude sign-in state, backed by `claude auth` (src-tauri/src/auth.rs).
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { create } from "zustand";
+import { hasBackend } from "../db";
+
+export interface AuthState {
+  status: "checking" | "signed-out" | "signing-in" | "signed-in";
+  email: string | null;
+  /** Sign-in page, in case the browser didn't open. */
+  url: string | null;
+  error: string | null;
+  codeSent: boolean;
+}
+
+export const useAuth = create<AuthState>(() => ({
+  status: "checking",
+  email: null,
+  url: null,
+  error: null,
+  codeSent: false,
+}));
+
+let output = "";
+
+export function initAuth() {
+  if (!hasBackend()) return;
+  listen<string>("auth-output", (e) => {
+    output += e.payload;
+    const url = output.match(/https:\/\/\S+/)?.[0] ?? null;
+    if (url) useAuth.setState({ url });
+  });
+  listen<number | null>("auth-exit", async (e) => {
+    await checkAuth();
+    if (useAuth.getState().status !== "signed-in") {
+      const tail = output.trim().split("\n").slice(-3).join("\n");
+      useAuth.setState({ error: `Sign-in didn't complete (exit ${e.payload ?? "?"}).${tail ? `\n${tail}` : ""}` });
+    }
+  });
+  checkAuth();
+}
+
+export async function checkAuth() {
+  try {
+    const s = await invoke<Record<string, any>>("auth_status");
+    useAuth.setState({
+      status: s.loggedIn ? "signed-in" : "signed-out",
+      email: s.email ?? s.account?.email ?? null,
+      url: null,
+      codeSent: false,
+    });
+  } catch (e) {
+    useAuth.setState({ status: "signed-out", error: String(e) });
+  }
+}
+
+export async function startLogin() {
+  output = "";
+  useAuth.setState({ status: "signing-in", url: null, error: null, codeSent: false });
+  try {
+    await invoke("auth_login");
+  } catch (e) {
+    useAuth.setState({ status: "signed-out", error: String(e) });
+  }
+}
+
+export async function submitCode(code: string) {
+  try {
+    await invoke("auth_submit_code", { code });
+    useAuth.setState({ codeSent: true, error: null });
+  } catch (e) {
+    useAuth.setState({ error: String(e) });
+  }
+}
+
+export async function cancelLogin() {
+  await invoke("auth_cancel");
+  useAuth.setState({ status: "signed-out", url: null, codeSent: false });
+}
+
+export async function logout() {
+  await invoke("coach_reset");
+  try {
+    await invoke("auth_logout");
+  } catch (e) {
+    useAuth.setState({ error: String(e) });
+  }
+  await checkAuth();
+}

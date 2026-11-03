@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { formatMoves } from "../chess/line";
+import { logout, useAuth } from "../coach/auth";
 import { restartCoach, sendToCoach } from "../coach/bridge";
+import { hasBackend } from "../db";
 import { openTangent, useStore, type ChatItem } from "../store";
 import { Board } from "./Board";
+import { SignIn } from "./SignIn";
 
 export function Chat() {
   const { chat, busy } = useStore();
+  const auth = useAuth();
+  const signedIn = auth.status === "signed-in" || !hasBackend();
   const [draft, setDraft] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
 
@@ -16,7 +21,7 @@ export function Chat() {
 
   const send = () => {
     const text = draft.trim();
-    if (!text || busy) return;
+    if (!text || busy || !signedIn) return;
     setDraft("");
     sendToCoach(text);
   };
@@ -27,6 +32,11 @@ export function Chat() {
         <span className={`status ${busy ? "busy" : ""}`} />
         <strong>Coach</strong>
         <span className="spacer" />
+        {auth.status === "signed-in" && (
+          <button onClick={() => confirm("Sign out of Claude?") && logout()} title={auth.email ?? "Signed in"}>
+            Sign out
+          </button>
+        )}
         <button onClick={restartCoach} title="Start a fresh coach conversation (rereads coach.md)">
           Restart coach
         </button>
@@ -43,12 +53,14 @@ export function Chat() {
           <ChatRow key={item.id} item={item} />
         ))}
         {busy && <div className="typing">Coach is thinking…</div>}
+        {!signedIn && <SignIn />}
         <div ref={bottom} />
       </div>
 
       <div className="composer">
         <textarea
           value={draft}
+          disabled={!signedIn}
           placeholder="Ask the coach…  (Enter to send, Shift+Enter for a new line)"
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -58,7 +70,7 @@ export function Chat() {
             }
           }}
         />
-        <button onClick={send} disabled={busy || !draft.trim()}>
+        <button onClick={send} disabled={busy || !signedIn || !draft.trim()}>
           Send
         </button>
       </div>

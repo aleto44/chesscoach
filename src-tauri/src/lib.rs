@@ -1,3 +1,4 @@
+mod auth;
 mod coach;
 mod db;
 mod mcp;
@@ -49,6 +50,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(Coach::default())
+        .manage(auth::Login::default())
         .setup(|app| {
             let mcp = tauri::async_runtime::block_on(mcp::start(app.handle().clone()))?;
             app.manage(mcp);
@@ -61,6 +63,11 @@ pub fn run() {
             coach_send,
             coach_reset,
             tool_result,
+            auth::auth_status,
+            auth::auth_login,
+            auth::auth_submit_code,
+            auth::auth_cancel,
+            auth::auth_logout,
             db::db_create_game,
             db::db_update_game,
             db::db_set_moves,

@@ -449,3 +449,43 @@ button.primary {
 .error {
   color: var(--error);
 }
+
+.signin {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.signin p,
+.signin ol {
+  margin: 0;
+}
+
+.signin ol {
+  padding-left: 18px;
+}
+
+.signin a {
+  color: var(--accent);
+}
+
+.signin-code {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.signin-code input {
+  flex: 1;
+  font: inherit;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}

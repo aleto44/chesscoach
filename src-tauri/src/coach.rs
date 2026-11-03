@@ -30,8 +30,7 @@ impl ClaudeCli {
         let prompt_file = dir.join("coach.md");
         std::fs::write(&prompt_file, system_prompt()).map_err(|e| e.to_string())?;
 
-        let exe = claude_exe();
-        let mut cmd = Command::new(&exe);
+        let mut cmd = claude_command();
         // Run outside the project so no project CLAUDE.md or settings leak into the coach.
         cmd.current_dir(&dir)
             .args(["-p", "--verbose", "--include-partial-messages"])
@@ -49,16 +48,10 @@ impl ClaudeCli {
         if let Some(id) = resume {
             cmd.args(["--resume", id]);
         }
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
 
         let mut child = cmd
             .spawn()
-            .map_err(|e| format!("could not start {}: {e}", exe.display()))?;
+            .map_err(|e| format!("could not start {}: {e}", claude_exe().display()))?;
         let stdin = child.stdin.take().unwrap();
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
@@ -94,6 +87,18 @@ impl Drop for ClaudeCli {
     fn drop(&mut self) {
         let _ = self.child.kill();
     }
+}
+
+/// A `claude` invocation that doesn't flash a console window on Windows.
+pub fn claude_command() -> Command {
+    let mut cmd = Command::new(claude_exe());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
 }
 
 /// `CHESSCOACH_CLAUDE` overrides; otherwise the native installer location, then PATH.

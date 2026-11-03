@@ -5,12 +5,14 @@ import "chessground/assets/chessground.brown.css";
 import "chessground/assets/chessground.cburnett.css";
 import "./styles.css";
 import App from "./App";
+import { initAuth } from "./coach/auth";
 import { initBridge } from "./coach/bridge";
 import { initPersistence } from "./db";
 import { initOpponent } from "./game/opponent";
 import { bootstrap, initGameOverWatch } from "./game/session";
 
 initBridge();
+initAuth();
 initPersistence();
 initGameOverWatch();
 initOpponent();
