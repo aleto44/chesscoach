@@ -335,3 +335,117 @@ button:disabled {
   border-color: var(--accent);
   color: #fff;
 }
+
+/* Game bar and dialogs */
+
+.game-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: min(100%, calc(100vh - 260px));
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.status-text {
+  color: var(--accent);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 10;
+}
+
+.modal {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.modal header,
+.modal footer {
+  display: flex;
+  align-items: center;
+}
+
+.modal footer {
+  justify-content: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field select {
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.segmented {
+  display: flex;
+  gap: 6px;
+}
+
+.segmented .on,
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.game-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.game-row {
+  text-align: left;
+  padding: 8px 10px;
+}
+
+.game-row.current {
+  border-color: var(--accent);
+}
+
+.game-row-top {
+  display: flex;
+  justify-content: space-between;
+}
+
+.game-row-sub,
+.game-row-moves {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.result.win {
+  color: var(--accent);
+}
+
+.result.loss {
+  color: var(--error);
+}
+
+.error {
+  color: var(--error);
+}

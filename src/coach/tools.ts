@@ -2,7 +2,7 @@
 import { Chess } from "chess.js";
 import { buildLine, formatMoves, sideToMove } from "../chess/line";
 import { formatScore, getEngine, pvToSan } from "../engine/stockfish";
-import { addTangent, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
+import { addTangent, gameDescription, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
 
 export interface ToolResult {
   text: string;
@@ -16,7 +16,7 @@ const handlers: Record<string, (args: Args) => Promise<ToolResult>> = {
     const s = useStore.getState();
     const { tangent } = screen();
     const state = {
-      mode: "free play",
+      mode: gameDescription(),
       focus: null,
       onScreenFen: screenFen(),
       game: {

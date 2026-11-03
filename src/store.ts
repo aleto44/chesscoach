@@ -19,21 +19,39 @@ export type ChatItem =
   | { kind: "tool"; id: string; text: string; status: "running" | "ok" | "error"; detail?: string }
   | { kind: "system"; id: string; text: string; error?: boolean };
 
+export type Color = "white" | "black";
+
+export interface GameMeta {
+  /** "both" = free play, the student moves for both sides. */
+  studentColor: Color | "both";
+  /** Stockfish strength; null = no opponent. */
+  opponentElo: number | null;
+  result: "1-0" | "0-1" | "1/2-1/2" | null;
+  termination: string | null;
+}
+
 interface State {
+  gameId: number | null;
+  meta: GameMeta;
   game: Line;
   gamePly: number;
   tangents: Record<string, Tangent>;
   active: string | null;
-  orientation: "white" | "black";
+  orientation: Color;
   chat: ChatItem[];
   busy: boolean;
   sessionId: string | null;
+  opponentThinking: boolean;
 }
 
-let counter = 0;
-export const newId = (prefix: string) => `${prefix}${++counter}`;
+/** Ids are stored in SQLite, so they must be unique across app runs. */
+export const newId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
+
+export const FREE_PLAY: GameMeta = { studentColor: "both", opponentElo: null, result: null, termination: null };
 
 export const useStore = create<State>(() => ({
+  gameId: null,
+  meta: FREE_PLAY,
   game: emptyLine(),
   gamePly: 0,
   tangents: {},
@@ -42,7 +60,30 @@ export const useStore = create<State>(() => ({
   chat: [],
   busy: false,
   sessionId: null,
+  opponentThinking: false,
 }));
+
+/** Whether the student may move on the main board right now. */
+export function canStudentMove(): boolean {
+  const s = get();
+  if (s.active) return true;
+  if (s.meta.result) return false;
+  const turn = s.game.fens[s.gamePly].split(" ")[1] === "w" ? "white" : "black";
+  return s.meta.studentColor === "both" || s.meta.studentColor === turn;
+}
+
+/** e.g. "student plays White vs Stockfish 1500, in progress". */
+export function gameDescription(): string {
+  const { meta } = get();
+  if (meta.studentColor === "both") return "free play (student moves both sides, no opponent)";
+  const side = meta.studentColor === "white" ? "White" : "Black";
+  const state = meta.result ? `finished ${meta.result} by ${meta.termination}` : "in progress";
+  return `student plays ${side} vs ${opponentLabel(meta)}, ${state}`;
+}
+
+export function opponentLabel(meta: GameMeta): string {
+  return meta.opponentElo ? `Stockfish ${meta.opponentElo}` : "Free play";
+}
 
 const set = useStore.setState;
 const get = useStore.getState;
@@ -109,6 +150,7 @@ export function boardMove(from: Key, to: Key) {
   if (!played) return;
 
   if (!tangent) {
+    if (!canStudentMove()) return;
     set({ game: played.line, gamePly: ply + 1 });
     return;
   }
@@ -137,10 +179,6 @@ export function boardMove(from: Key, to: Key) {
     ply: 1,
   });
   openTangent(child.id);
-}
-
-export function newGame() {
-  set({ game: emptyLine(), gamePly: 0, active: null });
 }
 
 export function flip() {

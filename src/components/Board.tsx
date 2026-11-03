@@ -12,16 +12,27 @@ interface Props {
   lastMove?: [Key, Key];
   onMove?: (from: Key, to: Key) => void;
   viewOnly?: boolean;
+  /** False locks the pieces without making the board view-only (e.g. opponent's turn). */
+  canMove?: boolean;
   coordinates?: boolean;
   className?: string;
 }
 
 /** Thin React wrapper around Chessground; chess.js supplies legal destinations. */
-export function Board({ fen, orientation = "white", lastMove, onMove, viewOnly, coordinates = true, className }: Props) {
+export function Board({
+  fen,
+  orientation = "white",
+  lastMove,
+  onMove,
+  viewOnly,
+  canMove = true,
+  coordinates = true,
+  className,
+}: Props) {
   const el = useRef<HTMLDivElement>(null);
   const api = useRef<Api | null>(null);
-  const props = useRef({ fen, orientation, lastMove, onMove, viewOnly });
-  props.current = { fen, orientation, lastMove, onMove, viewOnly };
+  const props = useRef({ fen, orientation, lastMove, onMove, viewOnly, canMove });
+  props.current = { fen, orientation, lastMove, onMove, viewOnly, canMove };
 
   // Re-applies props; also used after a move so a rejected move snaps back.
   const sync = () => {
@@ -33,7 +44,10 @@ export function Board({ fen, orientation = "white", lastMove, onMove, viewOnly, 
       lastMove: p.lastMove,
       turnColor: turn,
       check: new Chess(p.fen).inCheck(),
-      movable: { color: p.viewOnly ? undefined : turn, dests: p.viewOnly ? new Map() : legalDests(p.fen) },
+      movable: {
+        color: p.viewOnly || !p.canMove ? undefined : turn,
+        dests: p.viewOnly || !p.canMove ? new Map() : legalDests(p.fen),
+      },
     };
     api.current?.set(config);
   };
@@ -60,7 +74,7 @@ export function Board({ fen, orientation = "white", lastMove, onMove, viewOnly, 
     return () => api.current?.destroy();
   }, []);
 
-  useEffect(sync, [fen, orientation, lastMove, viewOnly]);
+  useEffect(sync, [fen, orientation, lastMove, viewOnly, canMove]);
 
   return <div ref={el} className={className ?? "cg-board-wrap"} />;
 }

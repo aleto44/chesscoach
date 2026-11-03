@@ -56,10 +56,38 @@ class Engine {
     this.queue = job.catch(() => undefined);
     return job;
   }
+
+  /** A move to play, in UCI. `elo` null = full strength. */
+  bestMove(fen: string, elo: number | null, movetime: number): Promise<string | null> {
+    const job = this.queue.then(async () => {
+      let best: string | null = null;
+      this.worker.postMessage("setoption name MultiPV value 1");
+      this.worker.postMessage(`setoption name UCI_LimitStrength value ${elo !== null}`);
+      if (elo !== null) this.worker.postMessage(`setoption name UCI_Elo value ${elo}`);
+      this.worker.postMessage(`position fen ${fen}`);
+      await this.run(`go movetime ${movetime}`, (l) => {
+        if (!l.startsWith("bestmove")) return false;
+        const move = l.split(" ")[1];
+        best = move && move !== "(none)" ? move : null;
+        return true;
+      });
+      return best;
+    });
+    this.queue = job.catch(() => undefined);
+    return job;
+  }
 }
 
 let engine: Engine | null = null;
+/** For the coach's analysis. */
 export const getEngine = () => (engine ??= new Engine());
+
+let opponent: Engine | null = null;
+/** A separate instance so the opponent never waits behind the coach's analysis. */
+export const getOpponentEngine = () => (opponent ??= new Engine());
+
+/** UCI_Elo range Stockfish accepts. */
+export const OPPONENT_LEVELS = [1320, 1500, 1700, 1900, 2100, 2400, 2800];
 
 export function formatScore(l: Pick<EngineLine, "cp" | "mate">): string {
   if (l.mate !== undefined) return l.mate > 0 ? `#${l.mate}` : `#-${-l.mate}`;

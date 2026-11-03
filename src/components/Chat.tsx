@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { formatMoves } from "../chess/line";
-import { newSession, sendToCoach } from "../coach/bridge";
+import { restartCoach, sendToCoach } from "../coach/bridge";
 import { openTangent, useStore, type ChatItem } from "../store";
 import { Board } from "./Board";
 
@@ -27,8 +27,8 @@ export function Chat() {
         <span className={`status ${busy ? "busy" : ""}`} />
         <strong>Coach</strong>
         <span className="spacer" />
-        <button onClick={newSession} title="Start a new coach session (rereads coach.md)">
-          New session
+        <button onClick={restartCoach} title="Start a fresh coach conversation (rereads coach.md)">
+          Restart coach
         </button>
       </header>
 

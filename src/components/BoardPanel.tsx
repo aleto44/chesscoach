@@ -1,9 +1,13 @@
-import { useStore, boardMove, goto, step, openTangent, tangentPath, flip, newGame } from "../store";
+import { useState } from "react";
+import { resign } from "../game/session";
+import { useStore, boardMove, goto, step, openTangent, tangentPath, flip, canStudentMove, opponentLabel } from "../store";
 import { Board } from "./Board";
+import { GamesDialog, NewGameDialog } from "./GameDialogs";
 
 /** Main board with the tangent breadcrumbs, step-through controls and move list. */
 export function BoardPanel() {
-  const { game, gamePly, tangents, active, orientation } = useStore();
+  const { game, gamePly, tangents, active, orientation, meta, opponentThinking } = useStore();
+  const [dialog, setDialog] = useState<"new" | "games" | null>(null);
   const tangent = active ? tangents[active] : null;
   const line = tangent ? tangent.line : game;
   const ply = tangent ? tangent.ply : gamePly;
@@ -12,6 +16,22 @@ export function BoardPanel() {
 
   return (
     <main className="board-panel">
+      <div className="game-bar">
+        <span className="game-status">
+          <strong>{opponentLabel(meta)}</strong>
+          {meta.studentColor !== "both" && <span className="muted"> · you play {meta.studentColor}</span>}
+          <span className="status-text"> · {gameStatus(meta, opponentThinking, game.fens[game.sans.length])}</span>
+        </span>
+        <span className="spacer" />
+        <button onClick={() => setDialog("games")}>Games</button>
+        <button onClick={() => setDialog("new")}>New game</button>
+        {meta.studentColor !== "both" && !meta.result && game.sans.length > 0 && (
+          <button onClick={() => confirm("Resign this game?") && resign()}>Resign</button>
+        )}
+      </div>
+      {dialog === "new" && <NewGameDialog onClose={() => setDialog(null)} />}
+      {dialog === "games" && <GamesDialog onClose={() => setDialog(null)} />}
+
       <nav className="crumbs">
         <button className={`crumb ${active ? "" : "current"}`} onClick={() => openTangent(null)}>
           Game
@@ -37,6 +57,7 @@ export function BoardPanel() {
           lastMove={ply > 0 ? line.lastMoves[ply - 1] : undefined}
           orientation={orientation}
           onMove={boardMove}
+          canMove={canStudentMove()}
         />
       </div>
 
@@ -47,7 +68,6 @@ export function BoardPanel() {
         <button onClick={() => goto(line.sans.length)} title="End (End)">⏭</button>
         <span className="spacer" />
         <button onClick={flip} title="Flip board">⇅</button>
-        {!tangent && <button onClick={newGame}>New game</button>}
       </div>
 
       <div className="note">{note || " "}</div>
@@ -55,6 +75,17 @@ export function BoardPanel() {
       <MoveList sans={line.sans} fens={line.fens} ply={ply} />
     </main>
   );
+}
+
+function gameStatus(meta: ReturnType<typeof useStore.getState>["meta"], thinking: boolean, endFen: string): string {
+  if (meta.result) {
+    const mine = meta.studentColor === "both" ? "" : meta.result === "1/2-1/2" ? " (draw)" : (meta.result === "1-0") === (meta.studentColor === "white") ? " (you won)" : " (you lost)";
+    return `${meta.result} by ${meta.termination}${mine}`;
+  }
+  if (meta.studentColor === "both") return "move both sides";
+  if (thinking) return "opponent is thinking…";
+  const turn = endFen.split(" ")[1] === "w" ? "white" : "black";
+  return turn === meta.studentColor ? "your move" : "opponent to move";
 }
 
 function MoveList({ sans, fens, ply }: { sans: string[]; fens: string[]; ply: number }) {

@@ -50,12 +50,18 @@ export function buildLine(
   return { line };
 }
 
-/** Plays a board move (from/to) at `ply`, dropping anything after it. Auto-queens. */
-export function playAt(line: Line, ply: number, from: Key, to: Key): { line: Line; san: string } | null {
+/** Plays a board move (from/to) at `ply`, dropping anything after it. Queens unless told otherwise. */
+export function playAt(
+  line: Line,
+  ply: number,
+  from: Key,
+  to: Key,
+  promotion = "q",
+): { line: Line; san: string } | null {
   const chess = new Chess(line.fens[ply]);
   let m;
   try {
-    m = chess.move({ from, to, promotion: "q" });
+    m = chess.move({ from, to, promotion });
   } catch {
     return null;
   }

@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { formatMoves } from "../chess/line";
-import { newId, pushChat, screen, updateChat, useStore } from "../store";
+import { gameDescription, newId, pushChat, screen, updateChat, useStore } from "../store";
 import { describeCall, handleTool } from "./tools";
 
 let streamingId: string | null = null;
@@ -85,7 +85,7 @@ function withContext(text: string): string {
   const from = Math.max(0, ply - 6);
   const recent = ply > 0 ? formatMoves(line, from, ply) : "(none)";
   const where = tangent ? `tangent board "${tangent.title}"` : "main game";
-  return `<screen>\nShowing: ${where}\nFEN: ${line.fens[ply]}\nLast moves: ${recent}\n</screen>\n\n${text}`;
+  return `<screen>\nGame: ${gameDescription()}\nShowing: ${where}\nFEN: ${line.fens[ply]}\nLast moves: ${recent}\n</screen>\n\n${text}`;
 }
 
 export async function sendToCoach(text: string) {
@@ -100,7 +100,9 @@ export async function sendToCoach(text: string) {
   }
 }
 
-export async function newSession() {
+/** Fresh coach conversation for this game (rereads coach.md); the chat history stays on screen. */
+export async function restartCoach() {
   await invoke("coach_reset");
-  useStore.setState({ chat: [], tangents: {}, active: null, sessionId: null, busy: false });
+  useStore.setState({ sessionId: null, busy: false });
+  pushChat({ kind: "system", id: newId("c"), text: "Coach restarted. It won't remember the conversation above." });
 }
