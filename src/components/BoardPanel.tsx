@@ -4,10 +4,13 @@ import { useStore, boardMove, goto, step, openTangent, tangentPath, flip, canStu
 import { Board } from "./Board";
 import { GamesDialog, NewGameDialog } from "./GameDialogs";
 import { SettingsDialog } from "./SettingsDialog";
+import { EvalBar, EvalLine } from "./EvalBar";
+import { saveSetting, useSettings } from "../settings";
 
 /** Main board with the tangent breadcrumbs, step-through controls and move list. */
 export function BoardPanel() {
   const { game, gamePly, tangents, active, orientation, meta, opponentThinking } = useStore();
+  const showEval = useSettings((s) => s.showEval);
   const [dialog, setDialog] = useState<"new" | "games" | "settings" | null>(null);
   const tangent = active ? tangents[active] : null;
   const line = tangent ? tangent.line : game;
@@ -57,12 +60,14 @@ export function BoardPanel() {
       </nav>
 
       <div className={`board-frame ${tangent ? "tangent" : ""}`}>
+        {showEval && <EvalBar orientation={orientation} />}
         <Board
           fen={line.fens[ply]}
           lastMove={ply > 0 ? line.lastMoves[ply - 1] : undefined}
           orientation={orientation}
           onMove={boardMove}
           canMove={canStudentMove()}
+          premoveColor={!tangent && !meta.result && meta.studentColor !== "both" ? meta.studentColor : undefined}
         />
       </div>
 
@@ -72,8 +77,17 @@ export function BoardPanel() {
         <button onClick={() => step(1)} title="Forward (→)">▶</button>
         <button onClick={() => goto(line.sans.length)} title="End (End)">⏭</button>
         <span className="spacer" />
+        <button
+          className={showEval ? "on" : ""}
+          onClick={() => saveSetting("showEval", !showEval)}
+          title={showEval ? "Hide engine evaluation" : "Show engine evaluation"}
+        >
+          Eval
+        </button>
         <button onClick={flip} title="Flip board">⇅</button>
       </div>
+
+      {showEval && <EvalLine />}
 
       <div className="note">{note || " "}</div>
 

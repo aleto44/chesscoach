@@ -646,3 +646,81 @@ button.icon {
   background: var(--error);
   stroke: var(--error);
 }
+
+/* Eval */
+
+.board-frame {
+  position: relative;
+}
+
+.eval-bar {
+  position: absolute;
+  left: -22px;
+  top: 4px;
+  bottom: 4px;
+  width: 16px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #403d39;
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.eval-bar.flipped {
+  flex-direction: column;
+}
+
+.eval-white {
+  background: #f2f0ec;
+  transition: height 0.4s ease;
+}
+
+.eval-score {
+  position: absolute;
+  left: 0;
+  right: 0;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 14px;
+}
+
+.eval-score.for-white {
+  bottom: 2px;
+  color: #403d39;
+}
+
+.eval-score.for-black {
+  top: 2px;
+  color: #f2f0ec;
+}
+
+.eval-bar.flipped .eval-score.for-white {
+  bottom: auto;
+  top: 2px;
+}
+
+.eval-bar.flipped .eval-score.for-black {
+  top: auto;
+  bottom: 2px;
+}
+
+.eval-line {
+  width: min(100%, calc(100vh - 260px));
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.controls button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}

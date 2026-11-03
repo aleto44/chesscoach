@@ -8,7 +8,7 @@ import { Modal } from "./GameDialogs";
 const CHOICES = [...MODEL_CHOICES, { value: "custom", label: "Custom…", hint: "Any model name or ID claude accepts" }];
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const { coachModel, activeModel } = useSettings();
+  const { coachModel, activeModel, sounds, showEval } = useSettings();
   const preset = MODEL_CHOICES.some((c) => c.value === coachModel);
   const [choice, setChoice] = useState(preset ? coachModel : "custom");
   const [custom, setCustom] = useState(preset ? "" : coachModel);
@@ -54,6 +54,14 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           Models your plan doesn't include will show an error in the chat.
         </span>
       </div>
+      <label className="toggle">
+        <input type="checkbox" checked={sounds} onChange={(e) => saveSetting("sounds", e.target.checked)} />
+        <span>Move sounds</span>
+      </label>
+      <label className="toggle">
+        <input type="checkbox" checked={showEval} onChange={(e) => saveSetting("showEval", e.target.checked)} />
+        <span>Show engine evaluation</span>
+      </label>
       <footer>
         <button className="primary" onClick={save} disabled={choice === "custom" && !custom.trim()}>
           {changed ? "Save" : "Done"}

@@ -12,6 +12,8 @@ import { initPersistence } from "./db";
 import { initOpponent } from "./game/opponent";
 import { bootstrap, initGameOverWatch } from "./game/session";
 import { loadSettings } from "./settings";
+import { initSounds } from "./sound";
+import { initLiveEval } from "./engine/live";
 
 initBridge();
 initAuth();
@@ -19,6 +21,8 @@ initUsage();
 initPersistence();
 initGameOverWatch();
 initOpponent();
+initSounds();
+initLiveEval();
 loadSettings().catch((e) => console.error("could not load settings", e));
 bootstrap().catch((e) => console.error("could not open the last game", e));
 

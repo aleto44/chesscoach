@@ -1,0 +1,27 @@
+diff --git a/node_modules/chessground/dist/svg.js b/node_modules/chessground/dist/svg.js
+index b38c6a0..a79913e 100644
+--- a/node_modules/chessground/dist/svg.js
++++ b/node_modules/chessground/dist/svg.js
+@@ -189,6 +189,22 @@ function renderArrow(s, brush, from, to, current, shorten) {
+     function renderLine(isHilite) {
+         var _a;
+         const m = arrowMargin(shorten && !current), dx = to[0] - from[0], dy = to[1] - from[1], angle = Math.atan2(dy, dx), xo = Math.cos(angle) * m, yo = Math.sin(angle) * m;
++        // chesscoach patch: knight jumps are drawn as an L (long leg first, then the short one).
++        const adx = Math.round(Math.abs(dx) * 100) / 100, ady = Math.round(Math.abs(dy) * 100) / 100;
++        if ((adx === 1 && ady === 2) || (adx === 2 && ady === 1)) {
++            const corner = adx > ady ? [to[0], from[1]] : [from[0], to[1]];
++            const lx = to[0] - corner[0], ly = to[1] - corner[1], la = Math.atan2(ly, lx);
++            return setAttributes(createElement('path'), {
++                stroke: isHilite ? hilite(brush).color : brush.color,
++                'stroke-width': lineWidth(brush, current) + (isHilite ? 0.04 : 0),
++                'stroke-linecap': 'round',
++                'stroke-linejoin': 'round',
++                fill: 'none',
++                'marker-end': `url(#arrowhead-${isHilite ? hilite(brush).key : brush.key})`,
++                opacity: ((_a = s.modifiers) === null || _a === void 0 ? void 0 : _a.hilite) ? 1 : opacity(brush, current),
++                d: `M ${from[0]} ${from[1]} L ${corner[0]} ${corner[1]} L ${to[0] - Math.cos(la) * m} ${to[1] - Math.sin(la) * m}`,
++            });
++        }
+         return setAttributes(createElement('line'), {
+             stroke: isHilite ? hilite(brush).color : brush.color,
+             'stroke-width': lineWidth(brush, current) + (isHilite ? 0.04 : 0),

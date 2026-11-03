@@ -6,9 +6,12 @@ import { hasBackend } from "./db";
 export interface Settings {
   /** Passed to `claude --model`; "" = the CLI's default. */
   coachModel: string;
+  sounds: boolean;
+  /** Eval bar and engine line beside the board. */
+  showEval: boolean;
 }
 
-const DEFAULTS: Settings = { coachModel: "" };
+const DEFAULTS: Settings = { coachModel: "", sounds: true, showEval: false };
 
 export const MODEL_CHOICES = [
   { value: "", label: "Default", hint: "Whatever your Claude Code default is" },
