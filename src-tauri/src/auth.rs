@@ -3,7 +3,8 @@
 
 use std::io::{Read, Write};
 use std::process::{Child, ChildStdin, Stdio};
-use std::sync::Mutex;
+use std::fs::File;
+use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -11,7 +12,15 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::coach::claude_command;
 
 #[derive(Default)]
-pub struct Login(Mutex<Option<(Child, ChildStdin)>>);
+pub struct Login(Mutex<Option<(Child, ChildStdin)>>, Mutex<Option<Arc<Mutex<File>>>>);
+
+/// Appends an app-side marker to the login log (never the code itself).
+fn note(login: &Login, text: &str) {
+    if let Some(log) = login.1.lock().unwrap().as_ref() {
+        let _ = writeln!(log.lock().unwrap(), "
+{text}");
+    }
+}
 
 impl Drop for Login {
     fn drop(&mut self) {
@@ -60,13 +69,26 @@ pub fn auth_login(app: AppHandle, login: State<Login>) -> Result<(), String> {
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
 
+    // Everything the CLI prints also goes to auth-login.log in the app data dir, for debugging.
+    let log = app
+        .path()
+        .app_data_dir()
+        .ok()
+        .and_then(|dir| File::create(dir.join("auth-login.log")).ok())
+        .map(|f| Arc::new(Mutex::new(f)));
+    *login.1.lock().unwrap() = log.clone();
+
     for mut stream in [Box::new(stdout) as Box<dyn Read + Send>, Box::new(stderr)] {
         let app = app.clone();
+        let log = log.clone();
         std::thread::spawn(move || {
             let mut buf = [0u8; 4096];
             while let Ok(n) = stream.read(&mut buf) {
                 if n == 0 {
                     break;
+                }
+                if let Some(log) = &log {
+                    let _ = log.lock().unwrap().write_all(&buf[..n]);
                 }
                 let _ = app.emit("auth-output", String::from_utf8_lossy(&buf[..n]).to_string());
             }
@@ -87,6 +109,7 @@ pub fn auth_login(app: AppHandle, login: State<Login>) -> Result<(), String> {
             Some((child, _)) if child.id() == pid => match child.try_wait() {
                 Ok(Some(status)) => {
                     slot.take();
+                    note(&state, &format!("[exited: {status}]"));
                     let _ = app2.emit("auth-exit", status.code());
                     return;
                 }
@@ -111,9 +134,11 @@ pub fn auth_submit_code(login: State<Login>, code: String) -> Result<(), String>
     let Some((_, stdin)) = slot.as_mut() else {
         return Err("No sign-in in progress.".into());
     };
-    writeln!(stdin, "{}", code.trim())
-        .and_then(|_| stdin.flush())
-        .map_err(|e| e.to_string())
+    let code = code.trim();
+    let sent = writeln!(stdin, "{code}").and_then(|_| stdin.flush()).map_err(|e| e.to_string());
+    drop(slot);
+    note(&login, &format!("[app wrote a {}-character code to stdin: {sent:?}]", code.len()));
+    sent
 }
 
 #[tauri::command]

@@ -4,7 +4,7 @@ import { cancelLogin, startLogin, submitCode, useAuth } from "../coach/auth";
 
 /** Shown in the chat until the Claude CLI is signed in. */
 export function SignIn() {
-  const { status, url, error, codeSent } = useAuth();
+  const { status, url, error, codeSent, output } = useAuth();
   const [code, setCode] = useState("");
 
   if (status === "checking") return <div className="signin muted">Checking your Claude sign-in…</div>;
@@ -26,9 +26,12 @@ export function SignIn() {
   }
 
   // signing-in
+  const trimmed = code.trim();
+  // The email verification code (6 digits) belongs on the browser page, not here.
+  const looksLikeEmailCode = /^\d{4,8}$/.test(trimmed);
   const send = () => {
-    if (!code.trim()) return;
-    submitCode(code);
+    if (!trimmed || looksLikeEmailCode) return;
+    submitCode(trimmed);
     setCode("");
   };
   return (
@@ -49,7 +52,11 @@ export function SignIn() {
           )}
           .
         </li>
-        <li>Copy the code the page shows and paste it here.</li>
+        <li>If Claude emails you a short verification code, enter it on that page, not here.</li>
+        <li>
+          Click <strong>Authorize</strong>. The page then shows a long code (it usually contains a <code>#</code>). Copy
+          all of it and paste it here.
+        </li>
       </ol>
       <div className="signin-code">
         <input
@@ -59,12 +66,24 @@ export function SignIn() {
           onKeyDown={(e) => e.key === "Enter" && send()}
           autoFocus
         />
-        <button className="primary" onClick={send} disabled={!code.trim()}>
+        <button className="primary" onClick={send} disabled={!trimmed || looksLikeEmailCode}>
           Submit
         </button>
       </div>
+      {looksLikeEmailCode && (
+        <p className="error">
+          That looks like the email verification code. Enter it in the browser, then paste the long code shown after
+          you click Authorize.
+        </p>
+      )}
       {codeSent && !error && <p className="muted">Checking the code…</p>}
       {error && <p className="error">{error}</p>}
+      {codeSent && output && (
+        <details className="signin-output" open>
+          <summary>Claude CLI output</summary>
+          <pre>{output.replace(/https:\/\/\S+/g, "<sign-in link>").trim()}</pre>
+        </details>
+      )}
       <button onClick={cancelLogin}>Cancel</button>
     </div>
   );

@@ -489,3 +489,16 @@ button.primary {
   border-radius: 6px;
   padding: 6px 8px;
 }
+
+.signin-output {
+  width: 100%;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.signin-output pre {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: Consolas, monospace;
+}

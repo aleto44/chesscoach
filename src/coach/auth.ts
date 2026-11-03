@@ -11,6 +11,8 @@ export interface AuthState {
   url: string | null;
   error: string | null;
   codeSent: boolean;
+  /** What the CLI has printed during this sign-in. */
+  output: string;
 }
 
 export const useAuth = create<AuthState>(() => ({
@@ -19,6 +21,7 @@ export const useAuth = create<AuthState>(() => ({
   url: null,
   error: null,
   codeSent: false,
+  output: "",
 }));
 
 let output = "";
@@ -28,7 +31,11 @@ export function initAuth() {
   listen<string>("auth-output", (e) => {
     output += e.payload;
     const url = output.match(/https:\/\/\S+/)?.[0] ?? null;
-    if (url) useAuth.setState({ url });
+    useAuth.setState({ output, ...(url ? { url } : {}) });
+    // The CLI keeps waiting after a bad code, so let the student paste again.
+    if (/invalid code/i.test(e.payload)) {
+      useAuth.setState({ codeSent: false, error: "The CLI rejected that code. Copy the whole code from the browser page and try again." });
+    }
   });
   listen<number | null>("auth-exit", async (e) => {
     await checkAuth();
@@ -56,7 +63,7 @@ export async function checkAuth() {
 
 export async function startLogin() {
   output = "";
-  useAuth.setState({ status: "signing-in", url: null, error: null, codeSent: false });
+  useAuth.setState({ status: "signing-in", url: null, error: null, codeSent: false, output: "" });
   try {
     await invoke("auth_login");
   } catch (e) {
