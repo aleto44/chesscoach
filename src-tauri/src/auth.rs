@@ -7,9 +7,10 @@ use std::fs::File;
 use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
 
 use crate::coach::claude_command;
+use crate::relay;
 
 #[derive(Default)]
 pub struct Login(Mutex<Option<(Child, ChildStdin)>>, Mutex<Option<Arc<Mutex<File>>>>);
@@ -90,7 +91,7 @@ pub fn auth_login(app: AppHandle, login: State<Login>) -> Result<(), String> {
                 if let Some(log) = &log {
                     let _ = log.lock().unwrap().write_all(&buf[..n]);
                 }
-                let _ = app.emit("auth-output", String::from_utf8_lossy(&buf[..n]).to_string());
+                relay::emit_all(&app, "auth-output", String::from_utf8_lossy(&buf[..n]).to_string());
             }
         });
     }
@@ -110,13 +111,13 @@ pub fn auth_login(app: AppHandle, login: State<Login>) -> Result<(), String> {
                 Ok(Some(status)) => {
                     slot.take();
                     note(&state, &format!("[exited: {status}]"));
-                    let _ = app2.emit("auth-exit", status.code());
+                    relay::emit_all(&app2, "auth-exit", status.code());
                     return;
                 }
                 Ok(None) => continue,
                 Err(_) => {
                     slot.take();
-                    let _ = app2.emit("auth-exit", None::<i32>);
+                    relay::emit_all(&app2, "auth-exit", None::<i32>);
                     return;
                 }
             },

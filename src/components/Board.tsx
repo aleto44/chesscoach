@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Chessground } from "chessground";
 import type { Api } from "chessground/api";
 import type { Config } from "chessground/config";
@@ -11,7 +11,8 @@ interface Props {
   fen: string;
   orientation?: "white" | "black";
   lastMove?: [Key, Key];
-  onMove?: (from: Key, to: Key) => void;
+  /** `promotion` is set ("q", "r", "b", "n") when a pawn reaches the last rank. */
+  onMove?: (from: Key, to: Key, promotion?: string) => void;
   viewOnly?: boolean;
   /** False locks the pieces without making the board view-only (e.g. opponent's turn). */
   canMove?: boolean;
@@ -22,6 +23,10 @@ interface Props {
   /** Arrows and circles drawn by the app (best moves, the coach's draw_arrows). */
   shapes?: DrawShape[];
 }
+
+const PROMO_NAMES = { q: "Queen", r: "Rook", b: "Bishop", n: "Knight" };
+const WHITE_GLYPHS = { q: "♕", r: "♖", b: "♗", n: "♘" };
+const BLACK_GLYPHS = { q: "♛", r: "♜", b: "♝", n: "♞" };
 
 /** Thin React wrapper around Chessground; chess.js supplies legal destinations. */
 export function Board({
@@ -37,6 +42,8 @@ export function Board({
   shapes,
 }: Props) {
   const el = useRef<HTMLDivElement>(null);
+  // A pawn just reached the last rank: the move waits for the student's choice of piece.
+  const [promo, setPromo] = useState<{ from: Key; to: Key; color: "white" | "black" } | null>(null);
   const api = useRef<Api | null>(null);
   const props = useRef({ fen, orientation, lastMove, onMove, viewOnly, canMove, premoveColor, shapes });
   props.current = { fen, orientation, lastMove, onMove, viewOnly, canMove, premoveColor, shapes };
@@ -78,6 +85,11 @@ export function Board({
         showDests: true,
         events: {
           after: (from, to) => {
+            const piece = new Chess(props.current.fen).get(from as never);
+            if (piece?.type === "p" && (to[1] === "8" || to[1] === "1")) {
+              setPromo({ from, to, color: piece.color === "w" ? "white" : "black" });
+              return;
+            }
             props.current.onMove?.(from, to);
             queueMicrotask(sync);
           },
@@ -90,5 +102,29 @@ export function Board({
 
   useEffect(sync, [fen, orientation, lastMove, viewOnly, canMove, premoveColor, shapes]);
 
-  return <div ref={el} className={className ?? "cg-board-wrap"} />;
+  const choose = (piece: string | null) => {
+    const move = promo;
+    setPromo(null);
+    if (move && piece) props.current.onMove?.(move.from, move.to, piece);
+    queueMicrotask(sync);
+  };
+
+  // View-only boards (chat cards) can't promote; keep them a single element for their layouts.
+  if (viewOnly) return <div ref={el} className={className ?? "cg-board-wrap"} />;
+  return (
+    <div className="board-holder">
+      <div ref={el} className={className ?? "cg-board-wrap"} />
+      {promo && (
+        <div className="promo-backdrop" onMouseDown={() => choose(null)}>
+          <div className="promo-picker" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label="Promote to">
+            {(["q", "r", "b", "n"] as const).map((p) => (
+              <button key={p} onClick={() => choose(p)} title={PROMO_NAMES[p]} aria-label={PROMO_NAMES[p]}>
+                {(promo.color === "white" ? WHITE_GLYPHS : BLACK_GLYPHS)[p]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

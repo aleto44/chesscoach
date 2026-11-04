@@ -109,3 +109,38 @@ button.link {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* Promotion picker */
+
+.board-holder {
+  position: relative;
+  width: 100%;
+}
+
+.promo-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.promo-picker {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.promo-picker button {
+  width: 64px;
+  height: 64px;
+  font-size: 44px;
+  line-height: 1;
+  padding: 0;
+}

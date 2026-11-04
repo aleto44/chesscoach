@@ -225,17 +225,18 @@ export function step(delta: number) {
  * playing the line's next move steps forward and anything else branches into a student tangent
  * (reusing one that starts the same way). Student tangents simply extend.
  */
-type MoveInterceptor = (tangent: Tangent, from: Key, to: Key) => boolean;
+type MoveInterceptor = (tangent: Tangent, from: Key, to: Key, promotion?: string) => boolean;
 let interceptor: MoveInterceptor | null = null;
 /** Lets a feature (ask_move quizzes) claim moves on a tangent before the normal handling. */
 export function setMoveInterceptor(fn: MoveInterceptor) {
   interceptor = fn;
 }
 
-export function boardMove(from: Key, to: Key) {
+/** `promotion`: "q", "r", "b" or "n" when a pawn reaches the last rank (default queen). */
+export function boardMove(from: Key, to: Key, promotion?: string) {
   const { line, ply, tangent } = screen();
-  if (tangent && interceptor?.(tangent, from, to)) return;
-  const played = playAt(line, ply, from, to);
+  if (tangent && interceptor?.(tangent, from, to, promotion)) return;
+  const played = playAt(line, ply, from, to, promotion);
   if (!played) return;
 
   if (!tangent) {
@@ -259,7 +260,7 @@ export function boardMove(from: Key, to: Key) {
     set((s) => ({ active: existing.id, tangents: { ...s.tangents, [existing.id]: { ...existing, ply: 1 } } }));
     return;
   }
-  const branch = playAt(emptyLine(fen), 0, from, to)!;
+  const branch = playAt(emptyLine(fen), 0, from, to, promotion)!;
   const child = addTangent({
     parentId: tangent.id,
     title: `What if ${moveLabel(fen, branch.san)}?`,

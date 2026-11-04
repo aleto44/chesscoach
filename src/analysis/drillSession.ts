@@ -91,14 +91,14 @@ const toCp = (l: EngineLine | undefined, side: "white" | "black") => {
   return side === "white" ? white : -white;
 };
 
-export async function drillMove(from: Key, to: Key) {
+export async function drillMove(from: Key, to: Key, promotion?: string) {
   const s = useDrill.getState();
   const drill = current();
   if (!s || !drill || s.status !== "solving" || !s.line) return;
   const ply = s.line.sans.length;
   const fen = s.line.fens[ply];
   if (sideToMove(fen) !== drill.color) return;
-  const played = playAt(s.line, ply, from, to);
+  const played = playAt(s.line, ply, from, to, promotion);
   if (!played) return;
   useDrill.setState({ line: played.line });
 

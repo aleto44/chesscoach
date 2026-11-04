@@ -63,9 +63,9 @@ export function cancelQuizzes() {
   for (const id of [...pending.keys()]) skipQuiz(id);
 }
 
-async function answer(tangent: Tangent, from: Key, to: Key): Promise<void> {
+async function answer(tangent: Tangent, from: Key, to: Key, promotion?: string): Promise<void> {
   const p = pending.get(tangent.id)!;
-  const played = playAt(tangent.line, 0, from, to);
+  const played = playAt(tangent.line, 0, from, to, promotion);
   if (!played) return;
   pending.delete(tangent.id);
   useStore.setState((s) => ({ tangents: { ...s.tangents, [tangent.id]: { ...tangent, line: played.line, ply: 1 } } }));
@@ -105,9 +105,9 @@ async function answer(tangent: Tangent, from: Key, to: Key): Promise<void> {
 
 /** Moves on a quiz board answer the quiz instead of branching. */
 export function initQuiz() {
-  setMoveInterceptor((tangent, from, to) => {
+  setMoveInterceptor((tangent, from, to, promotion) => {
     if (!pending.has(tangent.id) || tangent.line.sans.length > 0) return false;
-    answer(tangent, from, to);
+    answer(tangent, from, to, promotion);
     return true;
   });
 }

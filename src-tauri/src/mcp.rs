@@ -14,10 +14,10 @@ use axum::routing::post;
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use tokio::sync::oneshot;
 
-use crate::tools;
+use crate::{relay, tools};
 
 /// Long enough for tools that wait on the user (e.g. `ask_move`).
 const TOOL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
@@ -132,13 +132,11 @@ async fn call_tool(inner: &Inner, params: &Value) -> Value {
         name: params["name"].as_str().unwrap_or_default().to_string(),
         args: params.get("arguments").cloned().unwrap_or_else(|| json!({})),
     };
-    let outcome = match inner.app.emit("tool-call", call) {
-        Err(e) => Err(e.to_string()),
-        Ok(()) => match tokio::time::timeout(TOOL_TIMEOUT, rx).await {
-            Ok(Ok(result)) => Ok(result),
-            Ok(Err(_)) => Err("tool call was dropped by the app".to_string()),
-            Err(_) => Err("tool call timed out".to_string()),
-        },
+    relay::emit_owner(&inner.app, "tool-call", call);
+    let outcome = match tokio::time::timeout(TOOL_TIMEOUT, rx).await {
+        Ok(Ok(result)) => Ok(result),
+        Ok(Err(_)) => Err("tool call was dropped by the app".to_string()),
+        Err(_) => Err("tool call timed out".to_string()),
     };
     inner.pending.lock().unwrap().remove(&id);
 
