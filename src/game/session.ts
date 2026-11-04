@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Chess } from "chess.js";
 import { buildLine, emptyLine, START_FEN } from "../chess/line";
-import { db, flush, hasBackend, opponentElo, opponentKey, withoutSaving } from "../db";
+import { db, discardPending, flush, hasBackend, opponentElo, opponentKey, withoutSaving } from "../db";
 import { FREE_PLAY, newId, pushChat, useStore, type ChatItem, type Color, type GameMeta, type Tangent } from "../store";
 
 export interface NewGameOptions {
@@ -35,7 +35,7 @@ export async function newGame(opts: NewGameOptions) {
 export async function loadGame(id: number) {
   const record = await db.loadGame(id);
   if (!record) return;
-  await leaveGame();
+  await leaveGame(id);
   const { game, moves, tangents, chat } = record;
 
   const built = buildLine(game.startFen, moves.map((m) => m.san));
@@ -81,15 +81,37 @@ export async function loadGame(id: number) {
   );
 }
 
-/** Saves pending writes and stops the coach process (the next message resumes this game's session). */
-async function leaveGame() {
+/**
+ * Saves pending writes and stops the coach process (the next message resumes this game's
+ * session). A game the student never moved in or talked about is deleted on the way out.
+ */
+async function leaveGame(keep: number | null = null) {
   await flush();
-  if (hasBackend()) await invoke("coach_reset");
+  if (!hasBackend()) return;
+  await invoke("coach_reset");
+  await db.pruneEmptyGames(keep);
+}
+
+/** Deletes a game for good. Deleting the open game moves on to the latest remaining one. */
+export async function deleteGame(id: number) {
+  const current = useStore.getState().gameId === id;
+  if (current) {
+    discardPending();
+    await invoke("coach_reset");
+  }
+  await db.deleteGame(id);
+  if (!current) return;
+  withoutSaving(() => useStore.setState({ gameId: null }));
+  const [latest] = await db.listGames(1);
+  if (latest) await loadGame(latest.id);
+  else await newGame({ studentColor: "white", opponentElo: 1500 });
 }
 
 /** On launch, reopen the most recent game, or start one against the opponent. */
 export async function bootstrap() {
   if (!hasBackend()) return;
+  // Games abandoned before the student moved (e.g. the app was closed) go on launch.
+  await db.pruneEmptyGames(null);
   const [latest] = await db.listGames(1);
   if (latest) await loadGame(latest.id);
   else await newGame({ studentColor: "white", opponentElo: 1500 });

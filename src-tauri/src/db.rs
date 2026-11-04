@@ -401,3 +401,29 @@ pub fn db_load_game(db: State<Db>, id: i64) -> Result<Option<GameRecord>, String
 
     Ok(Some(GameRecord { game, moves, tangents, chat }))
 }
+
+/// Deletes a game and (via ON DELETE CASCADE) its moves, tangents and chat.
+#[tauri::command]
+pub fn db_delete_game(db: State<Db>, id: i64) -> Result<(), String> {
+    db.0.lock()
+        .unwrap()
+        .execute("DELETE FROM games WHERE id = ?1", [id])
+        .map(|_| ())
+        .map_err(err)
+}
+
+/// Deletes games the student never took part in: no move of theirs and nothing said to the
+/// coach. `keep` spares the game currently open. Returns how many were deleted.
+#[tauri::command]
+pub fn db_prune_empty_games(db: State<Db>, keep: Option<i64>) -> Result<usize, String> {
+    db.0.lock()
+        .unwrap()
+        .execute(
+            "DELETE FROM games
+             WHERE id IS NOT ?1
+               AND NOT EXISTS (SELECT 1 FROM moves m WHERE m.game_id = games.id AND m.by_student = 1)
+               AND NOT EXISTS (SELECT 1 FROM chat_items c WHERE c.game_id = games.id AND c.kind = 'user')",
+            [keep],
+        )
+        .map_err(err)
+}

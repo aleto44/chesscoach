@@ -86,8 +86,8 @@ let opponent: Engine | null = null;
 /** A separate instance so the opponent never waits behind the coach's analysis. */
 export const getOpponentEngine = () => (opponent ??= new Engine());
 
-/** UCI_Elo range Stockfish accepts. */
-export const OPPONENT_LEVELS = [1320, 1500, 1700, 1900, 2100, 2400, 2800];
+/** The UCI_Elo range this Stockfish build accepts (from its `uci` option list). */
+export const OPPONENT_ELO = { min: 1320, max: 3190 };
 
 export function formatScore(l: Pick<EngineLine, "cp" | "mate">): string {
   if (l.mate !== undefined) return l.mate > 0 ? `#${l.mate}` : `#-${-l.mate}`;

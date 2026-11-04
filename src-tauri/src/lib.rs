@@ -82,6 +82,8 @@ pub fn run() {
             db::db_upsert_chat,
             db::db_list_games,
             db::db_load_game,
+            db::db_delete_game,
+            db::db_prune_empty_games,
             db::db_get_settings,
             db::db_set_setting,
         ])

@@ -53,6 +53,9 @@ export const db = {
     invoke<void>("db_update_game", { id, patch }),
   listGames: (limit = 100) => invoke<GameSummary[]>("db_list_games", { limit }),
   loadGame: (id: number) => invoke<GameRecord | null>("db_load_game", { id }),
+  deleteGame: (id: number) => invoke<void>("db_delete_game", { id }),
+  /** Deletes games the student never played in or talked about, except `keep`. */
+  pruneEmptyGames: (keep: number | null) => invoke<number>("db_prune_empty_games", { keep }),
 };
 
 export const opponentKey = (elo: number | null) => (elo ? `stockfish:${elo}` : null);
@@ -116,6 +119,14 @@ export function initPersistence() {
       timer = window.setTimeout(flush, 300);
     }
   });
+}
+
+/** Drops unsaved changes (the game they belong to is being deleted). */
+export function discardPending() {
+  clearTimeout(timer);
+  dirtyMoves = false;
+  dirtyTangents.clear();
+  dirtyChat.clear();
 }
 
 export async function flush() {

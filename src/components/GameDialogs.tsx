@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { db, opponentElo, type GameSummary } from "../db";
-import { OPPONENT_LEVELS } from "../engine/stockfish";
-import { loadGame, newGame } from "../game/session";
+import { OPPONENT_ELO } from "../engine/stockfish";
+import { deleteGame, loadGame, newGame } from "../game/session";
 import { opponentLabel, useStore, type Color } from "../store";
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -26,7 +26,9 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 
 export function NewGameDialog({ onClose }: { onClose: () => void }) {
   const last = useStore((s) => s.meta);
-  const [elo, setElo] = useState<number | null>(last.opponentElo ?? 1500);
+  const [hasOpponent, setHasOpponent] = useState(last.studentColor !== "both" || last.opponentElo !== null);
+  const [rating, setRating] = useState(last.opponentElo ?? 1500);
+  const elo = hasOpponent ? rating : null;
   const [color, setColor] = useState<Color | "random">(last.studentColor === "black" ? "black" : "white");
 
   const start = async () => {
@@ -38,17 +40,37 @@ export function NewGameDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="New game" onClose={onClose}>
-      <label className="field">
+      <div className="field">
         <span>Opponent</span>
-        <select value={elo ?? ""} onChange={(e) => setElo(e.target.value ? Number(e.target.value) : null)}>
-          {OPPONENT_LEVELS.map((l) => (
-            <option key={l} value={l}>
-              Stockfish {l}
-            </option>
-          ))}
-          <option value="">None (free play, move both sides)</option>
-        </select>
-      </label>
+        <div className="segmented">
+          <button className={hasOpponent ? "on" : ""} onClick={() => setHasOpponent(true)}>
+            Stockfish
+          </button>
+          <button className={hasOpponent ? "" : "on"} onClick={() => setHasOpponent(false)}>
+            None (free play)
+          </button>
+        </div>
+      </div>
+      {hasOpponent && (
+        <label className="field">
+          <span>
+            Strength: <strong>{rating}</strong>
+          </span>
+          <input
+            type="range"
+            className="elo-slider"
+            min={OPPONENT_ELO.min}
+            max={OPPONENT_ELO.max}
+            step={10}
+            value={rating}
+            onChange={(e) => setRating(Number(e.target.value))}
+          />
+          <span className="elo-scale muted small">
+            <span>{OPPONENT_ELO.min}</span>
+            <span>{OPPONENT_ELO.max}</span>
+          </span>
+        </label>
+      )}
       {elo !== null && (
         <div className="field">
           <span>You play</span>
@@ -84,13 +106,23 @@ export function GamesDialog({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
+  const remove = async (g: GameSummary) => {
+    const what = `${describeSides(g)}, ${formatDate(g.updatedAt)}`;
+    if (!confirm(`Delete this game and its coach chat? This can't be undone.
+
+${what}`)) return;
+    await deleteGame(g.id);
+    setGames((list) => list?.filter((x) => x.id !== g.id) ?? null);
+  };
+
   return (
     <Modal title="Games" onClose={onClose}>
       {error && <p className="error">{error}</p>}
       {games?.length === 0 && <p className="muted">No games yet.</p>}
       <div className="game-list">
         {games?.map((g) => (
-          <button key={g.id} className={`game-row ${g.id === current ? "current" : ""}`} onClick={() => open(g.id)}>
+          <div key={g.id} className={`game-row ${g.id === current ? "current" : ""}`}>
+            <button className="game-row-open" onClick={() => open(g.id)}>
             <div className="game-row-top">
               <strong>{describeSides(g)}</strong>
               <span className={`result ${outcome(g)}`}>{g.result ?? "in progress"}</span>
@@ -100,7 +132,11 @@ export function GamesDialog({ onClose }: { onClose: () => void }) {
               {g.termination ? ` · ${g.termination}` : ""}
             </div>
             {g.opening && <div className="game-row-moves">{numbered(g.opening)}…</div>}
-          </button>
+            </button>
+            <button className="game-row-delete" onClick={() => remove(g)} title="Delete game" aria-label="Delete game">
+              🗑
+            </button>
+          </div>
         ))}
       </div>
     </Modal>
