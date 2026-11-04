@@ -5,7 +5,7 @@ import { hasBackend } from "./db";
 import { useSettings } from "./settings";
 import { screen, useStore } from "./store";
 
-export const SOUND_NAMES = ["move", "capture", "castle", "check", "game-end"] as const;
+export const SOUND_NAMES = ["move", "capture", "castle", "check", "promotion", "game-end"] as const;
 export type SoundName = (typeof SOUND_NAMES)[number];
 
 const RATE = 48000;
@@ -95,6 +95,14 @@ const RECIPES: Record<SoundName, { length: number; peak: number; draw: (ac: Base
       chime(ac, 0.02, 1318.5, 0.25, 0.18, out);
     },
   },
+  promotion: {
+    length: 0.3,
+    peak: 0.6,
+    draw: (ac, out) => {
+      strike(ac, 0, 540, 1, out);
+      chime(ac, 0.03, 987.77, 0.25, 0.15, out);
+    },
+  },
   "game-end": {
     length: 0.9,
     peak: 0.4,
@@ -133,6 +141,9 @@ export async function loadSounds() {
       console.warn(`custom sound ${name} not loaded`, e);
     }
   }
+  // Without a castle file, castling sounds like your custom move rather than the built-in.
+  const move = buffers.get("move");
+  if (custom.has("move") && !custom.has("castle") && move) buffers.set("castle", move);
 }
 
 export const customSounds = () => [...custom];
@@ -152,6 +163,7 @@ export function play(name: SoundName) {
 
 export function soundForMove(san: string): SoundName {
   if (san.includes("+") || san.includes("#")) return "check";
+  if (san.includes("=")) return "promotion";
   if (san.startsWith("O-O")) return "castle";
   if (san.includes("x")) return "capture";
   return "move";

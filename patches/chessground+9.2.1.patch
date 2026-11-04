@@ -1,8 +1,18 @@
 diff --git a/node_modules/chessground/dist/svg.js b/node_modules/chessground/dist/svg.js
-index b38c6a0..a79913e 100644
+index b38c6a0..9dacb2a 100644
 --- a/node_modules/chessground/dist/svg.js
 +++ b/node_modules/chessground/dist/svg.js
-@@ -189,6 +189,22 @@ function renderArrow(s, brush, from, to, current, shorten) {
+@@ -28,7 +28,8 @@ export function renderSvg(state, shapesEl, customsEl) {
+             hash: shapeHash(s, isShort(s.dest, dests), false, bounds),
+         };
+     });
+-    if (cur)
++    // chesscoach patch: no preview while dragging; the arrow appears when the button is released.
++    if (cur && false)
+         shapes.push({
+             shape: cur,
+             current: true,
+@@ -189,6 +190,22 @@ function renderArrow(s, brush, from, to, current, shorten) {
      function renderLine(isHilite) {
          var _a;
          const m = arrowMargin(shorten && !current), dx = to[0] - from[0], dy = to[1] - from[1], angle = Math.atan2(dy, dx), xo = Math.cos(angle) * m, yo = Math.sin(angle) * m;

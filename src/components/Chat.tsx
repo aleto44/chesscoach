@@ -35,7 +35,7 @@ export function Chat() {
         <span className={`status ${busy ? "busy" : ""}`} />
         <strong>Coach</strong>
         {auth.status === "signed-in" && <UsageMeter />}
-        <span className="muted small" title="Change in Settings (⚙)">{activeModel ?? (coachModel || "default model")}</span>
+        <span className="muted small coach-model" title="Change in Settings (⚙)">{activeModel ?? (coachModel || "default model")}</span>
         <span className="spacer" />
         {auth.status === "signed-in" && (
           <button onClick={() => confirm("Sign out of Claude?") && logout()} title={auth.email ?? "Signed in"}>
@@ -57,7 +57,7 @@ export function Chat() {
         {chat.map((item) => (
           <ChatRow key={item.id} item={item} />
         ))}
-        {busy && <div className="typing">Coach is thinking…</div>}
+        {busy && <Thinking />}
         {!signedIn && <SignIn />}
         <div ref={bottom} />
       </div>
@@ -80,6 +80,38 @@ export function Chat() {
         </button>
       </div>
     </aside>
+  );
+}
+
+const TOOL_LABELS: Record<string, string> = {
+  analyze: "Analyzing the position",
+  show_line: "Checking the line",
+  get_state: "Looking at the board",
+};
+
+/** Animated "working" row: what the coach is doing and for how long. Hidden while text streams. */
+function Thinking() {
+  const { busySince, streaming, chat } = useStore();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => tick((n) => n + 1), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  if (streaming) return null;
+  const running = [...chat].reverse().find((c) => c.kind === "tool" && c.status === "running");
+  const name = running?.kind === "tool" ? running.text.split(" ")[0] : null;
+  const label = (name && TOOL_LABELS[name]) || "Thinking";
+  const seconds = busySince ? Math.floor((Date.now() - busySince) / 1000) : 0;
+  return (
+    <div className="thinking" role="status" aria-live="polite">
+      <span className="thinking-dots" aria-hidden>
+        <span />
+        <span />
+        <span />
+      </span>
+      <span className="thinking-label">{label}…</span>
+      {seconds >= 2 && <span className="thinking-time">{seconds}s</span>}
+    </div>
   );
 }
 

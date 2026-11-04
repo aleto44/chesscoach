@@ -66,6 +66,8 @@ export function Board({
       animation: { enabled: true, duration: 180 },
       highlight: { lastMove: true, check: true },
       premovable: { enabled: true, showDests: true, castle: true },
+      // Arrows go between any two squares, not just ones a piece could reach.
+      drawable: { defaultSnapToValidMove: false },
       movable: {
         free: false,
         showDests: true,

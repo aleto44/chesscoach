@@ -60,6 +60,7 @@ function onEvent(msg: any) {
       if (ev.type === "content_block_start" && ev.content_block?.type === "text") {
         streamingId = newId("c");
         pushChat({ kind: "coach", id: streamingId, text: ev.content_block.text ?? "" });
+        useStore.setState({ streaming: true });
       } else if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && streamingId) {
         const id = streamingId;
         useStore.setState((s) => ({
@@ -67,6 +68,7 @@ function onEvent(msg: any) {
         }));
       } else if (ev.type === "content_block_stop") {
         streamingId = null;
+        useStore.setState({ streaming: false });
       }
       break;
     }
@@ -85,7 +87,7 @@ function onEvent(msg: any) {
 
 function finishTurn() {
   streamingId = null;
-  useStore.setState({ busy: false });
+  useStore.setState({ busy: false, busySince: null, streaming: false });
 }
 
 /** Prefix each turn with a compact view of the screen so the coach rarely needs get_state. */
@@ -100,7 +102,7 @@ function withContext(text: string): string {
 export async function sendToCoach(text: string) {
   const { sessionId } = useStore.getState();
   pushChat({ kind: "user", id: newId("c"), text });
-  useStore.setState({ busy: true });
+  useStore.setState({ busy: true, busySince: Date.now(), streaming: false });
   try {
     await invoke("coach_send", { text: withContext(text), resume: sessionId });
   } catch (e) {

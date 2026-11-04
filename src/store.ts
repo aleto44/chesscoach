@@ -40,6 +40,10 @@ interface State {
   orientation: Color;
   chat: ChatItem[];
   busy: boolean;
+  /** When the current coach turn started, for the thinking indicator. */
+  busySince: number | null;
+  /** Coach text is streaming in right now. */
+  streaming: boolean;
   sessionId: string | null;
   opponentThinking: boolean;
 }
@@ -59,6 +63,8 @@ export const useStore = create<State>(() => ({
   orientation: "white",
   chat: [],
   busy: false,
+  busySince: null,
+  streaming: false,
   sessionId: null,
   opponentThinking: false,
 }));
