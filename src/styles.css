@@ -499,7 +499,12 @@ button.primary {
 
 .game-row-top {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.game-row-top .result {
+  margin-left: auto;
 }
 
 .game-row-sub,
@@ -944,4 +949,69 @@ button.icon {
 .elo-scale {
   display: flex;
   justify-content: space-between;
+}
+
+/* Rated (unaided) vs practice games. */
+.mode-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  margin-right: 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+.mode-badge.rated {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+}
+
+.mode-badge.practice {
+  color: var(--tangent);
+  background: var(--tangent-soft);
+}
+
+.game-row-top .mode-badge {
+  margin-right: 0;
+}
+
+.mode-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mode-choice button {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.mode-choice button .mode-badge {
+  flex: none;
+  width: 72px;
+  text-align: center;
+}
+
+.mode-choice button.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.locked-note {
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  font-size: 13px;
+  line-height: 1.45;
 }

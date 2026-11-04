@@ -86,8 +86,36 @@ let opponent: Engine | null = null;
 /** A separate instance so the opponent never waits behind the coach's analysis. */
 export const getOpponentEngine = () => (opponent ??= new Engine());
 
-/** The UCI_Elo range this Stockfish build accepts (from its `uci` option list). */
-export const OPPONENT_ELO = { min: 1320, max: 3190 };
+/**
+ * Stockfish's UCI_Elo (calibrated against engine rating lists) next to the chess.com rapid rating it
+ * roughly plays like. Below ~2000 chess.com runs well under FIDE/CCRL numbers; above, a little over.
+ * An estimate: tune it here. The ends are the UCI_Elo range this build accepts.
+ */
+const RATING_SCALE: [engineElo: number, chessCom: number][] = [
+  [1320, 950],
+  [1650, 1500],
+  [2000, 2000],
+  [2300, 2400],
+  [3190, 3250],
+];
+
+function convert(x: number, from: 0 | 1, to: 0 | 1): number {
+  const s = RATING_SCALE;
+  if (x <= s[0][from]) return s[0][to];
+  for (let i = 1; i < s.length; i++) {
+    const [a, b] = [s[i - 1], s[i]];
+    if (x <= b[from]) return a[to] + ((x - a[from]) / (b[from] - a[from])) * (b[to] - a[to]);
+  }
+  return s[s.length - 1][to];
+}
+
+/** The UCI_Elo to give Stockfish for a chess.com-scale rating. */
+export const toEngineElo = (rating: number) => Math.round(convert(rating, 1, 0));
+/** The chess.com-scale rating for a UCI_Elo, to the nearest 10. */
+export const fromEngineElo = (elo: number) => Math.round(convert(elo, 0, 1) / 10) * 10;
+
+/** The opponent ratings on offer, on the chess.com scale. */
+export const OPPONENT_RATING = { min: RATING_SCALE[0][1], max: RATING_SCALE[RATING_SCALE.length - 1][1] };
 
 export function formatScore(l: Pick<EngineLine, "cp" | "mate">): string {
   if (l.mate !== undefined) return l.mate > 0 ? `#${l.mate}` : `#-${-l.mate}`;

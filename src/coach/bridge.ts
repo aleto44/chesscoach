@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { formatMoves } from "../chess/line";
-import { gameDescription, newId, pushChat, screen, updateChat, useStore } from "../store";
+import { gameDescription, isLocked, newId, pushChat, screen, updateChat, useStore } from "../store";
 import { useSettings } from "../settings";
 import { describeCall, handleTool } from "./tools";
 import { refreshUsageSoon } from "./usage";
@@ -100,6 +100,8 @@ function withContext(text: string): string {
 }
 
 export async function sendToCoach(text: string) {
+  // The UI stops this too; a rated game in progress gets no help.
+  if (isLocked()) return;
   const { sessionId } = useStore.getState();
   pushChat({ kind: "user", id: newId("c"), text });
   useStore.setState({ busy: true, busySince: Date.now(), streaming: false });

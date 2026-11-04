@@ -19,7 +19,7 @@ CREATE TABLE games (
     ended_at         TEXT,
     start_fen        TEXT NOT NULL,
     student_color    TEXT NOT NULL,          -- 'white' | 'black' | 'both' (free play)
-    opponent         TEXT,                   -- e.g. 'stockfish:1500'; NULL = free play
+    opponent         TEXT,                   -- e.g. 'stockfish-cc:1500' (chess.com-scale); NULL = free play
     result           TEXT,                   -- '1-0' | '0-1' | '1/2-1/2'; NULL = in progress
     termination      TEXT,                   -- 'checkmate', 'resignation', 'stalemate', ...
     coach_session_id TEXT
@@ -66,6 +66,22 @@ CREATE TABLE settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL                     -- JSON
 );
+"#, r#"
+-- How a game was played, fixed when it starts. Analysis of the student's real strength uses
+-- rated games only.
+--   'rated':    no engine, no coach and no takebacks until the game is over: unaided play.
+--   'practice': engine, coach and takebacks allowed. Not evidence of unaided strength.
+ALTER TABLE games ADD COLUMN mode TEXT NOT NULL DEFAULT 'practice' CHECK (mode IN ('rated', 'practice'));
+ALTER TABLE games ADD COLUMN takebacks INTEGER NOT NULL DEFAULT 0;
+
+-- A rated game may be downgraded to practice (the student asked for help), never the reverse.
+CREATE TRIGGER games_mode_one_way BEFORE UPDATE OF mode ON games
+WHEN OLD.mode = 'practice' AND NEW.mode = 'rated'
+BEGIN
+    SELECT RAISE(ABORT, 'a practice game cannot become rated');
+END;
+
+CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
 "#];
 
 impl Db {
@@ -132,6 +148,7 @@ pub struct NewGame {
     start_fen: String,
     student_color: String,
     opponent: Option<String>,
+    mode: String,
 }
 
 /// Fields left as None are unchanged. Setting `result` also stamps `ended_at`.
@@ -141,6 +158,8 @@ pub struct GamePatch {
     coach_session_id: Option<String>,
     result: Option<String>,
     termination: Option<String>,
+    mode: Option<String>,
+    takebacks: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -188,6 +207,8 @@ pub struct GameSummary {
     result: Option<String>,
     termination: Option<String>,
     coach_session_id: Option<String>,
+    mode: String,
+    takebacks: i64,
     plies: i64,
     opening: String,
 }
@@ -202,7 +223,7 @@ pub struct GameRecord {
 
 const SUMMARY_SQL: &str = "
     SELECT g.id, g.started_at, g.updated_at, g.ended_at, g.start_fen, g.student_color, g.opponent,
-           g.result, g.termination, g.coach_session_id,
+           g.result, g.termination, g.coach_session_id, g.mode, g.takebacks,
            (SELECT count(*) FROM moves m WHERE m.game_id = g.id),
            (SELECT coalesce(group_concat(san, ' '), '')
               FROM (SELECT san FROM moves m WHERE m.game_id = g.id ORDER BY ply LIMIT 10))
@@ -220,8 +241,10 @@ fn summary(r: &Row) -> rusqlite::Result<GameSummary> {
         result: r.get(7)?,
         termination: r.get(8)?,
         coach_session_id: r.get(9)?,
-        plies: r.get(10)?,
-        opening: r.get(11)?,
+        mode: r.get(10)?,
+        takebacks: r.get(11)?,
+        plies: r.get(12)?,
+        opening: r.get(13)?,
     })
 }
 
@@ -231,10 +254,13 @@ fn err(e: impl std::fmt::Display) -> String {
 
 #[tauri::command]
 pub fn db_create_game(db: State<Db>, game: NewGame) -> Result<i64, String> {
+    if game.mode == "rated" && (game.opponent.is_none() || game.student_color == "both") {
+        return Err("a rated game needs an opponent".into());
+    }
     let conn = db.0.lock().unwrap();
     conn.execute(
-        "INSERT INTO games (start_fen, student_color, opponent) VALUES (?1, ?2, ?3)",
-        params![game.start_fen, game.student_color, game.opponent],
+        "INSERT INTO games (start_fen, student_color, opponent, mode) VALUES (?1, ?2, ?3, ?4)",
+        params![game.start_fen, game.student_color, game.opponent, game.mode],
     )
     .map_err(err)?;
     Ok(conn.last_insert_rowid())
@@ -249,10 +275,12 @@ pub fn db_update_game(db: State<Db>, id: i64, patch: GamePatch) -> Result<(), St
                 coach_session_id = coalesce(?2, coach_session_id),
                 result           = coalesce(?3, result),
                 termination      = coalesce(?4, termination),
+                mode             = coalesce(?5, mode),
+                takebacks        = coalesce(?6, takebacks),
                 ended_at         = CASE WHEN ?3 IS NOT NULL THEN datetime('now') ELSE ended_at END,
                 updated_at       = datetime('now')
              WHERE id = ?1",
-            params![id, patch.coach_session_id, patch.result, patch.termination],
+            params![id, patch.coach_session_id, patch.result, patch.termination, patch.mode, patch.takebacks],
         )
         .map(|_| ())
         .map_err(err)

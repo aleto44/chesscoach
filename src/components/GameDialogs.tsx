@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { db, opponentElo, type GameSummary } from "../db";
-import { OPPONENT_ELO } from "../engine/stockfish";
+import { OPPONENT_RATING } from "../engine/stockfish";
 import { deleteGame, loadGame, newGame } from "../game/session";
-import { opponentLabel, useStore, type Color } from "../store";
+import { FREE_PLAY, opponentLabel, useStore, type Color, type GameMode } from "../store";
+import { ModeBadge } from "./ModeBadge";
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
@@ -26,32 +27,49 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 
 export function NewGameDialog({ onClose }: { onClose: () => void }) {
   const last = useStore((s) => s.meta);
+  const [mode, setMode] = useState<GameMode>(last.mode);
   const [hasOpponent, setHasOpponent] = useState(last.studentColor !== "both" || last.opponentElo !== null);
   const [rating, setRating] = useState(last.opponentElo ?? 1500);
-  const elo = hasOpponent ? rating : null;
+  // A rated game is always against an opponent.
+  const elo = hasOpponent || mode === "rated" ? rating : null;
   const [color, setColor] = useState<Color | "random">(last.studentColor === "black" ? "black" : "white");
 
   const start = async () => {
     const studentColor: Color | "both" =
       elo === null ? "both" : color === "random" ? (Math.random() < 0.5 ? "white" : "black") : color;
-    await newGame({ studentColor, opponentElo: elo });
+    await newGame({ mode, studentColor, opponentElo: elo });
     onClose();
   };
 
   return (
     <Modal title="New game" onClose={onClose}>
       <div className="field">
-        <span>Opponent</span>
-        <div className="segmented">
-          <button className={hasOpponent ? "on" : ""} onClick={() => setHasOpponent(true)}>
-            Stockfish
+        <span>Game type</span>
+        <div className="mode-choice">
+          <button className={mode === "rated" ? "on" : ""} onClick={() => setMode("rated")}>
+            <ModeBadge mode="rated" />
+            <span>No engine, no coach, no takebacks. Shows how you really play, and counts toward your profile.</span>
           </button>
-          <button className={hasOpponent ? "" : "on"} onClick={() => setHasOpponent(false)}>
-            None (free play)
+          <button className={mode === "practice" ? "on" : ""} onClick={() => setMode("practice")}>
+            <ModeBadge mode="practice" />
+            <span>Engine, coach and takebacks whenever you want. Doesn't count toward your profile.</span>
           </button>
         </div>
       </div>
-      {hasOpponent && (
+      {mode === "practice" && (
+        <div className="field">
+          <span>Opponent</span>
+          <div className="segmented">
+            <button className={hasOpponent ? "on" : ""} onClick={() => setHasOpponent(true)}>
+              Stockfish
+            </button>
+            <button className={hasOpponent ? "" : "on"} onClick={() => setHasOpponent(false)}>
+              None (free play)
+            </button>
+          </div>
+        </div>
+      )}
+      {elo !== null && (
         <label className="field">
           <span>
             Strength: <strong>{rating}</strong>
@@ -59,15 +77,16 @@ export function NewGameDialog({ onClose }: { onClose: () => void }) {
           <input
             type="range"
             className="elo-slider"
-            min={OPPONENT_ELO.min}
-            max={OPPONENT_ELO.max}
-            step={10}
+            min={OPPONENT_RATING.min}
+            max={OPPONENT_RATING.max}
+            step={50}
             value={rating}
             onChange={(e) => setRating(Number(e.target.value))}
           />
           <span className="elo-scale muted small">
-            <span>{OPPONENT_ELO.min}</span>
-            <span>{OPPONENT_ELO.max}</span>
+            <span>{OPPONENT_RATING.min}</span>
+            <span>about chess.com rapid</span>
+            <span>{OPPONENT_RATING.max}</span>
           </span>
         </label>
       )}
@@ -124,11 +143,13 @@ ${what}`)) return;
           <div key={g.id} className={`game-row ${g.id === current ? "current" : ""}`}>
             <button className="game-row-open" onClick={() => open(g.id)}>
             <div className="game-row-top">
+              <ModeBadge mode={g.mode} />
               <strong>{describeSides(g)}</strong>
               <span className={`result ${outcome(g)}`}>{g.result ?? "in progress"}</span>
             </div>
             <div className="game-row-sub">
               {formatDate(g.updatedAt)} · {Math.ceil(g.plies / 2)} moves
+              {g.takebacks ? ` · ${g.takebacks} takeback${g.takebacks > 1 ? "s" : ""}` : ""}
               {g.termination ? ` · ${g.termination}` : ""}
             </div>
             {g.opening && <div className="game-row-moves">{numbered(g.opening)}…</div>}
@@ -144,7 +165,7 @@ ${what}`)) return;
 }
 
 function describeSides(g: GameSummary): string {
-  const opp = opponentLabel({ studentColor: g.studentColor, opponentElo: opponentElo(g.opponent), result: null, termination: null });
+  const opp = opponentLabel({ ...FREE_PLAY, studentColor: g.studentColor, opponentElo: opponentElo(g.opponent) });
   if (g.studentColor === "both") return opp;
   return g.studentColor === "white" ? `You vs ${opp}` : `${opp} vs You`;
 }

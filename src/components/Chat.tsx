@@ -5,13 +5,14 @@ import { logout, useAuth } from "../coach/auth";
 import { restartCoach, sendToCoach } from "../coach/bridge";
 import { hasBackend } from "../db";
 import { useSettings } from "../settings";
-import { openTangent, useStore, type ChatItem } from "../store";
+import { isLocked, openTangent, useStore, type ChatItem } from "../store";
 import { Board } from "./Board";
 import { SignIn } from "./SignIn";
 import { UsageMeter } from "./UsageMeter";
 
 export function Chat() {
-  const { chat, busy } = useStore();
+  const { chat, busy, meta } = useStore();
+  const locked = isLocked(meta);
   const auth = useAuth();
   const { coachModel, activeModel } = useSettings();
   const signedIn = auth.status === "signed-in" || !hasBackend();
@@ -24,7 +25,7 @@ export function Chat() {
 
   const send = () => {
     const text = draft.trim();
-    if (!text || busy || !signedIn) return;
+    if (!text || busy || !signedIn || locked) return;
     setDraft("");
     sendToCoach(text);
   };
@@ -48,7 +49,16 @@ export function Chat() {
       </header>
 
       <div className="messages">
-        {chat.length === 0 && (
+        {locked && (
+          <div className="locked-note">
+            <strong>Rated game: the coach is off.</strong> No engine, coach or takebacks until it ends, so this game
+            shows how you really play. Afterwards the coach can go through it with you.
+          </div>
+        )}
+        {!locked && chat.length === 0 && meta.mode === "rated" && (
+          <p className="hint">Game over. Ask the coach to go through it with you, e.g. <em>“Where did I go wrong?”</em></p>
+        )}
+        {!locked && chat.length === 0 && meta.mode === "practice" && (
           <p className="hint">
             Play some moves, then ask about the position, e.g. <em>“What's the idea behind this move?”</em> or{" "}
             <em>“Why not …Nf6 here?”</em>
@@ -65,8 +75,10 @@ export function Chat() {
       <div className="composer">
         <textarea
           value={draft}
-          disabled={!signedIn}
-          placeholder="Ask the coach…  (Enter to send, Shift+Enter for a new line)"
+          disabled={!signedIn || locked}
+          placeholder={
+            locked ? "The coach is off until this rated game ends" : "Ask the coach…  (Enter to send, Shift+Enter for a new line)"
+          }
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -75,7 +87,7 @@ export function Chat() {
             }
           }}
         />
-        <button onClick={send} disabled={busy || !signedIn || !draft.trim()}>
+        <button onClick={send} disabled={busy || !signedIn || locked || !draft.trim()}>
           Send
         </button>
       </div>

@@ -1,6 +1,7 @@
 // SQLite access (src-tauri/src/db.rs) and the store subscription that keeps it up to date.
 import { invoke } from "@tauri-apps/api/core";
 import type { Line } from "./chess/line";
+import { fromEngineElo } from "./engine/stockfish";
 import { useStore, type ChatItem, type GameMeta, type Tangent } from "./store";
 
 export const hasBackend = () => "__TAURI_INTERNALS__" in window;
@@ -35,6 +36,8 @@ export interface GameSummary {
   result: GameMeta["result"];
   termination: string | null;
   coachSessionId: string | null;
+  mode: GameMeta["mode"];
+  takebacks: number;
   plies: number;
   opening: string;
 }
@@ -47,9 +50,12 @@ export interface GameRecord {
 }
 
 export const db = {
-  createGame: (game: { startFen: string; studentColor: string; opponent: string | null }) =>
+  createGame: (game: { startFen: string; studentColor: string; opponent: string | null; mode: GameMeta["mode"] }) =>
     invoke<number>("db_create_game", { game }),
-  updateGame: (id: number, patch: { coachSessionId?: string; result?: string; termination?: string }) =>
+  updateGame: (
+    id: number,
+    patch: { coachSessionId?: string; result?: string; termination?: string; mode?: GameMeta["mode"]; takebacks?: number },
+  ) =>
     invoke<void>("db_update_game", { id, patch }),
   listGames: (limit = 100) => invoke<GameSummary[]>("db_list_games", { limit }),
   loadGame: (id: number) => invoke<GameRecord | null>("db_load_game", { id }),
@@ -58,8 +64,14 @@ export const db = {
   pruneEmptyGames: (keep: number | null) => invoke<number>("db_prune_empty_games", { keep }),
 };
 
-export const opponentKey = (elo: number | null) => (elo ? `stockfish:${elo}` : null);
-export const opponentElo = (key: string | null) => (key?.startsWith("stockfish:") ? Number(key.slice(10)) : null);
+// "stockfish-cc:" holds a chess.com-scale rating; older games saved the raw UCI_Elo as "stockfish:".
+export const opponentKey = (rating: number | null) => (rating ? `stockfish-cc:${rating}` : null);
+export const opponentElo = (key: string | null) =>
+  key?.startsWith("stockfish-cc:")
+    ? Number(key.slice(13))
+    : key?.startsWith("stockfish:")
+      ? fromEngineElo(Number(key.slice(10)))
+      : null;
 
 function moveRows(line: Line, studentColor: GameMeta["studentColor"]): MoveRow[] {
   return line.sans.map((san, i) => {

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Key } from "chessground/types";
-import { emptyLine, moveLabel, playAt, type Line } from "./chess/line";
+import { emptyLine, moveLabel, playAt, sideToMove, type Line } from "./chess/line";
 
 /** A side board. Tangents form a tree: parentId is the tangent it branched from (null = the game). */
 export interface Tangent {
@@ -21,13 +21,23 @@ export type ChatItem =
 
 export type Color = "white" | "black";
 
+/**
+ * Fixed when a game starts (a rated game can only be downgraded to practice).
+ * rated: no engine, coach or takebacks until it's over, so it shows the student's real play.
+ * practice: everything allowed.
+ */
+export type GameMode = "rated" | "practice";
+
 export interface GameMeta {
+  mode: GameMode;
   /** "both" = free play, the student moves for both sides. */
   studentColor: Color | "both";
-  /** Stockfish strength; null = no opponent. */
+  /** Stockfish strength as a chess.com-scale rating (see toEngineElo); null = no opponent. */
   opponentElo: number | null;
   result: "1-0" | "0-1" | "1/2-1/2" | null;
   termination: string | null;
+  /** Practice games only. */
+  takebacks: number;
 }
 
 interface State {
@@ -51,7 +61,14 @@ interface State {
 /** Ids are stored in SQLite, so they must be unique across app runs. */
 export const newId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
 
-export const FREE_PLAY: GameMeta = { studentColor: "both", opponentElo: null, result: null, termination: null };
+export const FREE_PLAY: GameMeta = {
+  mode: "practice",
+  studentColor: "both",
+  opponentElo: null,
+  result: null,
+  termination: null,
+  takebacks: 0,
+};
 
 export const useStore = create<State>(() => ({
   gameId: null,
@@ -69,22 +86,33 @@ export const useStore = create<State>(() => ({
   opponentThinking: false,
 }));
 
+/** A rated game still being played: engine, coach, takebacks and side boards are off. */
+export function isLocked(meta: GameMeta = get().meta): boolean {
+  return meta.mode === "rated" && !meta.result;
+}
+
 /** Whether the student may move on the main board right now. */
 export function canStudentMove(): boolean {
   const s = get();
   if (s.active) return true;
   if (s.meta.result) return false;
-  const turn = s.game.fens[s.gamePly].split(" ")[1] === "w" ? "white" : "black";
-  return s.meta.studentColor === "both" || s.meta.studentColor === turn;
+  if (s.meta.studentColor === "both") return true;
+  // Against an opponent, moves are played at the end of the game only (going back is a takeback).
+  const end = s.game.sans.length;
+  return s.gamePly === end && sideToMove(s.game.fens[end]) === s.meta.studentColor;
 }
 
-/** e.g. "student plays White vs Stockfish 1500, in progress". */
+/** e.g. "rated game: student plays White vs Stockfish 1500, in progress". */
 export function gameDescription(): string {
   const { meta } = get();
-  if (meta.studentColor === "both") return "free play (student moves both sides, no opponent)";
+  if (meta.studentColor === "both") return "practice, free play (student moves both sides, no opponent)";
   const side = meta.studentColor === "white" ? "White" : "Black";
   const state = meta.result ? `finished ${meta.result} by ${meta.termination}` : "in progress";
-  return `student plays ${side} vs ${opponentLabel(meta)}, ${state}`;
+  const mode =
+    meta.mode === "rated"
+      ? "rated game (played without engine, coach or takebacks)"
+      : `practice game (help allowed${meta.takebacks ? `, ${meta.takebacks} takeback${meta.takebacks > 1 ? "s" : ""}` : ""})`;
+  return `${mode}: student plays ${side} vs ${opponentLabel(meta)}, ${state}`;
 }
 
 export function opponentLabel(meta: GameMeta): string {

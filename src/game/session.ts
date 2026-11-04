@@ -1,20 +1,39 @@
 // Starting, loading and finishing games. Each game owns its chat, tangents and coach session.
 import { invoke } from "@tauri-apps/api/core";
 import { Chess } from "chess.js";
-import { buildLine, emptyLine, START_FEN } from "../chess/line";
+import { buildLine, emptyLine, sideToMove, START_FEN, type Line } from "../chess/line";
 import { db, discardPending, flush, hasBackend, opponentElo, opponentKey, withoutSaving } from "../db";
-import { FREE_PLAY, newId, pushChat, useStore, type ChatItem, type Color, type GameMeta, type Tangent } from "../store";
+import {
+  FREE_PLAY,
+  isLocked,
+  newId,
+  pushChat,
+  useStore,
+  type ChatItem,
+  type Color,
+  type GameMeta,
+  type GameMode,
+  type Tangent,
+} from "../store";
 
 export interface NewGameOptions {
+  mode: GameMode;
   studentColor: Color | "both";
   opponentElo: number | null;
 }
 
 export async function newGame(opts: NewGameOptions) {
   await leaveGame();
-  const meta: GameMeta = { ...FREE_PLAY, ...opts };
+  // Rated means against an opponent; free play is always practice.
+  const mode: GameMode = opts.studentColor === "both" || !opts.opponentElo ? "practice" : opts.mode;
+  const meta: GameMeta = { ...FREE_PLAY, ...opts, mode };
   const gameId = hasBackend()
-    ? await db.createGame({ startFen: START_FEN, studentColor: opts.studentColor, opponent: opponentKey(opts.opponentElo) })
+    ? await db.createGame({
+        startFen: START_FEN,
+        studentColor: opts.studentColor,
+        opponent: opponentKey(opts.opponentElo),
+        mode,
+      })
     : null;
   withoutSaving(() =>
     useStore.setState({
@@ -64,6 +83,8 @@ export async function loadGame(id: number) {
     useStore.setState({
       gameId: game.id,
       meta: {
+        mode: game.mode,
+        takebacks: game.takebacks,
         studentColor: game.studentColor,
         opponentElo: opponentElo(game.opponent),
         result: game.result,
@@ -104,7 +125,7 @@ export async function deleteGame(id: number) {
   withoutSaving(() => useStore.setState({ gameId: null }));
   const [latest] = await db.listGames(1);
   if (latest) await loadGame(latest.id);
-  else await newGame({ studentColor: "white", opponentElo: 1500 });
+  else await newGame({ mode: "practice", studentColor: "white", opponentElo: 1500 });
 }
 
 /** On launch, reopen the most recent game, or start one against the opponent. */
@@ -114,7 +135,45 @@ export async function bootstrap() {
   await db.pruneEmptyGames(null);
   const [latest] = await db.listGames(1);
   if (latest) await loadGame(latest.id);
-  else await newGame({ studentColor: "white", opponentElo: 1500 });
+  else await newGame({ mode: "practice", studentColor: "white", opponentElo: 1500 });
+}
+
+/** Where a takeback would rewind the game to: before the student's last move. Null = nothing to take back. */
+export function takebackPly(game: Line, meta: GameMeta): number | null {
+  if (meta.mode !== "practice" || meta.result || meta.studentColor === "both") return null;
+  for (let ply = game.sans.length - 1; ply >= 0; ply--) {
+    if (sideToMove(game.fens[ply]) === meta.studentColor) return ply;
+  }
+  return null;
+}
+
+/** Practice games: undo the student's last move (and the opponent's reply), and count it. */
+export async function takeBack() {
+  const { game, meta, gameId } = useStore.getState();
+  const ply = takebackPly(game, meta);
+  if (ply === null) return;
+  const line: Line = {
+    ...game,
+    sans: game.sans.slice(0, ply),
+    fens: game.fens.slice(0, ply + 1),
+    lastMoves: game.lastMoves.slice(0, ply),
+    notes: game.notes.slice(0, ply),
+  };
+  const takebacks = meta.takebacks + 1;
+  useStore.setState({ game: line, gamePly: ply, meta: { ...meta, takebacks } });
+  if (gameId !== null && hasBackend()) await db.updateGame(gameId, { takebacks });
+}
+
+/**
+ * Turns a rated game in progress into a practice game, for good, so the engine and coach can
+ * help. It then no longer counts as the student's unaided play.
+ */
+export async function switchToPractice() {
+  const { meta, gameId } = useStore.getState();
+  if (!isLocked(meta)) return;
+  useStore.setState({ meta: { ...meta, mode: "practice" } });
+  pushChat({ kind: "system", id: newId("c"), text: "Switched to practice. This game no longer counts as a rated game." });
+  if (gameId !== null && hasBackend()) await db.updateGame(gameId, { mode: "practice" });
 }
 
 export async function resign() {
@@ -126,7 +185,8 @@ export async function resign() {
 async function finish(result: NonNullable<GameMeta["result"]>, termination: string) {
   const { gameId, meta } = useStore.getState();
   useStore.setState({ meta: { ...meta, result, termination } });
-  pushChat({ kind: "system", id: newId("c"), text: `Game over: ${result} (${termination}).` });
+  const review = meta.mode === "rated" ? " The coach is on again: ask it to go through the game with you." : "";
+  pushChat({ kind: "system", id: newId("c"), text: `Game over: ${result} (${termination}).${review}` });
   if (gameId !== null && hasBackend()) await db.updateGame(gameId, { result, termination });
 }
 

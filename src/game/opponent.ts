@@ -1,7 +1,7 @@
 // The sparring partner: Stockfish at limited strength. The coach never chooses these moves.
 import type { Key } from "chessground/types";
 import { playAt, sideToMove } from "../chess/line";
-import { getOpponentEngine } from "../engine/stockfish";
+import { getOpponentEngine, toEngineElo } from "../engine/stockfish";
 import { useStore } from "../store";
 
 const MOVETIME_MS = 600;
@@ -24,7 +24,7 @@ async function maybeMove() {
   thinkingOn = fen;
   useStore.setState({ opponentThinking: true });
   const started = Date.now();
-  const uci = await getOpponentEngine().bestMove(fen, meta.opponentElo, MOVETIME_MS);
+  const uci = await getOpponentEngine().bestMove(fen, toEngineElo(meta.opponentElo), MOVETIME_MS);
   // Short pause so instant replies don't feel robotic.
   await new Promise((r) => setTimeout(r, Math.max(0, 350 - (Date.now() - started))));
   thinkingOn = null;

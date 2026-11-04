@@ -1,7 +1,7 @@
 // Live analysis for the eval bar: its own Stockfish, always analyzing the position on screen.
 import { create } from "zustand";
 import { useSettings } from "../settings";
-import { screenFen, useStore } from "../store";
+import { isLocked, screenFen, useStore } from "../store";
 import type { EngineLine } from "./stockfish";
 
 const MAX_DEPTH = 20;
@@ -76,11 +76,11 @@ class LiveAnalysis {
 
 const live = new LiveAnalysis();
 
-/** Follows the on-screen position while the eval bar is shown. */
+/** Follows the on-screen position while the eval bar is shown (never during a rated game). */
 export function initLiveEval() {
   let last: string | null = null;
   const update = () => {
-    if (!useSettings.getState().showEval) {
+    if (!useSettings.getState().showEval || isLocked()) {
       live.stop();
       last = null;
       return;
