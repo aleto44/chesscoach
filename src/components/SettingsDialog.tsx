@@ -10,7 +10,7 @@ import { customSounds, loadSounds, play, SOUND_NAMES } from "../sound";
 const CHOICES = [...MODEL_CHOICES, { value: "custom", label: "Custom…", hint: "Any model name or ID claude accepts" }];
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const { coachModel, activeModel, sounds, showEval, theme } = useSettings();
+  const { coachModel, activeModel, sounds, showEval, theme, nudges } = useSettings();
   const preset = MODEL_CHOICES.some((c) => c.value === coachModel);
   const [choice, setChoice] = useState(preset ? coachModel : "custom");
   const [custom, setCustom] = useState(preset ? "" : coachModel);
@@ -74,6 +74,18 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       <label className="toggle">
         <input type="checkbox" checked={showEval} onChange={(e) => saveSetting("showEval", e.target.checked)} />
         <span>Show engine evaluation</span>
+      </label>
+      <label className="field">
+        <span>Flag my mistakes in practice games</span>
+        <select value={nudges} onChange={(e) => saveSetting("nudges", e.target.value as typeof nudges)}>
+          <option value="blunders">Blunders only</option>
+          <option value="mistakes">Mistakes and blunders</option>
+          <option value="off">Off</option>
+        </select>
+        <span className="muted small">
+          Checked on your computer right after you move. Asking the coach about it is up to you, so it costs no usage
+          by itself. Never in rated games.
+        </span>
       </label>
       <footer>
         <button className="primary" onClick={save} disabled={choice === "custom" && !custom.trim()}>

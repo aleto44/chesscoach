@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { resign, switchToPractice, takeBack, takebackPly } from "../game/session";
 import { timeControlLabel } from "../game/clock";
 import {
@@ -20,6 +20,7 @@ import { EvalBar, EvalLine } from "./EvalBar";
 import { ModeBadge } from "./ModeBadge";
 import { PlayerCard } from "./Clock";
 import { markFor, ReviewBar, useMoment } from "./Review";
+import { bestShape, useNudge } from "../coach/nudge";
 import { saveSetting, useSettings } from "../settings";
 
 /**
@@ -29,6 +30,8 @@ import { saveSetting, useSettings } from "../settings";
 export function BoardPanel() {
   const { game, gamePly, tangents, active, orientation, meta, opponentThinking, annotations, arrows } = useStore();
   const moment = useMoment();
+  const nudge = useNudge();
+  const nudgeShapes = useMemo(() => (nudge ? bestShape(nudge) : []), [nudge]);
   const locked = isLocked(meta);
   const showEval = useSettings((s) => s.showEval) && !locked;
   const canTakeBack = takebackPly(game, meta) !== null;
@@ -93,7 +96,11 @@ export function BoardPanel() {
           orientation={orientation}
           onMove={boardMove}
           canMove={canStudentMove()}
-          shapes={moment?.shapes ?? (arrows?.fen === line.fens[ply] ? arrows.shapes : undefined)}
+          shapes={
+            moment?.shapes ??
+            (nudge?.showBest && !tangent && line.fens[ply] === nudge.fenBefore ? nudgeShapes : undefined) ??
+            (arrows?.fen === line.fens[ply] ? arrows.shapes : undefined)
+          }
           premoveColor={
             !tangent && !meta.result && meta.studentColor !== "both" && gamePly === game.sans.length
               ? meta.studentColor

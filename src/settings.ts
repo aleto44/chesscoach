@@ -10,9 +10,11 @@ export interface Settings {
   /** Eval bar and engine line beside the board. */
   showEval: boolean;
   theme: "dark" | "light" | "system";
+  /** Practice games: flag the student's mistakes right after they play them (local engine, no AI). */
+  nudges: "off" | "blunders" | "mistakes";
 }
 
-const DEFAULTS: Settings = { coachModel: "", sounds: true, showEval: false, theme: "dark" };
+const DEFAULTS: Settings = { coachModel: "", sounds: true, showEval: false, theme: "dark", nudges: "blunders" };
 
 export const MODEL_CHOICES = [
   { value: "", label: "Default", hint: "Whatever your Claude Code default is" },

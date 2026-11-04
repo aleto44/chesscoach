@@ -4,9 +4,11 @@ import { formatMoves } from "../chess/line";
 import { logout, useAuth } from "../coach/auth";
 import { restartCoach, sendToCoach } from "../coach/bridge";
 import { skipQuiz } from "../coach/quiz";
+import { bestSan, nudgeQuestion, useNudge } from "../coach/nudge";
+import { takeBack } from "../game/session";
 import { hasBackend } from "../db";
 import { useSettings } from "../settings";
-import { isLocked, openTangent, useStore, type ChatItem } from "../store";
+import { goto, isLocked, openTangent, useStore, type ChatItem } from "../store";
 import { Board } from "./Board";
 import { askConfirm } from "./Confirm";
 import { SignIn } from "./SignIn";
@@ -76,6 +78,8 @@ export function Chat() {
         {!signedIn && <SignIn />}
         <div ref={bottom} />
       </div>
+
+      <NudgeNote signedIn={signedIn} />
 
       <div className="composer">
         <textarea
@@ -162,6 +166,51 @@ function ChatRow({ item }: { item: ChatItem }) {
     case "quiz":
       return <QuizCard item={item} />;
   }
+}
+
+/** "That looked like a blunder": takeback, the better move, or one question to the coach. */
+function NudgeNote({ signedIn }: { signedIn: boolean }) {
+  const n = useNudge();
+  const busy = useStore((s) => s.busy);
+  if (!n) return null;
+  const best = bestSan(n);
+  return (
+    <div className={`nudge ${n.severity}`} role="status">
+      <div>
+        <strong>{n.severity === "blunder" ? "That looks like a blunder." : "That might be a mistake."}</strong>{" "}
+        <span className="muted">
+          {n.san}: your chances went from {Math.round(n.before)}% to {Math.round(n.after)}%.
+        </span>
+        {n.showBest && best && <span> Better was {best}.</span>}
+      </div>
+      <div className="nudge-actions">
+        <button onClick={takeBack}>↶ Take back</button>
+        {!n.showBest && best && <button
+            onClick={() => {
+              useNudge.setState({ ...n, showBest: true });
+              goto(n.ply);
+            }}
+          >
+            Show better move
+          </button>}
+        {signedIn && (
+          <button
+            disabled={busy}
+            onClick={() => {
+              sendToCoach(nudgeQuestion(n));
+              useNudge.setState(null, true);
+            }}
+          >
+            Ask the coach why
+          </button>
+        )}
+        <span className="spacer" />
+        <button onClick={() => useNudge.setState(null, true)} title="Dismiss" aria-label="Dismiss">
+          ✕
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function QuizCard({ item }: { item: Extract<ChatItem, { kind: "quiz" }> }) {
