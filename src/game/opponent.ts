@@ -11,6 +11,8 @@ import { clockLeft } from "./clock";
 export const OPPONENT_RATING = { min: 400, max: STOCKFISH_RATING.max };
 
 const MOVETIME_MS = 600;
+/** How long a reply takes, picked at random each move (thinking time included). */
+const THINK_MS = { min: 1000, max: 3000 };
 let thinkingOn: string | null = null;
 
 /** Replies whenever the end of the game line is the opponent's turn. */
@@ -42,10 +44,13 @@ async function maybeMove() {
 
   thinkingOn = fen;
   useStore.setState({ opponentThinking: true });
-  // On the clock, Stockfish spends at most a 40th of what's left, so bullet games don't flag it.
+  const started = Date.now();
+  // On the clock, it spends at most a 40th of what's left, so bullet games don't flag it.
   const left = clockLeft(sideToMove(fen));
   const budget = left === null ? Infinity : left / 40;
   const uci = await pickMove(fen, meta.opponentElo, Math.max(50, Math.min(MOVETIME_MS, budget)));
+  const delay = Math.min(THINK_MS.min + Math.random() * (THINK_MS.max - THINK_MS.min), budget);
+  await new Promise((r) => setTimeout(r, Math.max(0, delay - (Date.now() - started))));
   thinkingOn = null;
   useStore.setState({ opponentThinking: false });
 
