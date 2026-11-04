@@ -1158,6 +1158,182 @@ button.icon {
   font-style: normal;
 }
 
+.label-icon {
+  flex: none;
+  vertical-align: middle;
+}
+
+.move-row .mv .label-icon {
+  margin: -2px 0 0 4px;
+}
+
+/* The verdict on the move on screen, under the move list */
+.verdict {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.verdict-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.verdict-eval {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Game report: replaces the move list in the side column */
+.report {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.eval-graph {
+  position: relative;
+  flex: none;
+  height: 64px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #3a3733;
+  cursor: pointer;
+}
+
+.eval-graph svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.eval-graph-white {
+  fill: #f2f0ec;
+}
+
+.eval-graph-mid {
+  stroke: #8a847c;
+  stroke-width: 1;
+}
+
+.eval-graph-now {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.eval-graph-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px 22px 54px;
+  align-items: center;
+  row-gap: 6px;
+}
+
+.report-grid hr {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.report-row {
+  display: contents;
+}
+
+.report-row.zero .report-key,
+.report-row.zero .report-count {
+  opacity: 0.45;
+}
+
+.report-key {
+  font-weight: 600;
+}
+
+.report-player {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.report-player.you {
+  color: var(--accent);
+}
+
+.report-player .player-piece {
+  width: 10px;
+  height: 10px;
+}
+
+.report-count,
+.report-box,
+.report-phase {
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-grid .label-icon {
+  justify-self: center;
+}
+
+.report-phase {
+  display: flex;
+  justify-content: center;
+}
+
+.report-box {
+  padding: 3px 0;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.report-box.white {
+  background: #f2f0ec;
+  color: #22201c;
+}
+
+.report-box.black {
+  background: #3a3733;
+  color: #ebe6de;
+}
+
+.report-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.report-actions button {
+  flex: 1;
+}
+
 /* Drills */
 
 .count {
@@ -1270,9 +1446,14 @@ button.icon {
   .game-side {
     grid-column: 1;
     height: auto;
+    /* When it doesn't fit, overflow below rather than over the board. */
+    align-self: start;
   }
   .game-side .moves {
     max-height: 160px;
+  }
+  .game-side .report {
+    max-height: 300px;
   }
 }
 

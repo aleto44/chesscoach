@@ -84,6 +84,8 @@ interface State {
   annotations: (MoveAnnotation | null)[];
   /** Analysis in progress for the open game. */
   review: { done: number; total: number } | null;
+  /** The game report (accuracy, move counts) is showing in the side column instead of the moves. */
+  reportOpen: boolean;
   /** Arrows and circles the coach drew (draw_arrows), shown while that position is on screen. */
   arrows: { fen: string; shapes: DrawShape[] } | null;
 }
@@ -120,6 +122,7 @@ export const useStore = create<State>(() => ({
   turnStartedAt: null,
   annotations: [],
   review: null,
+  reportOpen: false,
   arrows: null,
 }));
 

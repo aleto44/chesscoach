@@ -19,7 +19,8 @@ import { askConfirm } from "./Confirm";
 import { EvalBar, EvalLine } from "./EvalBar";
 import { ModeBadge } from "./ModeBadge";
 import { PlayerCard } from "./Clock";
-import { markFor, ReviewBar, useMoment } from "./Review";
+import { GameReportPanel, LabelIcon, listLabel, ReviewBar, useGameReport, useMoment, useVerdict, VerdictLine } from "./Review";
+import type { MoveLabel } from "../analysis/review";
 import { bestShape, useNudge } from "../coach/nudge";
 import { saveSetting, useSettings } from "../settings";
 
@@ -28,8 +29,10 @@ import { saveSetting, useSettings } from "../settings";
  * controls, then the player at the bottom.
  */
 export function BoardPanel() {
-  const { game, gamePly, tangents, active, orientation, meta, opponentThinking, annotations, arrows } = useStore();
+  const { game, gamePly, tangents, active, orientation, meta, opponentThinking, annotations, arrows, reportOpen } = useStore();
   const moment = useMoment();
+  const verdict = useVerdict();
+  const report = useGameReport();
   const nudge = useNudge();
   const nudgeShapes = useMemo(() => (nudge ? bestShape(nudge) : []), [nudge]);
   const locked = isLocked(meta);
@@ -43,6 +46,14 @@ export function BoardPanel() {
   const vsOpponent = meta.studentColor !== "both";
   const inProgress = vsOpponent && !meta.result;
   const top = orientation === "white" ? "black" : "white";
+  const shapes = useMemo(() => {
+    const drawn =
+      moment?.shapes ??
+      (nudge?.showBest && !tangent && line.fens[ply] === nudge.fenBefore ? nudgeShapes : undefined) ??
+      (arrows?.fen === line.fens[ply] ? arrows.shapes : undefined);
+    // The review's badge on the square the last move went to.
+    return verdict ? [...(drawn ?? []), verdict.badge] : drawn;
+  }, [moment, nudge, nudgeShapes, tangent, line, ply, arrows, verdict]);
 
   const confirmResign = async () => {
     if (await askConfirm({ title: "Resign this game?", body: `${opponentLabel(meta)} wins.`, confirmLabel: "Resign", danger: true }))
@@ -96,11 +107,7 @@ export function BoardPanel() {
           orientation={orientation}
           onMove={boardMove}
           canMove={canStudentMove()}
-          shapes={
-            moment?.shapes ??
-            (nudge?.showBest && !tangent && line.fens[ply] === nudge.fenBefore ? nudgeShapes : undefined) ??
-            (arrows?.fen === line.fens[ply] ? arrows.shapes : undefined)
-          }
+          shapes={shapes}
           premoveColor={
             !tangent && !meta.result && meta.studentColor !== "both" && gamePly === game.sans.length
               ? meta.studentColor
@@ -122,9 +129,16 @@ export function BoardPanel() {
         <PlayerCard side={top} />
 
         <div className="side-body">
-          <MoveList sans={line.sans} fens={line.fens} ply={ply} marks={tangent ? undefined : annotations.map(markFor)} />
-          {showEval && <EvalLine />}
-          {(moment?.text || note) && <div className={`note ${moment ? "moment" : ""}`}>{moment?.text || note}</div>}
+          {reportOpen && report && !tangent ? (
+            <GameReportPanel report={report} />
+          ) : (
+            <>
+              <MoveList sans={line.sans} fens={line.fens} ply={ply} marks={tangent ? undefined : annotations.map(listLabel)} />
+              {showEval && <EvalLine />}
+              {verdict && <VerdictLine v={verdict} />}
+              {(moment?.text || note) && <div className={`note ${moment ? "moment" : ""}`}>{moment?.text || note}</div>}
+            </>
+          )}
           <ReviewBar />
         </div>
 
@@ -181,7 +195,7 @@ function gameStatus(meta: GameMeta, thinking: boolean, endFen: string): string {
 }
 
 /** Moves in rows, one per move number, scrolled to keep the current move in view. */
-function MoveList({ sans, fens, ply, marks }: { sans: string[]; fens: string[]; ply: number; marks?: string[] }) {
+function MoveList({ sans, fens, ply, marks }: { sans: string[]; fens: string[]; ply: number; marks?: (MoveLabel | null)[] }) {
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = list.current;
@@ -212,7 +226,7 @@ function MoveList({ sans, fens, ply, marks }: { sans: string[]; fens: string[]; 
             return (
               <button key={c} className={`mv ${i + 1 === ply ? "current" : ""}`} onClick={() => goto(i + 1)}>
                 {sans[i]}
-                {marks?.[i] && <span className={`mark m${marks[i].length}${marks[i] === "?!" ? "i" : ""}`}>{marks[i]}</span>}
+                {marks?.[i] && <LabelIcon label={marks[i]} size={14} />}
               </button>
             );
           })}

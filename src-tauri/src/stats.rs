@@ -53,6 +53,8 @@ pub struct AnalyzedMove {
     cp_loss: i64,
     best_uci: Option<String>,
     class: String,
+    #[serde(default)]
+    label: Option<String>,
     phase: String,
     tags: Vec<String>,
 }
@@ -70,7 +72,7 @@ pub fn db_save_analysis(
         let mut update = tx
             .prepare(
                 "UPDATE moves SET eval_before = ?3, eval_after = ?4, cp_loss = ?5, best_uci = ?6,
-                        class = ?7, phase = ?8, tags = ?9
+                        class = ?7, phase = ?8, tags = ?9, label = ?10
                  WHERE game_id = ?1 AND ply = ?2",
             )
             .map_err(err)?;
@@ -86,6 +88,7 @@ pub fn db_save_analysis(
                     m.class,
                     m.phase,
                     serde_json::to_string(&m.tags).map_err(err)?,
+                    m.label,
                 ])
                 .map_err(err)?;
         }

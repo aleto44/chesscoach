@@ -1,41 +1,63 @@
 // Post-game analysis, all local (Stockfish, no AI): evaluates every position of a finished game,
-// classifies each move by how much winning chance it gave away, tags the mistakes with simple
+// classifies each move by how much winning chance it gave away (lichess thresholds), labels it the
+// way chess.com's review does (brilliant, great, miss, ...), tags the mistakes with simple
 // patterns, saves it all to SQLite and turns the student's mistakes into drills.
 import { invoke } from "@tauri-apps/api/core";
 import { Chess } from "chess.js";
-import { buildLine, sideToMove, type Line } from "../chess/line";
+import { buildLine, sideToMove, START_FEN, type Line } from "../chess/line";
 import { db, hasBackend } from "../db";
 import { whiteWinPercent } from "../engine/live";
-import { getReviewEngine } from "../engine/stockfish";
+import { getReviewEngine, type EngineLine } from "../engine/stockfish";
 import { useStore, type Color, type GameMeta } from "../store";
-import { openingName } from "../openings/book";
+import { inBook, openingName } from "../openings/book";
 import { addMistakeDrills } from "./drills";
 
 const DEPTH = 13;
 const MATE_CP = 10000;
 
+/** Severity, lichess-style. Stats and drills work on this. */
 export type MoveClass = "best" | "good" | "inaccuracy" | "mistake" | "blunder";
+/** The review's verdict on a move, chess.com-style (see labelFor). */
+export type MoveLabel =
+  | "brilliant"
+  | "great"
+  | "best"
+  | "excellent"
+  | "good"
+  | "book"
+  | "inaccuracy"
+  | "mistake"
+  | "miss"
+  | "blunder";
 export type Phase = "opening" | "middlegame" | "endgame";
 
 export interface MoveAnnotation {
   class: MoveClass;
+  /** Missing in analyses saved before labels existed; read it with labelOf. */
+  label?: MoveLabel;
   /** Centipawns the move gave away, mover's view (0–1000). */
   cpLoss: number;
   bestUci: string | null;
-  /** White's view after the move, centipawns (mate = ±10000). */
+  /** White's view before and after the move, centipawns (mate = ±10000). */
+  evalBefore?: number;
   evalAfter: number;
   phase: Phase;
   tags: string[];
 }
 
-interface Eval {
+interface Score {
   /** White's view, centipawns; mates as ±(10000 − distance). */
   cp: number;
   mate: boolean;
-  best: string | null;
 }
 
-/** Thresholds on the drop in the mover's winning chances, in percentage points (as lichess). */
+interface Eval extends Score {
+  best: string | null;
+  /** The engine's second choice, to tell an only move ("great") from one of several good ones. */
+  second: Score | null;
+}
+
+/** Thresholds on what a move threw away (see lossPoints), in percentage points (as lichess). */
 function classify(drop: number, isBest: boolean): MoveClass {
   if (drop >= 15) return "blunder";
   if (drop >= 10) return "mistake";
@@ -43,24 +65,50 @@ function classify(drop: number, isBest: boolean): MoveClass {
   return isBest ? "best" : "good";
 }
 
-async function evaluate(fen: string): Promise<Eval> {
-  const chess = new Chess(fen);
-  if (chess.isCheckmate()) return { cp: chess.turn() === "w" ? -MATE_CP : MATE_CP, mate: true, best: null };
-  if (chess.isGameOver()) return { cp: 0, mate: false, best: null };
-  const [line] = await getReviewEngine().analyze(fen, 1, DEPTH);
-  if (!line) return { cp: 0, mate: false, best: null };
+function score(line: EngineLine): Score {
   if (line.mate !== undefined) {
     const sign = line.mate > 0 ? 1 : -1;
-    return { cp: sign * (MATE_CP - Math.abs(line.mate)), mate: true, best: line.pv[0] ?? null };
+    return { cp: sign * (MATE_CP - Math.abs(line.mate)), mate: true };
   }
-  return { cp: line.cp ?? 0, mate: false, best: line.pv[0] ?? null };
+  return { cp: line.cp ?? 0, mate: false };
 }
 
-const winPct = (e: Eval, side: Color) => {
+async function evaluate(fen: string): Promise<Eval> {
+  const chess = new Chess(fen);
+  const none = { best: null, second: null };
+  if (chess.isCheckmate()) return { cp: chess.turn() === "w" ? -MATE_CP : MATE_CP, mate: true, ...none };
+  if (chess.isGameOver()) return { cp: 0, mate: false, ...none };
+  const [line, second] = await getReviewEngine().analyze(fen, 2, DEPTH);
+  if (!line) return { cp: 0, mate: false, ...none };
+  return { ...score(line), best: line.pv[0] ?? null, second: second ? score(second) : null };
+}
+
+const winPct = (e: Score, side: Color) => {
   const w = e.mate ? (e.cp > 0 ? 100 : 0) : whiteWinPercent({ cp: e.cp });
   return side === "white" ? w : 100 - w;
 };
-const pov = (e: Eval, side: Color) => (side === "white" ? e.cp : -e.cp);
+const pov = (e: Score, side: Color) => (side === "white" ? e.cp : -e.cp);
+
+/**
+ * What a move threw away, in points (≈ percentage points of winning chances, as lichess).
+ * Winning chances alone flatten out once a game is decided: from −5 another lost rook barely
+ * moves them, so a student who keeps hanging pieces in a bad position would see "good" moves.
+ * So unless the mover is still clearly winning afterwards (then a lost pawn or two really doesn't
+ * matter), the centipawns lost count too: 10 cp per point, more forgiving as the eval grows
+ * (engine numbers are noisy at −10), so 50 / 100 / 150 cp make an inaccuracy / mistake / blunder
+ * in a level position.
+ */
+function lossPoints(before: Score, after: Score, mover: Color): number {
+  const drop = Math.max(0, winPct(before, mover) - winPct(after, mover));
+  if (pov(after, mover) >= 150) return drop;
+  const cpLoss = Math.min(1000, Math.max(0, pov(before, mover) - pov(after, mover)));
+  const scale = 1 + Math.min(Math.abs(pov(before, mover)), 1500) / 1500;
+  return Math.max(drop, cpLoss / (10 * scale));
+}
+
+/** lossPoints from stored evals (White's view, mates as ±(10000 − distance)). */
+export const lossFromEvals = (before: number, after: number, mover: Color) =>
+  lossPoints({ cp: before, mate: Math.abs(before) >= 9000 }, { cp: after, mate: Math.abs(after) >= 9000 }, mover);
 
 const VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
@@ -115,6 +163,96 @@ function tagsFor(g: GameInput, i: number, before: Eval, after: Eval, cls: MoveCl
   return tags;
 }
 
+/**
+ * For each of the opponent's pieces (not pawns) the side to move can win, the material it gains
+ * in pawns, counting the capturer as lost when it can be taken back on that square. A one-ply
+ * exchange estimate: enough to spot a piece left en prise.
+ */
+function captureGains(fen: string): Map<string, number> {
+  const chess = new Chess(fen);
+  const gains = new Map<string, number>();
+  for (const m of chess.moves({ verbose: true })) {
+    if (!m.captured || VALUES[m.captured] < 3) continue;
+    chess.move(m);
+    const recapture = chess.moves({ verbose: true }).some((r) => r.to === m.to);
+    chess.undo();
+    const gain = VALUES[m.captured] - (recapture ? VALUES[m.piece] : 0);
+    if (gain > (gains.get(m.to) ?? 0)) gains.set(m.to, gain);
+  }
+  return gains;
+}
+
+/** What the opponent already threatened to win, by square, as if the mover passed (none in check). */
+function threatened(fen: string): Map<string, number> {
+  if (new Chess(fen).inCheck()) return new Map();
+  const parts = fen.split(" ");
+  parts[1] = parts[1] === "w" ? "b" : "w";
+  parts[3] = "-";
+  try {
+    return captureGains(parts.join(" "));
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * The move newly leaves a piece (not a pawn) for the taking and gives up material on balance.
+ * Leaving a piece that was already attacked doesn't count.
+ */
+function isSacrifice(fenBefore: string, fenAfter: string, played: string): boolean {
+  const captured = moveFacts(fenBefore, played)?.captured;
+  const before = threatened(fenBefore);
+  let gain = 0;
+  for (const [sq, g] of captureGains(fenAfter)) {
+    if (sq === played.slice(2, 4) || !before.has(sq)) gain = Math.max(gain, g);
+  }
+  return gain >= 2 && gain - (captured ? VALUES[captured] : 0) >= 1;
+}
+
+/**
+ * chess.com-style verdict, refining the severity class. `drops` holds lossPoints for every move
+ * up to this one.
+ * - book: still on a line of the opening book.
+ * - brilliant: a sound sacrifice: gives up a piece, not losing, and best or nearly (only the best
+ *   move when already winning, where any sensible move would do).
+ * - great: the only good move (the engine's second choice is a blunder), not a plain recapture.
+ * - excellent / good: not the engine's move, losing under 2 / 5 points.
+ * - miss: a mistake or blunder that fails to punish the opponent's own mistake (leaving you about
+ *   where you were before it), or lets a forced mate slip while still winning.
+ */
+function labelFor(g: GameInput, evals: Eval[], i: number, cls: MoveClass, drops: number[], played: string): MoveLabel {
+  const { fens, sans, lastMoves } = g.line;
+  const mover = sideToMove(fens[i]);
+  const [before, after] = [evals[i], evals[i + 1]];
+  const winBefore = winPct(before, mover);
+  const winAfter = winPct(after, mover);
+  const drop = drops[i];
+
+  if (g.line.startFen === START_FEN && drop < 5 && inBook(sans.slice(0, i + 1))) return "book";
+  if (cls === "mistake" || cls === "blunder") {
+    const unpunished = i > 0 && drops[i - 1] >= 10 && winAfter >= winPct(evals[i - 1], mover) - 5;
+    const slipped = before.mate && pov(before, mover) > 0 && winAfter >= 60;
+    return unpunished || slipped ? "miss" : cls;
+  }
+  if (cls === "inaccuracy") return cls;
+  const sound = cls === "best" || (drop < 2 && winBefore < 97);
+  if (sound && winAfter >= 50 && isSacrifice(fens[i], fens[i + 1], played)) return "brilliant";
+  if (cls === "best" && before.second) {
+    const gap = winBefore - winPct(before.second, mover);
+    const recapture = i > 0 && lastMoves[i][1] === lastMoves[i - 1][1] && sans[i - 1].includes("x");
+    if (gap >= 15 && !recapture) return "great";
+  }
+  if (cls === "best") return "best";
+  return drop < 2 ? "excellent" : "good";
+}
+
+/** The verdict on an analyzed move; analyses saved before labels have only the severity class. */
+export function labelOf(a: MoveAnnotation): MoveLabel {
+  if (a.label) return a.label;
+  if (a.class === "good") return a.cpLoss < 20 ? "excellent" : "good";
+  return a.class;
+}
+
 export async function analyzeGame(g: GameInput, onProgress?: (done: number, total: number) => void) {
   const { fens } = g.line;
   const evals: Eval[] = [];
@@ -122,18 +260,22 @@ export async function analyzeGame(g: GameInput, onProgress?: (done: number, tota
     evals.push(await evaluate(fens[i]));
     onProgress?.(i + 1, fens.length);
   }
+  const drops: number[] = [];
   const annotations: MoveAnnotation[] = g.line.sans.map((_, i) => {
     const mover = sideToMove(fens[i]);
     const played = g.line.lastMoves[i].join("") + (g.line.sans[i].match(/=([QRBN])/)?.[1].toLowerCase() ?? "");
     const [before, after] = [evals[i], evals[i + 1]];
     const isBest = before.best === played;
-    const drop = isBest ? 0 : Math.max(0, winPct(before, mover) - winPct(after, mover));
+    const drop = isBest ? 0 : lossPoints(before, after, mover);
+    drops.push(drop);
     const cls = classify(drop, isBest);
     const cpLoss = isBest ? 0 : Math.max(0, Math.min(1000, pov(before, mover) - pov(after, mover)));
     return {
       class: cls,
+      label: labelFor(g, evals, i, cls, drops, played),
       cpLoss: Math.round(cpLoss),
       bestUci: before.best,
+      evalBefore: before.cp,
       evalAfter: after.cp,
       phase: phaseOf(fens[i], i),
       tags: tagsFor(g, i, before, after, cls),
@@ -151,6 +293,7 @@ export async function analyzeGame(g: GameInput, onProgress?: (done: number, tota
         cpLoss: a.cpLoss,
         bestUci: a.bestUci,
         class: a.class,
+        label: a.label,
         phase: a.phase,
         tags: a.tags,
       })),
@@ -165,6 +308,7 @@ let queue: Promise<unknown> = Promise.resolve();
 /** Analyzes the open game (when it ends) and any finished games still unanalyzed, one at a time. */
 export function initReview() {
   useStore.subscribe((s, prev) => {
+    if (s.gameId !== prev.gameId && s.reportOpen) useStore.setState({ reportOpen: false });
     if (s.gameId !== null && s.gameId === prev.gameId && s.meta.result && !prev.meta.result) {
       enqueueCurrent();
     }
@@ -187,7 +331,8 @@ function enqueueCurrent() {
       const annotations = await analyzeGame(input, (done, total) => {
         if (isOpen()) useStore.setState({ review: { done, total } });
       });
-      if (isOpen()) useStore.setState({ annotations, review: null });
+      // The report opens by itself when the game just played has been analyzed.
+      if (isOpen()) useStore.setState({ annotations, review: null, reportOpen: !useStore.getState().active });
     } catch (e) {
       console.error("analysis failed", e);
       if (isOpen()) useStore.setState({ review: null });

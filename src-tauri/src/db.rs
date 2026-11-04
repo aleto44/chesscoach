@@ -167,13 +167,65 @@ CREATE TABLE repertoire (
 ALTER TABLE games ADD COLUMN opening_focus TEXT;
 DROP VIEW rated_games;
 CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
+"#, r#"
+-- Lichess puzzles the student tried (the puzzles themselves are in puzzles.db, attached as pz).
+-- Only the first try at a puzzle is rated; rating_after is the student's puzzle rating after it.
+CREATE TABLE puzzle_attempts (
+    id            INTEGER PRIMARY KEY,
+    puzzle_id     TEXT NOT NULL,            -- Lichess puzzle id
+    at            TEXT NOT NULL DEFAULT (datetime('now')),
+    correct       INTEGER NOT NULL,
+    ms            INTEGER,
+    puzzle_rating INTEGER NOT NULL,
+    rated         INTEGER NOT NULL,
+    rating_after  INTEGER NOT NULL,
+    themes        TEXT NOT NULL             -- space-separated copy, so stats don't need puzzles.db
+);
+CREATE INDEX puzzle_attempts_puzzle ON puzzle_attempts(puzzle_id);
+
+-- A fourth drill kind, 'puzzle': a missed Lichess puzzle (line holds the solution in SAN from fen,
+-- the opponent's replies included). SQLite can't alter a CHECK, so the table is rebuilt.
+CREATE TABLE drills_new (
+    id             INTEGER PRIMARY KEY,
+    kind           TEXT NOT NULL CHECK (kind IN ('mistake', 'opening', 'coach', 'puzzle')),
+    title          TEXT NOT NULL,
+    fen            TEXT NOT NULL,
+    color          TEXT NOT NULL,
+    answer_uci     TEXT,
+    line           TEXT NOT NULL DEFAULT '',
+    note           TEXT,
+    source_game_id INTEGER REFERENCES games(id) ON DELETE SET NULL,
+    source_ply     INTEGER,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    due_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    interval_days  REAL NOT NULL DEFAULT 0,
+    ease           REAL NOT NULL DEFAULT 2.5,
+    reps           INTEGER NOT NULL DEFAULT 0,
+    lapses         INTEGER NOT NULL DEFAULT 0,
+    retired        INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (kind, fen, line)
+);
+INSERT INTO drills_new SELECT * FROM drills;
+DROP TABLE drills;
+ALTER TABLE drills_new RENAME TO drills;
+CREATE INDEX drills_due ON drills(retired, due_at);
+"#, r#"
+-- The review's chess.com-style verdict on an analyzed move, finer than class: 'brilliant' |
+-- 'great' | 'best' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'miss' | 'blunder'.
+ALTER TABLE moves ADD COLUMN label TEXT;
+"#, r#"
+-- Move grading changed (centipawns lost count in positions that aren't won, so hanging pieces
+-- while behind are blunders again): re-analyze every game on the next launch. Drills are unique
+-- per position, so existing ones aren't duplicated.
+UPDATE games SET analyzed_at = NULL;
 "#];
 
 impl Db {
     pub fn open(path: &Path) -> rusqlite::Result<Self> {
         let mut conn = Connection::open(path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
-        conn.pragma_update(None, "foreign_keys", true)?;
+        // Off while migrating, so rebuilding a table (drop + rename) doesn't cascade deletes.
+        conn.pragma_update(None, "foreign_keys", false)?;
         let version: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
         for (i, sql) in MIGRATIONS.iter().enumerate().skip(version as usize) {
             let tx = conn.transaction()?;
@@ -181,6 +233,7 @@ impl Db {
             tx.pragma_update(None, "user_version", (i + 1) as i64)?;
             tx.commit()?;
         }
+        conn.pragma_update(None, "foreign_keys", true)?;
         Ok(Self(Mutex::new(conn)))
     }
 
@@ -269,10 +322,12 @@ pub struct MoveRow {
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveAnalysis {
+    pub eval_before: Option<i64>,
     pub eval_after: Option<i64>,
     pub cp_loss: Option<i64>,
     pub best_uci: Option<String>,
     pub class: String,
+    pub label: Option<String>,
     pub phase: Option<String>,
     pub tags: Vec<String>,
 }
@@ -427,6 +482,7 @@ pub fn db_set_moves(db: State<Db>, game_id: i64, moves: Vec<MoveRow>) -> Result<
                     cp_loss     = CASE WHEN {same} THEN cp_loss END,
                     best_uci    = CASE WHEN {same} THEN best_uci END,
                     class       = CASE WHEN {same} THEN class END,
+                    label       = CASE WHEN {same} THEN label END,
                     phase       = CASE WHEN {same} THEN phase END,
                     tags        = CASE WHEN {same} THEN tags END,
                     san = excluded.san, uci = excluded.uci, fen_before = excluded.fen_before,
@@ -509,7 +565,7 @@ pub fn db_load_game(db: State<Db>, id: i64) -> Result<Option<GameRecord>, String
     let moves = conn
         .prepare(
             "SELECT ply, san, uci, fen_before, fen_after, by_student, clock_ms,
-                    eval_after, cp_loss, best_uci, class, phase, tags
+                    eval_after, cp_loss, best_uci, class, phase, tags, eval_before, label
              FROM moves WHERE game_id = ?1 ORDER BY ply",
         )
         .map_err(err)?
@@ -525,10 +581,12 @@ pub fn db_load_game(db: State<Db>, id: i64) -> Result<Option<GameRecord>, String
                 analysis: match r.get::<_, Option<String>>(10)? {
                     None => None,
                     Some(class) => Some(MoveAnalysis {
+                        eval_before: r.get(13)?,
                         eval_after: r.get(7)?,
                         cp_loss: r.get(8)?,
                         best_uci: r.get(9)?,
                         class,
+                        label: r.get(14)?,
                         phase: r.get(11)?,
                         tags: r
                             .get::<_, Option<String>>(12)?

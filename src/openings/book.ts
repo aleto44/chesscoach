@@ -108,6 +108,10 @@ export function openingName(sans: string[]): Opening | null {
   return best;
 }
 
+/** Whether these moves (from the start position) are all on some book line. */
+export const inBook = (sans: string[]) =>
+  OPENINGS.some((o) => o.moves.length >= sans.length && startsWith(o.moves, sans));
+
 /** Book lines that continue from these moves, with their next move. */
 export function continuations(sans: string[]): { move: string; opening: Opening }[] {
   return OPENINGS.filter((o) => o.moves.length > sans.length && startsWith(o.moves, sans)).map((o) => ({
