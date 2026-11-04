@@ -6,6 +6,17 @@ import { maiaMove, preloadMaia } from "../engine/maia";
 import { getOpponentEngine, STOCKFISH_RATING, toEngineElo } from "../engine/stockfish";
 import { MAIA_MAX_RATING, useStore } from "../store";
 import { clockLeft } from "./clock";
+import { bookMove } from "../openings/book";
+import { Chess } from "chess.js";
+
+function sanToUci(fen: string, san: string): string | null {
+  try {
+    const m = new Chess(fen).move(san);
+    return m.from + m.to + (m.promotion ?? "");
+  } catch {
+    return null;
+  }
+}
 
 /** The ratings on offer, chess.com scale: Maia's floor up to Stockfish's ceiling. */
 export const OPPONENT_RATING = { min: 400, max: STOCKFISH_RATING.max };
@@ -48,7 +59,11 @@ async function maybeMove() {
   // On the clock, it spends at most a 40th of what's left, so bullet games don't flag it.
   const left = clockLeft(sideToMove(fen));
   const budget = left === null ? Infinity : left / 40;
-  const uci = await pickMove(fen, meta.opponentElo, Math.max(50, Math.min(MOVETIME_MS, budget)));
+  // Practicing an opening: follow the chosen line while the student stays in it.
+  const book = bookMove(game.sans, meta.openingFocus);
+  const uci = book
+    ? sanToUci(fen, book)
+    : await pickMove(fen, meta.opponentElo, Math.max(50, Math.min(MOVETIME_MS, budget)));
   const delay = Math.min(THINK_MS.min + Math.random() * (THINK_MS.max - THINK_MS.min), budget);
   await new Promise((r) => setTimeout(r, Math.max(0, delay - (Date.now() - started))));
   thinkingOn = null;

@@ -40,6 +40,8 @@ export interface GameMeta {
   mode: GameMode;
   /** Null = no clock. */
   timeControl: TimeControl | null;
+  /** The opening line (SAN from the start) the opponent steers toward; null = free choice. */
+  openingFocus: string[] | null;
   /** "both" = free play, the student moves for both sides. */
   studentColor: Color | "both";
   /** Stockfish strength as a chess.com-scale rating (see toEngineElo); null = no opponent. */
@@ -84,6 +86,7 @@ export const newId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
 export const FREE_PLAY: GameMeta = {
   mode: "practice",
   timeControl: null,
+  openingFocus: null,
   studentColor: "both",
   opponentElo: null,
   result: null,
@@ -135,12 +138,13 @@ export function gameDescription(): string {
   const side = meta.studentColor === "white" ? "White" : "Black";
   const state = meta.result ? `finished ${meta.result} by ${meta.termination}` : "in progress";
   const clock = meta.timeControl ? `, ${formatTimeControl(meta.timeControl)} clock` : ", no clock";
+  const focus = meta.openingFocus ? `, practicing the opening ${meta.openingFocus.join(" ")}` : "";
   const mode =
     meta.mode === "rated"
       ? "rated game (played without engine, coach or takebacks)"
       : `practice game (help allowed${meta.takebacks ? `, ${meta.takebacks} takeback${meta.takebacks > 1 ? "s" : ""}` : ""})`;
   const maia = meta.opponentElo && meta.opponentElo <= MAIA_MAX_RATING ? " (a bot trained to play like humans of that rating)" : "";
-  return `${mode}: student plays ${side} vs ${opponentLabel(meta)}${maia}${clock}, ${state}`;
+  return `${mode}: student plays ${side} vs ${opponentLabel(meta)}${maia}${clock}${focus}, ${state}`;
 }
 
 /** Maia-3 (human-like) plays up to this chess.com-scale rating, Stockfish above it. */

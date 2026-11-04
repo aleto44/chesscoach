@@ -47,6 +47,7 @@ export interface GameSummary {
   timeControl: string | null;
   analyzed: boolean;
   openingName: string | null;
+  openingFocus: string[] | null;
   plies: number;
   opening: string;
 }
@@ -65,6 +66,7 @@ export const db = {
     opponent: string | null;
     mode: GameMeta["mode"];
     timeControl: string | null;
+    openingFocus: string[];
   }) =>
     invoke<number>("db_create_game", { game }),
   updateGame: (

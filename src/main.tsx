@@ -4,6 +4,7 @@ import "chessground/assets/chessground.base.css";
 import "chessground/assets/chessground.brown.css";
 import "chessground/assets/chessground.cburnett.css";
 import "./styles.css";
+import "./features.css";
 import App from "./App";
 import { initAuth } from "./coach/auth";
 import { initBridge } from "./coach/bridge";

@@ -21,6 +21,8 @@ export interface NewGameOptions {
   mode: GameMode;
   /** Only with an opponent. */
   timeControl?: TimeControl | null;
+  /** An opening for the opponent to steer toward (SAN from the start). */
+  openingFocus?: string[] | null;
   studentColor: Color | "both";
   opponentElo: number | null;
 }
@@ -30,7 +32,8 @@ export async function newGame(opts: NewGameOptions) {
   // Rated means against an opponent; free play is always practice.
   const mode: GameMode = opts.studentColor === "both" || !opts.opponentElo ? "practice" : opts.mode;
   const timeControl = opts.studentColor === "both" || !opts.opponentElo ? null : (opts.timeControl ?? null);
-  const meta: GameMeta = { ...FREE_PLAY, ...opts, mode, timeControl };
+  const openingFocus = opts.opponentElo && opts.openingFocus?.length ? opts.openingFocus : null;
+  const meta: GameMeta = { ...FREE_PLAY, ...opts, mode, timeControl, openingFocus };
   const gameId = hasBackend()
     ? await db.createGame({
         startFen: START_FEN,
@@ -38,6 +41,7 @@ export async function newGame(opts: NewGameOptions) {
         opponent: opponentKey(opts.opponentElo),
         mode,
         timeControl: timeControl && `${timeControl.initial}+${timeControl.increment}`,
+        openingFocus: openingFocus ?? [],
       })
     : null;
   withoutSaving(() =>
@@ -95,6 +99,7 @@ export async function loadGame(id: number) {
         mode: game.mode,
         takebacks: game.takebacks,
         timeControl: parseTimeControl(game.timeControl),
+        openingFocus: game.openingFocus,
         studentColor: game.studentColor,
         opponentElo: opponentElo(game.opponent),
         result: game.result,

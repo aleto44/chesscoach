@@ -88,6 +88,16 @@ pub fn definitions() -> Value {
             }
         },
         {
+            "name": "book_lookup",
+            "description": "The app's opening book: the name of the opening on the student's board, the book                 continuations from here, and what the student's own repertoire plays. Cheaper and more reliable                 than recalling theory. Only works for lines from the normal starting position.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "moves": { "type": "array", "items": { "type": "string" }, "description": "SAN from the start position. Defaults to the moves on the student's board." }
+                }
+            }
+        },
+        {
             "name": "get_profile",
             "description": "The student's profile, built from their RATED games (played with no engine, coach or                 takebacks): record by color, average loss and mistake counts by game phase, the most common                 mistake patterns, results by opening, recent games, your earlier observations, and drill stats.                 Practice games are only counted. Call it before judging the student's level or picking what                 to work on.",
             "inputSchema": { "type": "object", "properties": {} }

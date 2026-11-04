@@ -161,6 +161,12 @@ CREATE TABLE repertoire (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE (color, moves)
 );
+"#, r#"
+-- The opening the student chose to practice: the opponent follows this line (JSON array of SAN
+-- from the start) while the game stays in it. NULL = the opponent chose freely from move one.
+ALTER TABLE games ADD COLUMN opening_focus TEXT;
+DROP VIEW rated_games;
+CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
 "#];
 
 impl Db {
@@ -229,6 +235,8 @@ pub struct NewGame {
     opponent: Option<String>,
     mode: String,
     time_control: Option<String>,
+    #[serde(default)]
+    opening_focus: Vec<String>,
 }
 
 /// Fields left as None are unchanged. Setting `result` also stamps `ended_at`.
@@ -308,6 +316,7 @@ pub struct GameSummary {
     time_control: Option<String>,
     analyzed: bool,
     opening_name: Option<String>,
+    opening_focus: Option<Vec<String>>,
     plies: i64,
     opening: String,
 }
@@ -323,7 +332,7 @@ pub struct GameRecord {
 const SUMMARY_SQL: &str = "
     SELECT g.id, g.started_at, g.updated_at, g.ended_at, g.start_fen, g.student_color, g.opponent,
            g.result, g.termination, g.coach_session_id, g.mode, g.takebacks, g.time_control,
-           g.analyzed_at IS NOT NULL, g.opening_name,
+           g.analyzed_at IS NOT NULL, g.opening_name, g.opening_focus,
            (SELECT count(*) FROM moves m WHERE m.game_id = g.id),
            (SELECT coalesce(group_concat(san, ' '), '')
               FROM (SELECT san FROM moves m WHERE m.game_id = g.id ORDER BY ply LIMIT 10))
@@ -346,8 +355,9 @@ fn summary(r: &Row) -> rusqlite::Result<GameSummary> {
         time_control: r.get(12)?,
         analyzed: r.get(13)?,
         opening_name: r.get(14)?,
-        plies: r.get(15)?,
-        opening: r.get(16)?,
+        opening_focus: r.get::<_, Option<String>>(15)?.and_then(|f| serde_json::from_str(&f).ok()),
+        plies: r.get(16)?,
+        opening: r.get(17)?,
     })
 }
 
@@ -362,8 +372,16 @@ pub fn db_create_game(db: State<Db>, game: NewGame) -> Result<i64, String> {
     }
     let conn = db.0.lock().unwrap();
     conn.execute(
-        "INSERT INTO games (start_fen, student_color, opponent, mode, time_control) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![game.start_fen, game.student_color, game.opponent, game.mode, game.time_control],
+        "INSERT INTO games (start_fen, student_color, opponent, mode, time_control, opening_focus)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![
+            game.start_fen,
+            game.student_color,
+            game.opponent,
+            game.mode,
+            game.time_control,
+            (!game.opening_focus.is_empty()).then(|| serde_json::to_string(&game.opening_focus).unwrap_or_default()),
+        ],
     )
     .map_err(err)?;
     Ok(conn.last_insert_rowid())

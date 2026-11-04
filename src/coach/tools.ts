@@ -5,6 +5,9 @@ import { formatScore, getEngine, pvToSan } from "../engine/stockfish";
 import { invoke } from "@tauri-apps/api/core";
 import { clockLeft, formatClock } from "../game/clock";
 import { gamesText, profileText } from "./profile";
+import { continuations, openingName } from "../openings/book";
+import { START_FEN } from "../chess/line";
+import { getRepertoire } from "../openings/repertoire";
 import type { Key } from "chessground/types";
 import { addTangent, openTangent, gameDescription, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
 
@@ -94,6 +97,30 @@ const SQUARE = /^[a-h][1-8]$/;
 const BRUSHES: Record<string, string> = { green: "green", red: "red", blue: "blue", yellow: "yellow" };
 
 Object.assign(handlers, {
+  async book_lookup(args: Args) {
+    let sans: string[];
+    if (Array.isArray(args.moves)) sans = args.moves.map(String);
+    else {
+      const { line, ply } = screen();
+      if (line.startFen !== START_FEN) return { text: "The board isn't a line from the starting position, so the book doesn't apply." };
+      sans = line.sans.slice(0, ply);
+    }
+    const built = buildLine(START_FEN, sans);
+    if ("error" in built) return { text: built.error, isError: true };
+    const name = openingName(sans);
+    const next = continuations(sans);
+    const moves = [...new Set(next.map((n) => n.move))];
+    const out = [
+      name ? `Opening: ${name.name} (${name.eco})${name.moves.length < sans.length ? ", now out of the named line" : ""}.` : "No named opening.",
+      moves.length
+        ? `Book continuations: ${moves.map((m) => `${m} (${next.filter((n) => n.move === m).map((n) => n.opening.name).join(" / ")})`).join("; ")}.`
+        : "The book has nothing further from here.",
+    ];
+    const rep = (await getRepertoire()).filter((r) => r.moves.length > sans.length && r.moves.slice(0, sans.length).every((m, i) => m === sans[i]));
+    if (rep.length) out.push(`Student's repertoire continues: ${rep.map((r) => `${r.moves[sans.length]} (${r.color}, ${r.name})`).join("; ")}.`);
+    return { text: out.join("\n") };
+  },
+
   async setup_position(args: Args) {
     const fen = String(args.fen ?? "").trim();
     try {

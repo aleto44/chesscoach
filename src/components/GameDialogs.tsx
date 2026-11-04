@@ -6,6 +6,7 @@ import { TIME_CONTROLS, timeControlLabel } from "../game/clock";
 import { FREE_PLAY, opponentLabel, opponentName, useStore, type Color, type GameMode, type TimeControl } from "../store";
 import { askConfirm } from "./Confirm";
 import { ModeBadge } from "./ModeBadge";
+import { OpeningSelect, RepertoireDialog } from "./RepertoireDialog";
 
 export function Modal({
   title,
@@ -46,11 +47,13 @@ export function NewGameDialog({ onClose }: { onClose: () => void }) {
   const elo = hasOpponent || mode === "rated" ? rating : null;
   const [color, setColor] = useState<Color | "random">(last.studentColor === "black" ? "black" : "white");
   const [timeControl, setTimeControl] = useState<TimeControl | null>(last.timeControl);
+  const [focus, setFocus] = useState<string[] | null>(last.openingFocus);
+  const [editingRepertoire, setEditingRepertoire] = useState(false);
 
   const start = async () => {
     const studentColor: Color | "both" =
       elo === null ? "both" : color === "random" ? (Math.random() < 0.5 ? "white" : "black") : color;
-    await newGame({ mode, studentColor, opponentElo: elo, timeControl });
+    await newGame({ mode, studentColor, opponentElo: elo, timeControl, openingFocus: focus });
     onClose();
   };
 
@@ -147,6 +150,23 @@ export function NewGameDialog({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       )}
+      {elo !== null && (
+        <div className="field">
+          <span>
+            Opening{" "}
+            <button className="link" onClick={() => setEditingRepertoire(true)}>
+              Edit repertoire…
+            </button>
+          </span>
+          <OpeningSelect color={color === "random" ? null : color} value={focus} onChange={setFocus} />
+          <span className="muted small">
+            {focus
+              ? "The computer follows this line as long as you do, then plays on its own."
+              : "The computer picks its own moves from the start."}
+          </span>
+        </div>
+      )}
+      {editingRepertoire && <RepertoireDialog onClose={() => setEditingRepertoire(false)} />}
       <footer>
         <button className="primary" onClick={start}>
           Start game

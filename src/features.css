@@ -1,0 +1,41 @@
+/* Coaching features: repertoire, quizzes, nudges, promotion picker. */
+
+button.link {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.field select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.rep-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.rep-add {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.rep-add select {
+  flex: 1;
+  min-width: 0;
+}
