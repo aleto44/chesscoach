@@ -14,10 +14,13 @@ import {
   type GameMeta,
   type GameMode,
   type Tangent,
+  type TimeControl,
 } from "../store";
 
 export interface NewGameOptions {
   mode: GameMode;
+  /** Only with an opponent. */
+  timeControl?: TimeControl | null;
   studentColor: Color | "both";
   opponentElo: number | null;
 }
@@ -26,13 +29,15 @@ export async function newGame(opts: NewGameOptions) {
   await leaveGame();
   // Rated means against an opponent; free play is always practice.
   const mode: GameMode = opts.studentColor === "both" || !opts.opponentElo ? "practice" : opts.mode;
-  const meta: GameMeta = { ...FREE_PLAY, ...opts, mode };
+  const timeControl = opts.studentColor === "both" || !opts.opponentElo ? null : (opts.timeControl ?? null);
+  const meta: GameMeta = { ...FREE_PLAY, ...opts, mode, timeControl };
   const gameId = hasBackend()
     ? await db.createGame({
         startFen: START_FEN,
         studentColor: opts.studentColor,
         opponent: opponentKey(opts.opponentElo),
         mode,
+        timeControl: timeControl && `${timeControl.initial}+${timeControl.increment}`,
       })
     : null;
   withoutSaving(() =>
@@ -46,6 +51,8 @@ export async function newGame(opts: NewGameOptions) {
       chat: [],
       busy: false,
       sessionId: null,
+      clocks: [],
+      turnStartedAt: Date.now(),
       orientation: opts.studentColor === "black" ? "black" : "white",
     }),
   );
@@ -85,6 +92,7 @@ export async function loadGame(id: number) {
       meta: {
         mode: game.mode,
         takebacks: game.takebacks,
+        timeControl: parseTimeControl(game.timeControl),
         studentColor: game.studentColor,
         opponentElo: opponentElo(game.opponent),
         result: game.result,
@@ -97,6 +105,9 @@ export async function loadGame(id: number) {
       chat: items,
       busy: false,
       sessionId: game.coachSessionId,
+      clocks: line.sans.map((_, i) => moves[i]?.clockMs ?? null),
+      // Time spent away from the game isn't charged: the clock resumes on reopening.
+      turnStartedAt: Date.now(),
       orientation: game.studentColor === "black" ? "black" : "white",
     }),
   );
@@ -182,7 +193,13 @@ export async function resign() {
   await finish(meta.studentColor === "white" ? "0-1" : "1-0", "resignation");
 }
 
-async function finish(result: NonNullable<GameMeta["result"]>, termination: string) {
+/** "180+2" → 3+2 blitz. */
+function parseTimeControl(s: string | null): TimeControl | null {
+  const m = s?.match(/^(\d+)\+(\d+)$/);
+  return m ? { initial: Number(m[1]), increment: Number(m[2]) } : null;
+}
+
+export async function finish(result: NonNullable<GameMeta["result"]>, termination: string) {
   const { gameId, meta } = useStore.getState();
   useStore.setState({ meta: { ...meta, result, termination } });
   const review = meta.mode === "rated" ? " The coach is on again: ask it to go through the game with you." : "";

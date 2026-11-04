@@ -28,8 +28,16 @@ export type Color = "white" | "black";
  */
 export type GameMode = "rated" | "practice";
 
+/** A chess clock: starting time and increment per move, in seconds (3+2 blitz = 180, 2). */
+export interface TimeControl {
+  initial: number;
+  increment: number;
+}
+
 export interface GameMeta {
   mode: GameMode;
+  /** Null = no clock. */
+  timeControl: TimeControl | null;
   /** "both" = free play, the student moves for both sides. */
   studentColor: Color | "both";
   /** Stockfish strength as a chess.com-scale rating (see toEngineElo); null = no opponent. */
@@ -56,6 +64,10 @@ interface State {
   streaming: boolean;
   sessionId: string | null;
   opponentThinking: boolean;
+  /** Parallel to game.sans: the mover's clock in ms right after each move (null without a clock). */
+  clocks: (number | null)[];
+  /** When the side to move started thinking; their clock runs from here. */
+  turnStartedAt: number | null;
 }
 
 /** Ids are stored in SQLite, so they must be unique across app runs. */
@@ -63,6 +75,7 @@ export const newId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
 
 export const FREE_PLAY: GameMeta = {
   mode: "practice",
+  timeControl: null,
   studentColor: "both",
   opponentElo: null,
   result: null,
@@ -84,6 +97,8 @@ export const useStore = create<State>(() => ({
   streaming: false,
   sessionId: null,
   opponentThinking: false,
+  clocks: [],
+  turnStartedAt: null,
 }));
 
 /** A rated game still being played: engine, coach, takebacks and side boards are off. */
@@ -108,12 +123,17 @@ export function gameDescription(): string {
   if (meta.studentColor === "both") return "practice, free play (student moves both sides, no opponent)";
   const side = meta.studentColor === "white" ? "White" : "Black";
   const state = meta.result ? `finished ${meta.result} by ${meta.termination}` : "in progress";
+  const clock = meta.timeControl ? `, ${formatTimeControl(meta.timeControl)} clock` : ", no clock";
   const mode =
     meta.mode === "rated"
       ? "rated game (played without engine, coach or takebacks)"
       : `practice game (help allowed${meta.takebacks ? `, ${meta.takebacks} takeback${meta.takebacks > 1 ? "s" : ""}` : ""})`;
-  return `${mode}: student plays ${side} vs ${opponentLabel(meta)}, ${state}`;
+  return `${mode}: student plays ${side} vs ${opponentLabel(meta)}${clock}, ${state}`;
 }
+
+
+/** "3+2", "10+0". */
+export const formatTimeControl = (tc: TimeControl) => `${tc.initial / 60}+${tc.increment}`;
 
 export function opponentLabel(meta: GameMeta): string {
   return meta.opponentElo ? `Stockfish ${meta.opponentElo}` : "Free play";

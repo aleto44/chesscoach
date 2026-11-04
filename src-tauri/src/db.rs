@@ -82,6 +82,15 @@ BEGIN
 END;
 
 CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
+"#, r#"
+-- PGN-style 'seconds+increment', e.g. '180+2' for 3+2 blitz; NULL = no clock.
+ALTER TABLE games ADD COLUMN time_control TEXT;
+-- The mover's clock right after the move (increment included), in ms; NULL without a clock.
+ALTER TABLE moves ADD COLUMN clock_ms INTEGER;
+
+-- rated_games was SELECT * when created, so it doesn't see new columns until it's recreated.
+DROP VIEW rated_games;
+CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
 "#];
 
 impl Db {
@@ -149,6 +158,7 @@ pub struct NewGame {
     student_color: String,
     opponent: Option<String>,
     mode: String,
+    time_control: Option<String>,
 }
 
 /// Fields left as None are unchanged. Setting `result` also stamps `ended_at`.
@@ -171,6 +181,8 @@ pub struct MoveRow {
     fen_before: String,
     fen_after: String,
     by_student: bool,
+    #[serde(default)]
+    clock_ms: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -209,6 +221,7 @@ pub struct GameSummary {
     coach_session_id: Option<String>,
     mode: String,
     takebacks: i64,
+    time_control: Option<String>,
     plies: i64,
     opening: String,
 }
@@ -223,7 +236,7 @@ pub struct GameRecord {
 
 const SUMMARY_SQL: &str = "
     SELECT g.id, g.started_at, g.updated_at, g.ended_at, g.start_fen, g.student_color, g.opponent,
-           g.result, g.termination, g.coach_session_id, g.mode, g.takebacks,
+           g.result, g.termination, g.coach_session_id, g.mode, g.takebacks, g.time_control,
            (SELECT count(*) FROM moves m WHERE m.game_id = g.id),
            (SELECT coalesce(group_concat(san, ' '), '')
               FROM (SELECT san FROM moves m WHERE m.game_id = g.id ORDER BY ply LIMIT 10))
@@ -243,8 +256,9 @@ fn summary(r: &Row) -> rusqlite::Result<GameSummary> {
         coach_session_id: r.get(9)?,
         mode: r.get(10)?,
         takebacks: r.get(11)?,
-        plies: r.get(12)?,
-        opening: r.get(13)?,
+        time_control: r.get(12)?,
+        plies: r.get(13)?,
+        opening: r.get(14)?,
     })
 }
 
@@ -259,8 +273,8 @@ pub fn db_create_game(db: State<Db>, game: NewGame) -> Result<i64, String> {
     }
     let conn = db.0.lock().unwrap();
     conn.execute(
-        "INSERT INTO games (start_fen, student_color, opponent, mode) VALUES (?1, ?2, ?3, ?4)",
-        params![game.start_fen, game.student_color, game.opponent, game.mode],
+        "INSERT INTO games (start_fen, student_color, opponent, mode, time_control) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![game.start_fen, game.student_color, game.opponent, game.mode, game.time_control],
     )
     .map_err(err)?;
     Ok(conn.last_insert_rowid())
@@ -295,13 +309,13 @@ pub fn db_set_moves(db: State<Db>, game_id: i64, moves: Vec<MoveRow>) -> Result<
     {
         let mut insert = tx
             .prepare(
-                "INSERT INTO moves (game_id, ply, san, uci, fen_before, fen_after, by_student)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                "INSERT INTO moves (game_id, ply, san, uci, fen_before, fen_after, by_student, clock_ms)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             )
             .map_err(err)?;
         for m in &moves {
             insert
-                .execute(params![game_id, m.ply, m.san, m.uci, m.fen_before, m.fen_after, m.by_student])
+                .execute(params![game_id, m.ply, m.san, m.uci, m.fen_before, m.fen_after, m.by_student, m.clock_ms])
                 .map_err(err)?;
         }
     }
@@ -372,7 +386,10 @@ pub fn db_load_game(db: State<Db>, id: i64) -> Result<Option<GameRecord>, String
     };
 
     let moves = conn
-        .prepare("SELECT ply, san, uci, fen_before, fen_after, by_student FROM moves WHERE game_id = ?1 ORDER BY ply")
+        .prepare(
+            "SELECT ply, san, uci, fen_before, fen_after, by_student, clock_ms FROM moves
+             WHERE game_id = ?1 ORDER BY ply",
+        )
         .map_err(err)?
         .query_map([id], |r| {
             Ok(MoveRow {
@@ -382,6 +399,7 @@ pub fn db_load_game(db: State<Db>, id: i64) -> Result<Option<GameRecord>, String
                 fen_before: r.get(3)?,
                 fen_after: r.get(4)?,
                 by_student: r.get(5)?,
+                clock_ms: r.get(6)?,
             })
         })
         .map_err(err)?

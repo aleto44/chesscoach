@@ -2,6 +2,7 @@
 import { Chess } from "chess.js";
 import { buildLine, formatMoves, sideToMove } from "../chess/line";
 import { formatScore, getEngine, pvToSan } from "../engine/stockfish";
+import { clockLeft, formatClock } from "../game/clock";
 import { addTangent, gameDescription, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
 
 export interface ToolResult {
@@ -25,6 +26,12 @@ const handlers: Record<string, (args: Args) => Promise<ToolResult>> = {
         viewingPly: s.gamePly,
         totalPlies: s.game.sans.length,
         sideToMove: sideToMove(s.game.fens[s.gamePly]),
+        clock: s.meta.timeControl && {
+          white: formatClock(clockLeft("white")!),
+          black: formatClock(clockLeft("black")!),
+          // Seconds each move took, for spotting time trouble or rushed moves.
+          moveTimes: moveTimes(),
+        },
       },
       openTangent: tangent && {
         breadcrumbs: ["Game", ...tangentPath(tangent.id).map((t) => t.title)].join(" > "),
@@ -99,4 +106,20 @@ export function describeCall(name: string, args: Args): string {
 
 function clamp(n: number, lo: number, hi: number) {
   return Number.isFinite(n) ? Math.max(lo, Math.min(hi, Math.round(n))) : lo;
+}
+
+/** "12. Nf3 (8s, 4:31 left)" for each move of a game with a clock. */
+function moveTimes(): string[] {
+  const { game, clocks, meta } = useStore.getState();
+  if (!meta.timeControl) return [];
+  const initial = meta.timeControl.initial * 1000;
+  const inc = meta.timeControl.increment * 1000;
+  return game.sans.map((san, i) => {
+    const after = clocks[i];
+    if (after === null || after === undefined) return san;
+    const before = i >= 2 ? (clocks[i - 2] ?? initial) : initial;
+    const spent = Math.max(0, before - (after - inc));
+    const [, turn, , , , full] = game.fens[i].split(" ");
+    return `${full}${turn === "w" ? "." : "..."} ${san} (${Math.round(spent / 1000)}s, ${formatClock(after)} left)`;
+  });
 }

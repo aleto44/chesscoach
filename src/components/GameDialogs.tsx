@@ -2,7 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { db, opponentElo, type GameSummary } from "../db";
 import { OPPONENT_RATING } from "../engine/stockfish";
 import { deleteGame, loadGame, newGame } from "../game/session";
-import { FREE_PLAY, opponentLabel, useStore, type Color, type GameMode } from "../store";
+import { TIME_CONTROLS, timeControlLabel } from "../game/clock";
+import { FREE_PLAY, opponentLabel, useStore, type Color, type GameMode, type TimeControl } from "../store";
 import { ModeBadge } from "./ModeBadge";
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -33,11 +34,12 @@ export function NewGameDialog({ onClose }: { onClose: () => void }) {
   // A rated game is always against an opponent.
   const elo = hasOpponent || mode === "rated" ? rating : null;
   const [color, setColor] = useState<Color | "random">(last.studentColor === "black" ? "black" : "white");
+  const [timeControl, setTimeControl] = useState<TimeControl | null>(last.timeControl);
 
   const start = async () => {
     const studentColor: Color | "both" =
       elo === null ? "both" : color === "random" ? (Math.random() < 0.5 ? "white" : "black") : color;
-    await newGame({ mode, studentColor, opponentElo: elo });
+    await newGame({ mode, studentColor, opponentElo: elo, timeControl });
     onClose();
   };
 
@@ -102,6 +104,35 @@ export function NewGameDialog({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       )}
+      {elo !== null && (
+        <div className="field">
+          <span>Time control</span>
+          <div className="time-controls">
+            {TIME_CONTROLS.map(({ group, controls }) => (
+              <div key={group} className="time-group">
+                <span className="time-group-name">
+                  <TimeIcon group={group} />
+                  {group}
+                </span>
+                <div className="time-grid">
+                  {controls.map((tc) => (
+                    <button
+                      key={timeControlLabel(tc)}
+                      className={sameTime(tc, timeControl) ? "on" : ""}
+                      onClick={() => setTimeControl(tc)}
+                    >
+                      {timeControlLabel(tc)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <button className={`no-clock ${timeControl ? "" : "on"}`} onClick={() => setTimeControl(null)}>
+              No clock
+            </button>
+          </div>
+        </div>
+      )}
       <footer>
         <button className="primary" onClick={start}>
           Start game
@@ -163,6 +194,24 @@ ${what}`)) return;
     </Modal>
   );
 }
+
+const ICON_PATHS = {
+  // A bullet in flight, a lightning bolt, a stopwatch.
+  Bullet: "M3 13l5-5 3 3-5 5H3v-3zm6-6l3-3c1.5-1.5 4-1.5 4-1.5s0 2.5-1.5 4l-3 3-2.5-2.5z",
+  Blitz: "M9.5 1L3 9.5h4.5L6 15l7-8.5H8.5L9.5 1z",
+  Rapid: "M7 1h2v1.5A6 6 0 1 1 7 2.5V1zm1 3a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm-.75 1.5h1.5v3.2l2 1.2-.75 1.3-2.75-1.6V5.5z",
+};
+
+function TimeIcon({ group }: { group: keyof typeof ICON_PATHS }) {
+  return (
+    <svg className={`time-icon ${group.toLowerCase()}`} viewBox="0 0 16 16" width="14" height="14" aria-hidden>
+      <path d={ICON_PATHS[group]} fill="currentColor" />
+    </svg>
+  );
+}
+
+const sameTime = (a: TimeControl | null, b: TimeControl | null) =>
+  a?.initial === b?.initial && a?.increment === b?.increment;
 
 function describeSides(g: GameSummary): string {
   const opp = opponentLabel({ ...FREE_PLAY, studentColor: g.studentColor, opponentElo: opponentElo(g.opponent) });

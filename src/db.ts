@@ -13,6 +13,8 @@ export interface MoveRow {
   fenBefore: string;
   fenAfter: string;
   byStudent: boolean;
+  /** The mover's clock right after the move, ms. */
+  clockMs: number | null;
 }
 
 export interface TangentRow {
@@ -38,6 +40,8 @@ export interface GameSummary {
   coachSessionId: string | null;
   mode: GameMeta["mode"];
   takebacks: number;
+  /** "180+2" (seconds + increment); null = no clock. */
+  timeControl: string | null;
   plies: number;
   opening: string;
 }
@@ -50,7 +54,13 @@ export interface GameRecord {
 }
 
 export const db = {
-  createGame: (game: { startFen: string; studentColor: string; opponent: string | null; mode: GameMeta["mode"] }) =>
+  createGame: (game: {
+    startFen: string;
+    studentColor: string;
+    opponent: string | null;
+    mode: GameMeta["mode"];
+    timeControl: string | null;
+  }) =>
     invoke<number>("db_create_game", { game }),
   updateGame: (
     id: number,
@@ -73,7 +83,7 @@ export const opponentElo = (key: string | null) =>
       ? fromEngineElo(Number(key.slice(10)))
       : null;
 
-function moveRows(line: Line, studentColor: GameMeta["studentColor"]): MoveRow[] {
+function moveRows(line: Line, studentColor: GameMeta["studentColor"], clocks: (number | null)[]): MoveRow[] {
   return line.sans.map((san, i) => {
     const [from, to] = line.lastMoves[i];
     const promo = san.match(/=([QRBN])/)?.[1].toLowerCase() ?? "";
@@ -85,6 +95,7 @@ function moveRows(line: Line, studentColor: GameMeta["studentColor"]): MoveRow[]
       fenBefore: line.fens[i],
       fenAfter: line.fens[i + 1],
       byStudent: studentColor === "both" || studentColor === mover,
+      clockMs: clocks[i] ?? null,
     };
   });
 }
@@ -122,7 +133,7 @@ export function initPersistence() {
   if (!hasBackend()) return;
   useStore.subscribe((s, prev) => {
     if (suppressed || s.gameId === null || s.gameId !== prev.gameId) return;
-    if (s.game !== prev.game) dirtyMoves = true;
+    if (s.game !== prev.game || s.clocks !== prev.clocks) dirtyMoves = true;
     for (const id in s.tangents) if (s.tangents[id] !== prev.tangents[id]) dirtyTangents.add(id);
     s.chat.forEach((c, i) => c !== prev.chat[i] && dirtyChat.add(c.id));
     if (s.sessionId && s.sessionId !== prev.sessionId) db.updateGame(s.gameId, { coachSessionId: s.sessionId });
@@ -147,7 +158,7 @@ export async function flush() {
   const gameId = s.gameId;
   if (gameId === null) return;
   const writes: Promise<unknown>[] = [];
-  if (dirtyMoves) writes.push(invoke("db_set_moves", { gameId, moves: moveRows(s.game, s.meta.studentColor) }));
+  if (dirtyMoves) writes.push(invoke("db_set_moves", { gameId, moves: moveRows(s.game, s.meta.studentColor, s.clocks) }));
   for (const id of dirtyTangents) {
     const t = s.tangents[id];
     if (t) writes.push(invoke("db_upsert_tangent", { gameId, tangent: tangentRow(t) }));

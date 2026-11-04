@@ -17,6 +17,7 @@ import { GamesDialog, NewGameDialog } from "./GameDialogs";
 import { SettingsDialog } from "./SettingsDialog";
 import { EvalBar, EvalLine } from "./EvalBar";
 import { ModeBadge } from "./ModeBadge";
+import { ClockRow } from "./Clock";
 import { saveSetting, useSettings } from "../settings";
 
 /** Main board with the tangent breadcrumbs, step-through controls and move list. */
@@ -33,7 +34,7 @@ export function BoardPanel() {
   const note = ply > 0 ? line.notes[ply - 1] : "";
 
   return (
-    <main className="board-panel">
+    <main className={`board-panel ${meta.timeControl ? "timed" : ""}`}>
       <div className="game-bar">
         <span className="game-status">
           {meta.studentColor !== "both" && <ModeBadge mode={meta.mode} />}
@@ -86,6 +87,7 @@ export function BoardPanel() {
         )}
       </nav>
 
+      {meta.timeControl && <ClockRow side={orientation === "white" ? "black" : "white"} />}
       <div className={`board-frame ${tangent ? "tangent" : ""}`}>
         {!locked && (
           <button
@@ -111,6 +113,8 @@ export function BoardPanel() {
           }
         />
       </div>
+
+      {meta.timeControl && <ClockRow side={orientation} />}
 
       <div className="controls">
         <button onClick={() => goto(0)} title="Start (Home)">⏮</button>

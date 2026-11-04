@@ -101,6 +101,8 @@ button:disabled {
 /* Board side */
 
 .board-panel {
+  /* The board, and everything lined up with it, gets this width. */
+  --board-w: min(100%, calc(100vh - 260px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -119,7 +121,7 @@ button:disabled {
   align-items: center;
   flex-wrap: wrap;
   gap: 2px;
-  width: min(100%, calc(100vh - 260px));
+  width: var(--board-w);
   min-height: 32px;
 }
 
@@ -146,7 +148,7 @@ button:disabled {
 }
 
 .board-frame {
-  width: min(100%, calc(100vh - 260px));
+  width: var(--board-w);
   padding: 4px;
   border-radius: 6px;
   background: transparent;
@@ -165,11 +167,11 @@ button:disabled {
 .controls {
   display: flex;
   gap: 6px;
-  width: min(100%, calc(100vh - 260px));
+  width: var(--board-w);
 }
 
 .note {
-  width: min(100%, calc(100vh - 260px));
+  width: var(--board-w);
   min-height: 1.5em;
   color: var(--tangent);
   font-style: italic;
@@ -181,7 +183,7 @@ button:disabled {
 }
 
 .moves {
-  width: min(100%, calc(100vh - 260px));
+  width: var(--board-w);
   display: flex;
   flex-wrap: wrap;
   gap: 2px 4px;
@@ -374,7 +376,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 6px;
-  width: min(100%, calc(100vh - 260px));
+  width: var(--board-w);
   white-space: nowrap;
 }
 
@@ -777,7 +779,7 @@ button.icon {
 }
 
 .eval-line {
-  width: min(100%, calc(100vh - 260px));
+  width: var(--board-w);
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
@@ -1014,4 +1016,116 @@ button.icon {
   background: color-mix(in srgb, var(--warn) 10%, transparent);
   font-size: 13px;
   line-height: 1.45;
+}
+
+/* Clocks */
+
+.board-panel.timed {
+  /* Two clock rows above and below the board. */
+  --board-w: min(100%, calc(100vh - 340px));
+}
+
+.clock-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: var(--board-w);
+  padding: 0 4px;
+}
+
+.clock-piece {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+.clock-piece.white {
+  background: #f2f0ec;
+}
+
+.clock-piece.black {
+  background: #2b2926;
+}
+
+.clock-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clock {
+  min-width: 92px;
+  padding: 4px 12px;
+  border-radius: 5px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.clock.active {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+.clock.low.active {
+  color: #fff;
+  background: var(--error);
+  border-color: var(--error);
+}
+
+.clock.low:not(.active) {
+  color: var(--error);
+}
+
+/* Time control picker */
+
+.time-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.time-group-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.time-icon.bullet {
+  color: #d9a94a;
+}
+
+.time-icon.blitz {
+  color: #e6c23a;
+}
+
+.time-icon.rapid {
+  color: var(--accent);
+}
+
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.time-grid button,
+.no-clock {
+  padding: 8px 0;
+  font-weight: 600;
+}
+
+.time-grid button.on,
+.no-clock.on {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
