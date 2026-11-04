@@ -103,6 +103,11 @@ const TOOL_LABELS: Record<string, string> = {
   analyze: "Analyzing the position",
   show_line: "Checking the line",
   get_state: "Looking at the board",
+  setup_position: "Setting up a position",
+  draw_arrows: "Drawing on the board",
+  get_profile: "Looking at your history",
+  query_games: "Going through your games",
+  record_observation: "Making a note",
 };
 
 /** Animated "working" row: what the coach is doing and for how long. Hidden while text streams. */

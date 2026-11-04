@@ -44,6 +44,50 @@ pub fn definitions() -> Value {
             }
         },
         {
+            "name": "setup_position",
+            "description": "Put a position on the student's board as a side board (tangent), for example to                 show a typical structure or set up a question. It opens right away; the student can move pieces                 on it to try ideas. Use show_line instead when you have concrete moves to show.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string", "description": "Short breadcrumb title, e.g. \"Carlsbad structure\"" },
+                    "fen": { "type": "string", "description": "The position. Must be legal (both kings, side to move not giving check)." },
+                    "note": { "type": "string", "description": "Optional one-line caption under the board." }
+                },
+                "required": ["title", "fen"]
+            }
+        },
+        {
+            "name": "draw_arrows",
+            "description": "Draw arrows and circles on the position the student is looking at (they stay until                 the position changes). Good for pointing at a plan, a weak square or a piece's route without                 writing coordinates. Colors: green (good/plan), red (threat/bad), blue (alternative), yellow                 (attention). Pass empty lists to clear.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "arrows": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "from": { "type": "string" }, "to": { "type": "string" },
+                                "color": { "type": "string", "enum": ["green", "red", "blue", "yellow"] }
+                            },
+                            "required": ["from", "to"]
+                        }
+                    },
+                    "circles": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "square": { "type": "string" },
+                                "color": { "type": "string", "enum": ["green", "red", "blue", "yellow"] }
+                            },
+                            "required": ["square"]
+                        }
+                    }
+                }
+            }
+        },
+        {
             "name": "get_profile",
             "description": "The student's profile, built from their RATED games (played with no engine, coach or                 takebacks): record by color, average loss and mistake counts by game phase, the most common                 mistake patterns, results by opening, recent games, your earlier observations, and drill stats.                 Practice games are only counted. Call it before judging the student's level or picking what                 to work on.",
             "inputSchema": { "type": "object", "properties": {} }

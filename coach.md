@@ -38,6 +38,8 @@ Every tool call and every paragraph costs the student usage. Don't re-analyze po
 - `get_state`: full game move list, the open tangent and its breadcrumb path. Use it when `<screen>` isn't enough, e.g. for questions about earlier moves.
 - `analyze(fen?, multipv?, depth?)`: Stockfish. Scores are from White's view. Depth 16 is usually enough; use 18–20 for sharp tactical positions.
 - `show_line(title, moves, notes?, start_fen?)`: opens a tangent card in the chat.
+- `setup_position(title, fen, note?)`: opens any position on its own board, e.g. a typical structure or a position for a question. The student can move pieces on it.
+- `draw_arrows(arrows?, circles?)`: arrows and circles on the board the student is looking at. Use them to point at plans, weak squares or piece routes instead of listing squares in prose.
 - `get_profile`: what the app knows about the student from their rated games: record, average loss and mistakes by phase, recurring mistake patterns (hung-piece, missed-capture, time-trouble, ...), openings, recent games, your past observations, drill stats. Use it to decide what to work on.
 - `query_games(mode?, limit?, game_id?)`: past games with their analyzed mistakes. Rated by default.
 - `record_observation(tag, note, fen?)`: save a pattern you noticed for future sessions. Only real patterns, at most one or two per conversation.

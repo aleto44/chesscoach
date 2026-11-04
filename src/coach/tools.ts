@@ -5,7 +5,8 @@ import { formatScore, getEngine, pvToSan } from "../engine/stockfish";
 import { invoke } from "@tauri-apps/api/core";
 import { clockLeft, formatClock } from "../game/clock";
 import { gamesText, profileText } from "./profile";
-import { addTangent, gameDescription, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
+import type { Key } from "chessground/types";
+import { addTangent, openTangent, gameDescription, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
 
 export interface ToolResult {
   text: string;
@@ -89,7 +90,52 @@ const handlers: Record<string, (args: Args) => Promise<ToolResult>> = {
   },
 };
 
+const SQUARE = /^[a-h][1-8]$/;
+const BRUSHES: Record<string, string> = { green: "green", red: "red", blue: "blue", yellow: "yellow" };
+
 Object.assign(handlers, {
+  async setup_position(args: Args) {
+    const fen = String(args.fen ?? "").trim();
+    try {
+      new Chess(fen);
+    } catch (e) {
+      return { text: `Invalid FEN: ${(e as Error).message}`, isError: true };
+    }
+    const built = buildLine(fen, []);
+    if ("error" in built) return { text: built.error, isError: true };
+    const title = String(args.title ?? "Position");
+    const note = typeof args.note === "string" ? args.note : "";
+    const tangent = addTangent({
+      parentId: useStore.getState().active,
+      title,
+      author: "coach",
+      line: { ...built.line, notes: [] },
+      ply: 0,
+    });
+    pushChat({ kind: "tangent", id: newId("c"), tangentId: tangent.id });
+    if (note) pushChat({ kind: "system", id: newId("c"), text: note });
+    openTangent(tangent.id);
+    return { text: `Opened "${title}" on the student's board (${sideToMove(fen)} to move).` };
+  },
+
+  async draw_arrows(args: Args) {
+    const shapes: { orig: Key; dest?: Key; brush: string }[] = [];
+    const bad: string[] = [];
+    for (const a of Array.isArray(args.arrows) ? args.arrows : []) {
+      const { from, to, color } = a as Record<string, string>;
+      if (!SQUARE.test(from) || !SQUARE.test(to) || from === to) bad.push(`${from}-${to}`);
+      else shapes.push({ orig: from as Key, dest: to as Key, brush: BRUSHES[color] ?? "green" });
+    }
+    for (const c of Array.isArray(args.circles) ? args.circles : []) {
+      const { square, color } = c as Record<string, string>;
+      if (!SQUARE.test(square)) bad.push(square);
+      else shapes.push({ orig: square as Key, brush: BRUSHES[color] ?? "green" });
+    }
+    if (bad.length) return { text: `Not squares: ${bad.join(", ")}. Use e.g. "e4".`, isError: true };
+    useStore.setState({ arrows: shapes.length ? { fen: screenFen(), shapes } : null });
+    return { text: shapes.length ? `Drew ${shapes.length} on the board.` : "Cleared." };
+  },
+
   async get_profile() {
     return { text: await profileText() };
   },
@@ -128,6 +174,7 @@ export async function handleTool(name: string, args: Args): Promise<ToolResult> 
 export function describeCall(name: string, args: Args): string {
   if (name === "show_line") return `show_line "${args.title ?? ""}"`;
   if (name === "analyze") return `analyze${args.depth ? ` depth ${args.depth}` : ""}`;
+  if (name === "setup_position") return `setup_position "${args.title ?? ""}"`;
   return name;
 }
 
