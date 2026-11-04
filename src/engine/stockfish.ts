@@ -86,6 +86,10 @@ let opponent: Engine | null = null;
 /** A separate instance so the opponent never waits behind the coach's analysis. */
 export const getOpponentEngine = () => (opponent ??= new Engine());
 
+let review: Engine | null = null;
+/** Post-game analysis runs in the background on its own instance. */
+export const getReviewEngine = () => (review ??= new Engine());
+
 /**
  * Stockfish's UCI_Elo (calibrated against engine rating lists) next to the chess.com rapid rating it
  * roughly plays like. Below ~2000 chess.com runs well under FIDE/CCRL numbers; above, a little over.

@@ -53,6 +53,8 @@ export async function newGame(opts: NewGameOptions) {
       sessionId: null,
       clocks: [],
       turnStartedAt: Date.now(),
+      annotations: [],
+      review: null,
       orientation: opts.studentColor === "black" ? "black" : "white",
     }),
   );
@@ -106,6 +108,8 @@ export async function loadGame(id: number) {
       busy: false,
       sessionId: game.coachSessionId,
       clocks: line.sans.map((_, i) => moves[i]?.clockMs ?? null),
+      annotations: line.sans.map((_, i) => moves[i]?.analysis ?? null),
+      review: null,
       // Time spent away from the game isn't charged: the clock resumes on reopening.
       turnStartedAt: Date.now(),
       orientation: game.studentColor === "black" ? "black" : "white",

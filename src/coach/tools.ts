@@ -2,7 +2,9 @@
 import { Chess } from "chess.js";
 import { buildLine, formatMoves, sideToMove } from "../chess/line";
 import { formatScore, getEngine, pvToSan } from "../engine/stockfish";
+import { invoke } from "@tauri-apps/api/core";
 import { clockLeft, formatClock } from "../game/clock";
+import { gamesText, profileText } from "./profile";
 import { addTangent, gameDescription, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
 
 export interface ToolResult {
@@ -86,6 +88,31 @@ const handlers: Record<string, (args: Args) => Promise<ToolResult>> = {
     return { text: `Shown to the student as "${title}": ${formatMoves(built.line)}\nFinal position: ${end}` };
   },
 };
+
+Object.assign(handlers, {
+  async get_profile() {
+    return { text: await profileText() };
+  },
+
+  async query_games(args: Args) {
+    const mode = ["rated", "practice", "all"].includes(String(args.mode)) ? String(args.mode) : "rated";
+    const gameId = Number.isFinite(Number(args.game_id)) && args.game_id !== undefined ? Number(args.game_id) : null;
+    return { text: await gamesText(mode, clamp(Number(args.limit ?? 5), 1, 20), gameId) };
+  },
+
+  async record_observation(args: Args) {
+    const tag = String(args.tag ?? "").trim();
+    const note = String(args.note ?? "").trim();
+    if (!tag || !note) return { text: "tag and note are required.", isError: true };
+    await invoke("db_record_observation", {
+      gameId: useStore.getState().gameId,
+      tag,
+      note,
+      fen: typeof args.fen === "string" && args.fen ? args.fen : null,
+    });
+    return { text: "Saved." };
+  },
+} satisfies typeof handlers);
 
 export async function handleTool(name: string, args: Args): Promise<ToolResult> {
   const handler = handlers[name];

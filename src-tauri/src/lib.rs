@@ -3,6 +3,7 @@ mod coach;
 mod db;
 mod mcp;
 mod sounds;
+mod stats;
 mod tools;
 
 use std::sync::Mutex;
@@ -86,6 +87,19 @@ pub fn run() {
             db::db_prune_empty_games,
             db::db_get_settings,
             db::db_set_setting,
+            stats::db_save_analysis,
+            stats::db_unanalyzed_games,
+            stats::db_profile,
+            stats::db_query_games,
+            stats::db_record_observation,
+            stats::db_add_drills,
+            stats::db_due_drills,
+            stats::db_drill_counts,
+            stats::db_grade_drill,
+            stats::db_retire_drill,
+            stats::db_repertoire,
+            stats::db_add_repertoire,
+            stats::db_remove_repertoire,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

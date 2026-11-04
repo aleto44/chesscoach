@@ -18,11 +18,13 @@ import { SettingsDialog } from "./SettingsDialog";
 import { EvalBar, EvalLine } from "./EvalBar";
 import { ModeBadge } from "./ModeBadge";
 import { ClockRow } from "./Clock";
+import { markFor, ReviewBar, useMoment } from "./Review";
 import { saveSetting, useSettings } from "../settings";
 
 /** Main board with the tangent breadcrumbs, step-through controls and move list. */
 export function BoardPanel() {
-  const { game, gamePly, tangents, active, orientation, meta, opponentThinking } = useStore();
+  const { game, gamePly, tangents, active, orientation, meta, opponentThinking, annotations, arrows } = useStore();
+  const moment = useMoment();
   const locked = isLocked(meta);
   const showEval = useSettings((s) => s.showEval) && !locked;
   const canTakeBack = takebackPly(game, meta) !== null;
@@ -106,6 +108,7 @@ export function BoardPanel() {
           orientation={orientation}
           onMove={boardMove}
           canMove={canStudentMove()}
+          shapes={moment?.shapes ?? (arrows?.fen === line.fens[ply] ? arrows.shapes : undefined)}
           premoveColor={
             !tangent && !meta.result && meta.studentColor !== "both" && gamePly === game.sans.length
               ? meta.studentColor
@@ -130,11 +133,13 @@ export function BoardPanel() {
         <button onClick={flip} title="Flip board">⇅</button>
       </div>
 
+      <ReviewBar />
+
       {showEval && <EvalLine />}
 
-      <div className="note">{note || " "}</div>
+      <div className={`note ${moment ? "moment" : ""}`}>{moment?.text || note || " "}</div>
 
-      <MoveList sans={line.sans} fens={line.fens} ply={ply} />
+      <MoveList sans={line.sans} fens={line.fens} ply={ply} marks={tangent ? undefined : annotations.map(markFor)} />
     </main>
   );
 }
@@ -150,7 +155,7 @@ function gameStatus(meta: ReturnType<typeof useStore.getState>["meta"], thinking
   return turn === meta.studentColor ? "your move" : "opponent to move";
 }
 
-function MoveList({ sans, fens, ply }: { sans: string[]; fens: string[]; ply: number }) {
+function MoveList({ sans, fens, ply, marks }: { sans: string[]; fens: string[]; ply: number; marks?: string[] }) {
   if (sans.length === 0) return <div className="moves empty">No moves yet. Drag a piece to play.</div>;
   return (
     <div className="moves">
@@ -162,6 +167,7 @@ function MoveList({ sans, fens, ply }: { sans: string[]; fens: string[]; ply: nu
             {num && <span className="num">{num}</span>}
             <button className={`mv ${i + 1 === ply ? "current" : ""}`} onClick={() => goto(i + 1)}>
               {san}
+              {marks?.[i] && <span className={`mark m${marks[i].length}${marks[i] === "?!" ? "i" : ""}`}>{marks[i]}</span>}
             </button>
           </span>
         );

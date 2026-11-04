@@ -42,6 +42,36 @@ pub fn definitions() -> Value {
                 },
                 "required": ["title", "moves"]
             }
+        },
+        {
+            "name": "get_profile",
+            "description": "The student's profile, built from their RATED games (played with no engine, coach or                 takebacks): record by color, average loss and mistake counts by game phase, the most common                 mistake patterns, results by opening, recent games, your earlier observations, and drill stats.                 Practice games are only counted. Call it before judging the student's level or picking what                 to work on.",
+            "inputSchema": { "type": "object", "properties": {} }
+        },
+        {
+            "name": "query_games",
+            "description": "List the student's games with their analyzed mistakes and blunders (move, the engine's                 best move, the swing, pattern tags, clock). Rated games by default. Engine numbers here are                 already computed: no need to re-run analyze on them.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "mode": { "type": "string", "enum": ["rated", "practice", "all"], "default": "rated" },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 20, "default": 5 },
+                    "game_id": { "type": "integer", "description": "Just this game (includes the FEN before each mistake)." }
+                }
+            }
+        },
+        {
+            "name": "record_observation",
+            "description": "Save a short note about the student's play for future sessions, e.g. tag \"endgames\",                 note \"Doesn't activate the king in rook endings\". Use it when you notice a pattern, not for                 one-off slips. Notes show up in get_profile.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "tag": { "type": "string", "description": "One or two words, e.g. \"tactics\", \"time management\"." },
+                    "note": { "type": "string" },
+                    "fen": { "type": "string", "description": "An example position, if there is one." }
+                },
+                "required": ["tag", "note"]
+            }
         }
     ])
 }

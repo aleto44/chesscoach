@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { Key } from "chessground/types";
 import { emptyLine, moveLabel, playAt, sideToMove, type Line } from "./chess/line";
+import type { DrawShape } from "chessground/draw";
+import type { MoveAnnotation } from "./analysis/review";
 
 /** A side board. Tangents form a tree: parentId is the tangent it branched from (null = the game). */
 export interface Tangent {
@@ -68,6 +70,12 @@ interface State {
   clocks: (number | null)[];
   /** When the side to move started thinking; their clock runs from here. */
   turnStartedAt: number | null;
+  /** Post-game analysis, parallel to game.sans (empty until the game is over and analyzed). */
+  annotations: (MoveAnnotation | null)[];
+  /** Analysis in progress for the open game. */
+  review: { done: number; total: number } | null;
+  /** Arrows and circles the coach drew (draw_arrows), shown while that position is on screen. */
+  arrows: { fen: string; shapes: DrawShape[] } | null;
 }
 
 /** Ids are stored in SQLite, so they must be unique across app runs. */
@@ -99,6 +107,9 @@ export const useStore = create<State>(() => ({
   opponentThinking: false,
   clocks: [],
   turnStartedAt: null,
+  annotations: [],
+  review: null,
+  arrows: null,
 }));
 
 /** A rated game still being played: engine, coach, takebacks and side boards are off. */

@@ -3,6 +3,7 @@ import { Chessground } from "chessground";
 import type { Api } from "chessground/api";
 import type { Config } from "chessground/config";
 import type { Key } from "chessground/types";
+import type { DrawShape } from "chessground/draw";
 import { Chess } from "chess.js";
 import { legalDests, sideToMove } from "../chess/line";
 
@@ -18,6 +19,8 @@ interface Props {
   premoveColor?: "white" | "black";
   coordinates?: boolean;
   className?: string;
+  /** Arrows and circles drawn by the app (best moves, the coach's draw_arrows). */
+  shapes?: DrawShape[];
 }
 
 /** Thin React wrapper around Chessground; chess.js supplies legal destinations. */
@@ -31,11 +34,12 @@ export function Board({
   premoveColor,
   coordinates = true,
   className,
+  shapes,
 }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const api = useRef<Api | null>(null);
-  const props = useRef({ fen, orientation, lastMove, onMove, viewOnly, canMove, premoveColor });
-  props.current = { fen, orientation, lastMove, onMove, viewOnly, canMove, premoveColor };
+  const props = useRef({ fen, orientation, lastMove, onMove, viewOnly, canMove, premoveColor, shapes });
+  props.current = { fen, orientation, lastMove, onMove, viewOnly, canMove, premoveColor, shapes };
 
   // Re-applies props; also used after a move so a rejected move snaps back.
   // A queued premove is played as soon as the student is allowed to move again.
@@ -55,6 +59,7 @@ export function Board({
       movable: { color: live ? turn : premove, dests: live ? legalDests(p.fen) : new Map() },
     };
     cg.set(config);
+    cg.setAutoShapes(p.shapes ?? []);
     if (live) cg.playPremove();
     else if (!premove) cg.cancelPremove();
   };
@@ -83,7 +88,7 @@ export function Board({
     return () => api.current?.destroy();
   }, []);
 
-  useEffect(sync, [fen, orientation, lastMove, viewOnly, canMove, premoveColor]);
+  useEffect(sync, [fen, orientation, lastMove, viewOnly, canMove, premoveColor, shapes]);
 
   return <div ref={el} className={className ?? "cg-board-wrap"} />;
 }

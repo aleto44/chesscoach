@@ -1,5 +1,6 @@
 // SQLite access (src-tauri/src/db.rs) and the store subscription that keeps it up to date.
 import { invoke } from "@tauri-apps/api/core";
+import type { MoveAnnotation } from "./analysis/review";
 import type { Line } from "./chess/line";
 import { fromEngineElo } from "./engine/stockfish";
 import { useStore, type ChatItem, type GameMeta, type Tangent } from "./store";
@@ -15,6 +16,8 @@ export interface MoveRow {
   byStudent: boolean;
   /** The mover's clock right after the move, ms. */
   clockMs: number | null;
+  /** Post-game analysis; read-only (saved by db_save_analysis). */
+  analysis?: MoveAnnotation | null;
 }
 
 export interface TangentRow {
@@ -42,6 +45,8 @@ export interface GameSummary {
   takebacks: number;
   /** "180+2" (seconds + increment); null = no clock. */
   timeControl: string | null;
+  analyzed: boolean;
+  openingName: string | null;
   plies: number;
   opening: string;
 }

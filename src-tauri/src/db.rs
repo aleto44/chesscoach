@@ -10,6 +10,12 @@ use tauri::State;
 
 pub struct Db(Mutex<Connection>);
 
+impl Db {
+    pub(crate) fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.0.lock().unwrap()
+    }
+}
+
 /// Append-only; each entry runs once and bumps `user_version`.
 const MIGRATIONS: &[&str] = &[r#"
 CREATE TABLE games (
@@ -91,6 +97,70 @@ ALTER TABLE moves ADD COLUMN clock_ms INTEGER;
 -- rated_games was SELECT * when created, so it doesn't see new columns until it's recreated.
 DROP VIEW rated_games;
 CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
+"#, r#"
+-- Post-game analysis (local Stockfish), filled in once a game is over. Evals are centipawns from
+-- White's view, mates clamped to +-10000. cp_loss is from the mover's view, capped at 1000.
+ALTER TABLE moves ADD COLUMN best_uci TEXT;
+ALTER TABLE moves ADD COLUMN class TEXT;        -- 'best' | 'good' | 'inaccuracy' | 'mistake' | 'blunder'
+ALTER TABLE moves ADD COLUMN phase TEXT;        -- 'opening' | 'middlegame' | 'endgame'
+ALTER TABLE moves ADD COLUMN tags TEXT;         -- JSON array, e.g. ["time-trouble", "hung-piece"]
+ALTER TABLE games ADD COLUMN analyzed_at TEXT;
+ALTER TABLE games ADD COLUMN opening_name TEXT; -- from the app's opening book, e.g. 'Sicilian Defense: Najdorf'
+
+-- Notes the coach makes about the student ("keeps missing back-rank threats").
+CREATE TABLE observations (
+    id         INTEGER PRIMARY KEY,
+    game_id    INTEGER REFERENCES games(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    tag        TEXT NOT NULL,
+    note       TEXT NOT NULL,
+    fen        TEXT
+);
+
+-- Spaced-repetition cards. Separate from games: drill answers are never counted as game moves.
+--   'mistake': a position from one of the student's games where they went wrong; find a good move.
+--   'opening': a repertoire line to play from memory (line holds the SAN moves from fen).
+--   'coach':   a position the coach set as an exercise.
+CREATE TABLE drills (
+    id             INTEGER PRIMARY KEY,
+    kind           TEXT NOT NULL CHECK (kind IN ('mistake', 'opening', 'coach')),
+    title          TEXT NOT NULL,
+    fen            TEXT NOT NULL,           -- the position the drill starts from
+    color          TEXT NOT NULL,           -- the side the student plays
+    answer_uci     TEXT,                    -- best move ('mistake' / 'coach')
+    line           TEXT NOT NULL DEFAULT '', -- JSON array of SAN ('opening')
+    note           TEXT,
+    source_game_id INTEGER REFERENCES games(id) ON DELETE SET NULL,
+    source_ply     INTEGER,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    due_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    interval_days  REAL NOT NULL DEFAULT 0,
+    ease           REAL NOT NULL DEFAULT 2.5,
+    reps           INTEGER NOT NULL DEFAULT 0,
+    lapses         INTEGER NOT NULL DEFAULT 0,
+    retired        INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (kind, fen, line)
+);
+CREATE INDEX drills_due ON drills(retired, due_at);
+
+CREATE TABLE drill_attempts (
+    id         INTEGER PRIMARY KEY,
+    drill_id   INTEGER NOT NULL REFERENCES drills(id) ON DELETE CASCADE,
+    at         TEXT NOT NULL DEFAULT (datetime('now')),
+    correct    INTEGER NOT NULL,
+    played     TEXT NOT NULL,               -- SAN the student played (the first wrong one, if any)
+    ms         INTEGER                      -- thinking time
+);
+
+-- The openings the student wants to play, per color.
+CREATE TABLE repertoire (
+    id         INTEGER PRIMARY KEY,
+    color      TEXT NOT NULL CHECK (color IN ('white', 'black')),
+    name       TEXT NOT NULL,
+    moves      TEXT NOT NULL,               -- JSON array of SAN from the start position
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (color, moves)
+);
 "#];
 
 impl Db {
@@ -183,6 +253,20 @@ pub struct MoveRow {
     by_student: bool,
     #[serde(default)]
     clock_ms: Option<i64>,
+    /// Read-only here; written by `stats::db_save_analysis`.
+    #[serde(default, skip_deserializing)]
+    analysis: Option<MoveAnalysis>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveAnalysis {
+    pub eval_after: Option<i64>,
+    pub cp_loss: Option<i64>,
+    pub best_uci: Option<String>,
+    pub class: String,
+    pub phase: Option<String>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -222,6 +306,8 @@ pub struct GameSummary {
     mode: String,
     takebacks: i64,
     time_control: Option<String>,
+    analyzed: bool,
+    opening_name: Option<String>,
     plies: i64,
     opening: String,
 }
@@ -237,6 +323,7 @@ pub struct GameRecord {
 const SUMMARY_SQL: &str = "
     SELECT g.id, g.started_at, g.updated_at, g.ended_at, g.start_fen, g.student_color, g.opponent,
            g.result, g.termination, g.coach_session_id, g.mode, g.takebacks, g.time_control,
+           g.analyzed_at IS NOT NULL, g.opening_name,
            (SELECT count(*) FROM moves m WHERE m.game_id = g.id),
            (SELECT coalesce(group_concat(san, ' '), '')
               FROM (SELECT san FROM moves m WHERE m.game_id = g.id ORDER BY ply LIMIT 10))
@@ -257,8 +344,10 @@ fn summary(r: &Row) -> rusqlite::Result<GameSummary> {
         mode: r.get(10)?,
         takebacks: r.get(11)?,
         time_control: r.get(12)?,
-        plies: r.get(13)?,
-        opening: r.get(14)?,
+        analyzed: r.get(13)?,
+        opening_name: r.get(14)?,
+        plies: r.get(15)?,
+        opening: r.get(16)?,
     })
 }
 
@@ -300,18 +389,32 @@ pub fn db_update_game(db: State<Db>, id: i64, patch: GamePatch) -> Result<(), St
         .map_err(err)
 }
 
-/// Replaces the game's whole move list (takebacks truncate it, so this is the simplest truth).
+/// Makes the stored move list match `moves` (takebacks truncate it). A move's analysis survives
+/// only while that ply still holds the same move from the same position.
 #[tauri::command]
 pub fn db_set_moves(db: State<Db>, game_id: i64, moves: Vec<MoveRow>) -> Result<(), String> {
     let mut conn = db.0.lock().unwrap();
     let tx = conn.transaction().map_err(err)?;
-    tx.execute("DELETE FROM moves WHERE game_id = ?1", [game_id]).map_err(err)?;
+    tx.execute("DELETE FROM moves WHERE game_id = ?1 AND ply > ?2", params![game_id, moves.len() as i64])
+        .map_err(err)?;
     {
+        let same = "(moves.uci = excluded.uci AND moves.fen_before = excluded.fen_before)";
         let mut insert = tx
-            .prepare(
+            .prepare(&format!(
                 "INSERT INTO moves (game_id, ply, san, uci, fen_before, fen_after, by_student, clock_ms)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            )
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 ON CONFLICT (game_id, ply) DO UPDATE SET
+                    eval_before = CASE WHEN {same} THEN eval_before END,
+                    eval_after  = CASE WHEN {same} THEN eval_after END,
+                    cp_loss     = CASE WHEN {same} THEN cp_loss END,
+                    best_uci    = CASE WHEN {same} THEN best_uci END,
+                    class       = CASE WHEN {same} THEN class END,
+                    phase       = CASE WHEN {same} THEN phase END,
+                    tags        = CASE WHEN {same} THEN tags END,
+                    san = excluded.san, uci = excluded.uci, fen_before = excluded.fen_before,
+                    fen_after = excluded.fen_after, by_student = excluded.by_student,
+                    clock_ms = excluded.clock_ms"
+            ))
             .map_err(err)?;
         for m in &moves {
             insert
@@ -387,8 +490,9 @@ pub fn db_load_game(db: State<Db>, id: i64) -> Result<Option<GameRecord>, String
 
     let moves = conn
         .prepare(
-            "SELECT ply, san, uci, fen_before, fen_after, by_student, clock_ms FROM moves
-             WHERE game_id = ?1 ORDER BY ply",
+            "SELECT ply, san, uci, fen_before, fen_after, by_student, clock_ms,
+                    eval_after, cp_loss, best_uci, class, phase, tags
+             FROM moves WHERE game_id = ?1 ORDER BY ply",
         )
         .map_err(err)?
         .query_map([id], |r| {
@@ -400,6 +504,20 @@ pub fn db_load_game(db: State<Db>, id: i64) -> Result<Option<GameRecord>, String
                 fen_after: r.get(4)?,
                 by_student: r.get(5)?,
                 clock_ms: r.get(6)?,
+                analysis: match r.get::<_, Option<String>>(10)? {
+                    None => None,
+                    Some(class) => Some(MoveAnalysis {
+                        eval_after: r.get(7)?,
+                        cp_loss: r.get(8)?,
+                        best_uci: r.get(9)?,
+                        class,
+                        phase: r.get(11)?,
+                        tags: r
+                            .get::<_, Option<String>>(12)?
+                            .and_then(|t| serde_json::from_str(&t).ok())
+                            .unwrap_or_default(),
+                    }),
+                },
             })
         })
         .map_err(err)?
