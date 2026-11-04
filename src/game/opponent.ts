@@ -1,8 +1,14 @@
-// The sparring partner: Stockfish at limited strength. The coach never chooses these moves.
+// The sparring partner: Maia-3 (human-like) at club ratings, limited Stockfish above. The coach never
+// chooses these moves.
 import type { Key } from "chessground/types";
 import { playAt, sideToMove } from "../chess/line";
-import { getOpponentEngine, toEngineElo } from "../engine/stockfish";
-import { useStore } from "../store";
+import { maiaMove, preloadMaia } from "../engine/maia";
+import { getOpponentEngine, STOCKFISH_RATING, toEngineElo } from "../engine/stockfish";
+import { MAIA_MAX_RATING, useStore } from "../store";
+import { clockLeft } from "./clock";
+
+/** The ratings on offer, chess.com scale: Maia's floor up to Stockfish's ceiling. */
+export const OPPONENT_RATING = { min: 400, max: STOCKFISH_RATING.max };
 
 const MOVETIME_MS = 600;
 let thinkingOn: string | null = null;
@@ -14,19 +20,32 @@ export function initOpponent() {
   });
 }
 
+/** Maia when it covers the rating; Stockfish (as close as it can get) if Maia fails to load. */
+async function pickMove(fen: string, rating: number, movetime: number): Promise<string | null> {
+  if (rating <= MAIA_MAX_RATING) {
+    try {
+      return await maiaMove(fen, rating);
+    } catch (e) {
+      console.error("Maia failed, falling back to Stockfish:", e);
+    }
+  }
+  return getOpponentEngine().bestMove(fen, toEngineElo(rating), movetime);
+}
+
 async function maybeMove() {
   const { game, meta, gameId } = useStore.getState();
   if (!meta.opponentElo || meta.result || meta.studentColor === "both") return;
+  if (meta.opponentElo <= MAIA_MAX_RATING) preloadMaia();
   const end = game.sans.length;
   const fen = game.fens[end];
   if (sideToMove(fen) === meta.studentColor || thinkingOn === fen) return;
 
   thinkingOn = fen;
   useStore.setState({ opponentThinking: true });
-  const started = Date.now();
-  const uci = await getOpponentEngine().bestMove(fen, toEngineElo(meta.opponentElo), MOVETIME_MS);
-  // Short pause so instant replies don't feel robotic.
-  await new Promise((r) => setTimeout(r, Math.max(0, 350 - (Date.now() - started))));
+  // On the clock, Stockfish spends at most a 40th of what's left, so bullet games don't flag it.
+  const left = clockLeft(sideToMove(fen));
+  const budget = left === null ? Infinity : left / 40;
+  const uci = await pickMove(fen, meta.opponentElo, Math.max(50, Math.min(MOVETIME_MS, budget)));
   thinkingOn = null;
   useStore.setState({ opponentThinking: false });
 

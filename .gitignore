@@ -25,6 +25,7 @@ dist-ssr
 
 # Copied from node_modules on install
 public/stockfish
+public/maia3
 
 # Claude Code local settings
 .claude/settings.local.json

@@ -128,15 +128,19 @@ export function gameDescription(): string {
     meta.mode === "rated"
       ? "rated game (played without engine, coach or takebacks)"
       : `practice game (help allowed${meta.takebacks ? `, ${meta.takebacks} takeback${meta.takebacks > 1 ? "s" : ""}` : ""})`;
-  return `${mode}: student plays ${side} vs ${opponentLabel(meta)}${clock}, ${state}`;
+  const maia = meta.opponentElo && meta.opponentElo <= MAIA_MAX_RATING ? " (a bot trained to play like humans of that rating)" : "";
+  return `${mode}: student plays ${side} vs ${opponentLabel(meta)}${maia}${clock}, ${state}`;
 }
 
+/** Maia-3 (human-like) plays up to this chess.com-scale rating, Stockfish above it. */
+export const MAIA_MAX_RATING = 2000;
+export const opponentName = (rating: number) => (rating <= MAIA_MAX_RATING ? "Maia" : "Stockfish");
 
 /** "3+2", "10+0". */
 export const formatTimeControl = (tc: TimeControl) => `${tc.initial / 60}+${tc.increment}`;
 
 export function opponentLabel(meta: GameMeta): string {
-  return meta.opponentElo ? `Stockfish ${meta.opponentElo}` : "Free play";
+  return meta.opponentElo ? `${opponentName(meta.opponentElo)} ${meta.opponentElo}` : "Free play";
 }
 
 const set = useStore.setState;

@@ -109,12 +109,12 @@ function SoundOptions() {
       </div>
       {folder && (
         <span className="muted small">
-          To use your own sounds, put files named {SOUND_NAMES.map((n) => `${n}.mp3`).join(", ")} (or .wav/.ogg) in{" "}
+          Sounds play from files named {SOUND_NAMES.map((n) => `${n}.mp3`).join(", ")} (or .wav/.ogg) in{" "}
           <a href="#" onClick={(e) => (e.preventDefault(), revealItemInDir(folder))}>
             this folder
           </a>
           , then <a href="#" onClick={(e) => (e.preventDefault(), reload())}>reload sounds</a>.
-          {loaded.length > 0 && ` Using your files for: ${loaded.join(", ")}.`}
+          {` Found: ${loaded.join(", ") || "none"}. Missing ones use the move sound (game-end stays silent).`}
         </span>
       )}
     </div>

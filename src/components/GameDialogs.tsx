@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { db, opponentElo, type GameSummary } from "../db";
-import { OPPONENT_RATING } from "../engine/stockfish";
+import { OPPONENT_RATING } from "../game/opponent";
 import { deleteGame, loadGame, newGame } from "../game/session";
 import { TIME_CONTROLS, timeControlLabel } from "../game/clock";
-import { FREE_PLAY, opponentLabel, useStore, type Color, type GameMode, type TimeControl } from "../store";
+import { FREE_PLAY, opponentLabel, opponentName, useStore, type Color, type GameMode, type TimeControl } from "../store";
 import { ModeBadge } from "./ModeBadge";
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -63,7 +63,7 @@ export function NewGameDialog({ onClose }: { onClose: () => void }) {
           <span>Opponent</span>
           <div className="segmented">
             <button className={hasOpponent ? "on" : ""} onClick={() => setHasOpponent(true)}>
-              Stockfish
+              Computer
             </button>
             <button className={hasOpponent ? "" : "on"} onClick={() => setHasOpponent(false)}>
               None (free play)
@@ -74,7 +74,10 @@ export function NewGameDialog({ onClose }: { onClose: () => void }) {
       {elo !== null && (
         <label className="field">
           <span>
-            Strength: <strong>{rating}</strong>
+            Strength: <strong>{rating}</strong>{" "}
+            <span className="muted">
+              {opponentName(rating) === "Maia" ? "· Maia, plays like a person at this rating" : "· Stockfish"}
+            </span>
           </span>
           <input
             type="range"

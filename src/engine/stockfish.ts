@@ -114,8 +114,8 @@ export const toEngineElo = (rating: number) => Math.round(convert(rating, 1, 0))
 /** The chess.com-scale rating for a UCI_Elo, to the nearest 10. */
 export const fromEngineElo = (elo: number) => Math.round(convert(elo, 0, 1) / 10) * 10;
 
-/** The opponent ratings on offer, on the chess.com scale. */
-export const OPPONENT_RATING = { min: RATING_SCALE[0][1], max: RATING_SCALE[RATING_SCALE.length - 1][1] };
+/** The ratings Stockfish can play at, on the chess.com scale. */
+export const STOCKFISH_RATING = { min: RATING_SCALE[0][1], max: RATING_SCALE[RATING_SCALE.length - 1][1] };
 
 export function formatScore(l: Pick<EngineLine, "cp" | "mate">): string {
   if (l.mate !== undefined) return l.mate > 0 ? `#${l.mate}` : `#-${-l.mate}`;
