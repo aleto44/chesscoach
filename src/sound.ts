@@ -1,5 +1,5 @@
 // Board sounds, played from the audio files the student puts in the sounds folder.
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./backend";
 import { hasBackend } from "./db";
 import { useSettings } from "./settings";
 import { screen, useStore } from "./store";

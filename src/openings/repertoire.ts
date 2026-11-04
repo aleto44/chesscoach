@@ -1,6 +1,6 @@
 // The student's repertoire: the opening lines they want to play, per color. Each line is also an
 // opening drill (play it from memory).
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../backend";
 import { create } from "zustand";
 import { START_FEN } from "../chess/line";
 import { addDrills } from "../analysis/drills";

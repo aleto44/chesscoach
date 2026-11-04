@@ -2,7 +2,7 @@
 // classifies each move by how much winning chance it gave away (lichess thresholds), labels it the
 // way chess.com's review does (brilliant, great, miss, ...), tags the mistakes with simple
 // patterns, saves it all to SQLite and turns the student's mistakes into drills.
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../backend";
 import { Chess } from "chess.js";
 import { buildLine, sideToMove, START_FEN, type Line } from "../chess/line";
 import { db, hasBackend } from "../db";

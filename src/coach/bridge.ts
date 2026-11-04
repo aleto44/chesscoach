@@ -1,12 +1,12 @@
 // Frontend end of the coach: sends user turns to the backend, renders its stream-json output,
 // and answers tool calls coming in through the MCP server.
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { hasBackend, invoke, listen } from "../backend";
 import { formatMoves } from "../chess/line";
 import { gameDescription, isLocked, newId, pushChat, screen, updateChat, useStore } from "../store";
 import { useSettings } from "../settings";
 import { describeCall, handleTool } from "./tools";
 import { drillContext } from "../analysis/drillSession";
+import { puzzleContext } from "../puzzles/session";
 import { cancelQuizzes } from "./quiz";
 import { refreshUsageSoon } from "./usage";
 
@@ -16,7 +16,7 @@ const stderrTail: string[] = [];
 /** Call once at startup (outside React, so StrictMode doesn't double-register). */
 export function initBridge() {
   // Plain-browser dev (vite only): the board works, the coach doesn't.
-  if (!("__TAURI_INTERNALS__" in window)) return;
+  if (!hasBackend()) return;
   listen<string>("coach-event", (e) => {
     let msg;
     try {
@@ -94,6 +94,13 @@ function finishTurn() {
 
 /** Prefix each turn with a compact view of the screen so the coach rarely needs get_state. */
 function withContext(text: string): string {
+  const puzzle = puzzleContext();
+  if (puzzle) return `<screen>
+Showing: ${puzzle.title} in the puzzle trainer (not a game): ${puzzle.detail}
+FEN: ${puzzle.fen}
+</screen>
+
+${text}`;
   const drill = drillContext();
   if (drill) return `<screen>
 Showing: drill "${drill.title}" (not a game)

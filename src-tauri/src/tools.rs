@@ -107,6 +107,28 @@ pub fn definitions() -> Value {
             }
         },
         {
+            "name": "find_puzzles",
+            "description": "Give the student a set of Lichess puzzles to solve: real-game tactics, rated by millions \
+                of attempts and tagged by theme. They open in the app's puzzle trainer, which grades them; this \
+                returns right away with what was queued. Results show up later in get_profile (puzzle rating, \
+                accuracy by theme). Use it to target a weakness (\"you missed two pins this week\") or the \
+                tactics of an opening the student is learning. Themes are Lichess's: fork, pin, skewer, \
+                discoveredAttack, hangingPiece, trappedPiece, deflection, attraction, sacrifice, quietMove, \
+                defensiveMove, backRankMate, mateIn1, mateIn2, mateIn3, kingsideAttack, exposedKing, \
+                rookEndgame, pawnEndgame, endgame, middlegame, opening, ...",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "themes": { "type": "array", "items": { "type": "string" }, "description": "Any of these Lichess themes. Empty = any." },
+                    "opening": { "type": "string", "description": "Only puzzles from games in this opening, e.g. \"Caro-Kann Defense\" or \"Caro-Kann Defense: Advance Variation\"." },
+                    "rating_min": { "type": "integer", "description": "Puzzle rating (Lichess scale). Defaults to around the student's puzzle rating." },
+                    "rating_max": { "type": "integer" },
+                    "count": { "type": "integer", "minimum": 1, "maximum": 10, "default": 5 },
+                    "title": { "type": "string", "description": "Shown above the set, e.g. \"Pins\"" }
+                }
+            }
+        },
+        {
             "name": "book_lookup",
             "description": "The app's opening book: the name of the opening on the student's board, the book                 continuations from here, and what the student's own repertoire plays. Cheaper and more reliable                 than recalling theory. Only works for lines from the normal starting position.",
             "inputSchema": {

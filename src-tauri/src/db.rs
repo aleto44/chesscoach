@@ -234,6 +234,9 @@ impl Db {
             tx.commit()?;
         }
         conn.pragma_update(None, "foreign_keys", true)?;
+        if let Some(dir) = path.parent() {
+            crate::puzzles::attach(&conn, dir)?;
+        }
         Ok(Self(Mutex::new(conn)))
     }
 

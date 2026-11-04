@@ -7,7 +7,9 @@ use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 
 use serde_json::json;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
+
+use crate::relay;
 
 pub trait CoachBackend: Send {
     fn send(&mut self, text: &str) -> Result<(), String>;
@@ -19,7 +21,14 @@ pub struct ClaudeCli {
 }
 
 impl ClaudeCli {
-    pub fn spawn(app: &AppHandle, mcp_url: &str, resume: Option<&str>, model: Option<&str>) -> Result<Self, String> {
+    /// `client` is the frontend that gets this process's output (see `relay`).
+    pub fn spawn(
+        app: &AppHandle,
+        client: &str,
+        mcp_url: &str,
+        resume: Option<&str>,
+        model: Option<&str>,
+    ) -> Result<Self, String> {
         let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
@@ -59,17 +68,17 @@ impl ClaudeCli {
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
 
-        let out_app = app.clone();
+        let (out_app, out_client) = (app.clone(), client.to_string());
         std::thread::spawn(move || {
             for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-                let _ = out_app.emit("coach-event", line);
+                relay::emit_to(&out_app, &out_client, "coach-event", line);
             }
-            let _ = out_app.emit("coach-exit", ());
+            relay::emit_to(&out_app, &out_client, "coach-exit", ());
         });
-        let err_app = app.clone();
+        let (err_app, err_client) = (app.clone(), client.to_string());
         std::thread::spawn(move || {
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-                let _ = err_app.emit("coach-stderr", line);
+                relay::emit_to(&err_app, &err_client, "coach-stderr", line);
             }
         });
 

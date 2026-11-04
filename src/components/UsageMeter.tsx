@@ -1,5 +1,5 @@
+import { openUrl } from "../backend";
 import { useEffect, useRef, useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { useAuth } from "../coach/auth";
 import { refreshUsage, useUsage, type UsageLimit } from "../coach/usage";
 

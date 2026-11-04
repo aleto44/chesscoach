@@ -206,6 +206,7 @@ pub fn db_profile(db: State<Db>) -> Result<Value, String> {
         "recentRated": recent,
         "observations": observations,
         "drills": drills,
+        "puzzles": crate::puzzles::profile(&conn)?,
     }))
 }
 

@@ -1,6 +1,6 @@
 // Compact text for the profile and game-history tools. Kept terse on purpose: every character
 // here is a token the coach reads.
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../backend";
 import { Chess } from "chess.js";
 import { opponentElo } from "../db";
 import { opponentName } from "../store";
@@ -75,6 +75,14 @@ export async function profileText(): Promise<string> {
     out.push(
       "Drills: " +
         p.drills.map((d: Row) => `${d.kind} ${d.cards} cards (${d.due} due, ${d.pct_correct ?? "–"}% correct)`).join("; "),
+    );
+  }
+  const pz = p.puzzles;
+  if (pz) {
+    out.push(
+      `Lichess puzzles: rating ${pz.rating} (Lichess puzzle scale) after ${pz.attempts} rated puzzles; ` +
+        `last ${pz.recent}: ${pz.recentPct}% solved.` +
+        (pz.themes.length ? " By theme, weakest first: " + pz.themes.map((t: Row) => `${t.theme} ${t.pct}% of ${t.n}`).join(", ") : ""),
     );
   }
   return out.join("\n");

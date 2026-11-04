@@ -7,7 +7,7 @@ import { hasBackend } from "../db";
 import { useStore } from "../store";
 import { Board } from "./Board";
 
-const KIND_LABEL = { mistake: "From your games", opening: "Repertoire", coach: "From the coach" } as const;
+const KIND_LABEL = { mistake: "From your games", opening: "Repertoire", coach: "From the coach", puzzle: "Missed puzzle" } as const;
 
 /** Replaces the game board while a drill session runs. */
 export function DrillPanel() {
@@ -55,6 +55,8 @@ export function DrillPanel() {
             {s.status === "solving" &&
               (drill.kind === "opening"
                 ? `Play your ${drill.color} repertoire from memory.`
+                : drill.kind === "puzzle"
+                  ? `${drill.color === "white" ? "White" : "Black"} to move. Find the winning line${drill.note ? ` (${drill.note})` : ""}.`
                 : `${drill.color === "white" ? "White" : "Black"} to move. Find a good move${drill.note ? ` (last time: ${drill.note})` : ""}.`)}
             {s.status === "checking" && "Checking with the engine…"}
             {(s.status === "right" || s.status === "wrong") && (

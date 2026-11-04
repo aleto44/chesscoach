@@ -1,6 +1,7 @@
 // A drill session: works through due cards on the main board, graded locally by Stockfish.
 // "Mistake" and "coach" cards: any move within 30cp of the engine's best counts. "Opening" cards:
 // the student plays their repertoire line from memory while the app plays the other side.
+// "Puzzle" cards replay a missed Lichess puzzle the same way, and any mating move counts.
 import type { Key } from "chessground/types";
 import { create } from "zustand";
 import { Chess } from "chess.js";
@@ -66,13 +67,18 @@ export async function retireCurrent() {
   nextDrill();
 }
 
-/** Opening drills: play the other side's moves of the line. */
+/** Drills that follow a line (opening and puzzle). */
+const followsLine = (d: Drill) => d.kind === "opening" || d.kind === "puzzle";
+
+/** Line drills: play the other side's moves of the line. */
 function autoplay() {
   const s = useDrill.getState();
   const drill = current();
-  if (!s || !drill || drill.kind !== "opening" || s.status !== "solving" || !s.line) return;
+  if (!s || !drill || !followsLine(drill) || s.status !== "solving" || !s.line) return;
   const ply = s.line.sans.length;
-  if (ply >= drill.line.length) return finish(true, drill.line[drill.line.length - 1] ?? "", "Line complete.");
+  if (ply >= drill.line.length) {
+    return finish(true, drill.line[drill.line.length - 1] ?? "", drill.kind === "puzzle" ? "Solved." : "Line complete.");
+  }
   if (sideToMove(s.line.fens[ply]) === drill.color) return;
   window.setTimeout(() => {
     const now = useDrill.getState();
@@ -102,15 +108,22 @@ export async function drillMove(from: Key, to: Key, promotion?: string) {
   if (!played) return;
   useDrill.setState({ line: played.line });
 
-  if (drill.kind === "opening") {
+  if (followsLine(drill)) {
     const expected = drill.line[ply];
     if (played.san === expected) {
       autoplay();
       return;
     }
+    if (drill.kind === "puzzle" && new Chess(played.line.fens[ply + 1]).isCheckmate()) {
+      return finish(true, played.san, "Solved.");
+    }
     const exp = new Chess(fen).move(expected);
     useDrill.setState({ shapes: [{ orig: exp.from as Key, dest: exp.to as Key, brush: "green" }] });
-    return finish(false, played.san, `Your repertoire plays ${expected} here.`);
+    return finish(
+      false,
+      played.san,
+      drill.kind === "puzzle" ? `${played.san} isn't it. The solution: ${drill.line.join(" ")}.` : `Your repertoire plays ${expected} here.`,
+    );
   }
 
   // Mistake / coach drills: one move, judged by the engine.
@@ -170,6 +183,9 @@ export function drillQuestion(): string {
   const line = s.line!;
   const start = drill.fen;
   const moves = line.sans.join(" ");
+  if (drill.kind === "puzzle") {
+    return `I missed this puzzle again (FEN ${start}, I play ${drill.color}). The solution is ${drill.line.join(" ")}. What's the idea? Keep it short.`;
+  }
   if (drill.kind === "opening") {
     return `In my repertoire drill "${drill.title}" (line: ${drill.line.join(" ")}), I played ${moves}. ${s.message} Why is the repertoire move better here? Keep it short.`;
   }

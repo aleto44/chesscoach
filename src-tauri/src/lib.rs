@@ -2,6 +2,9 @@ mod auth;
 mod coach;
 mod db;
 mod mcp;
+mod puzzles;
+mod relay;
+mod remote;
 mod sounds;
 mod stats;
 mod tools;
@@ -10,39 +13,53 @@ use std::sync::Mutex;
 
 use tauri::{AppHandle, Manager, State};
 
+use relay::Relay;
+
 use coach::{ClaudeCli, CoachBackend};
 use mcp::{Mcp, ToolResult};
 
+/// The coach process and the client (see `relay`) it belongs to.
 #[derive(Default)]
-struct Coach(Mutex<Option<Box<dyn CoachBackend>>>);
+struct Coach(Mutex<Option<(String, Box<dyn CoachBackend>)>>);
 
-/// Sends a user turn, starting (or restarting after a crash) the backend as needed.
-#[tauri::command]
-fn coach_send(
-    app: AppHandle,
-    coach: State<Coach>,
-    mcp: State<Mcp>,
-    db: State<db::Db>,
-    text: String,
-    resume: Option<String>,
-) -> Result<(), String> {
+/// Sends a user turn for `client`, starting the backend as needed: on first use, after a crash,
+/// or when the turn comes from a different client than the running process belongs to (then
+/// the process restarts resuming that client's own conversation).
+pub(crate) fn send_turn(app: &AppHandle, client: &str, text: &str, resume: Option<&str>) -> Result<(), String> {
+    let coach = app.state::<Coach>();
     let mut backend = coach.0.lock().unwrap();
-    if let Some(b) = backend.as_mut() {
-        if b.send(&text).is_ok() {
+    if let Some((owner, b)) = backend.as_mut() {
+        if owner == client && b.send(text).is_ok() {
             return Ok(());
         }
     }
-    let model = db.setting("coachModel");
+    backend.take();
+    app.state::<Relay>().set_owner(client);
+    let model = app.state::<db::Db>().setting("coachModel");
     let model = model.as_ref().and_then(|m| m.as_str()).filter(|m| !m.is_empty());
-    let mut fresh = ClaudeCli::spawn(&app, &mcp.url, resume.as_deref(), model)?;
-    fresh.send(&text)?;
-    *backend = Some(Box::new(fresh));
+    let mut fresh = ClaudeCli::spawn(app, client, &app.state::<Mcp>().url, resume, model)?;
+    fresh.send(text)?;
+    *backend = Some((client.to_string(), Box::new(fresh)));
     Ok(())
 }
 
+/// Ends `client`'s coach process; another client's is left alone.
+pub(crate) fn reset_coach(app: &AppHandle, client: &str) {
+    let coach = app.state::<Coach>();
+    let mut backend = coach.0.lock().unwrap();
+    if backend.as_ref().is_some_and(|(owner, _)| owner == client) {
+        backend.take();
+    }
+}
+
 #[tauri::command]
-fn coach_reset(coach: State<Coach>) {
-    coach.0.lock().unwrap().take();
+fn coach_send(app: AppHandle, text: String, resume: Option<String>) -> Result<(), String> {
+    send_turn(&app, relay::DESKTOP, &text, resume.as_deref())
+}
+
+#[tauri::command]
+fn coach_reset(app: AppHandle) {
+    reset_coach(&app, relay::DESKTOP);
 }
 
 #[tauri::command]
@@ -56,12 +73,17 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(Coach::default())
         .manage(auth::Login::default())
+        .manage(puzzles::Import::default())
+        .manage(Relay::default())
         .setup(|app| {
             let mcp = tauri::async_runtime::block_on(mcp::start(app.handle().clone()))?;
             app.manage(mcp);
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             app.manage(db::Db::open(&dir.join("chesscoach.db"))?);
+            app.manage(remote::Remote::load(&dir));
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move { remote::start_if_enabled(&handle).await });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -76,6 +98,9 @@ pub fn run() {
             auth::plan_usage,
             sounds::sounds_folder,
             sounds::custom_sound,
+            remote::remote_info,
+            remote::remote_set_enabled,
+            remote::remote_new_code,
             db::db_create_game,
             db::db_update_game,
             db::db_set_moves,
@@ -100,6 +125,11 @@ pub fn run() {
             stats::db_repertoire,
             stats::db_add_repertoire,
             stats::db_remove_repertoire,
+            puzzles::puzzle_status,
+            puzzles::puzzle_find,
+            puzzles::puzzle_record,
+            puzzles::puzzle_import_start,
+            puzzles::puzzle_import_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

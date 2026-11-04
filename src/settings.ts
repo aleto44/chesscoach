@@ -1,5 +1,5 @@
 // App settings, saved in SQLite (settings table). The coach reads coachModel when it starts.
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./backend";
 import { create } from "zustand";
 import { hasBackend } from "./db";
 

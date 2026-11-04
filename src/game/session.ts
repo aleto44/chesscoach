@@ -1,5 +1,5 @@
 // Starting, loading and finishing games. Each game owns its chat, tangents and coach session.
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../backend";
 import { Chess } from "chess.js";
 import { cancelQuizzes } from "../coach/quiz";
 import { buildLine, emptyLine, sideToMove, START_FEN, type Line } from "../chess/line";

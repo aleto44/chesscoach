@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useState } from "react";
+import { invoke, isTauri } from "../backend";
 import { hasBackend } from "../db";
 import { MODEL_CHOICES, saveSetting, useSettings } from "../settings";
 import { newId, pushChat, useStore } from "../store";
@@ -87,12 +87,65 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           by itself. Never in rated games.
         </span>
       </label>
+      {isTauri && <PhoneAccess />}
       <footer>
         <button className="primary" onClick={save} disabled={choice === "custom" && !custom.trim()}>
           {changed ? "Save" : "Done"}
         </button>
       </footer>
     </Modal>
+  );
+}
+
+interface RemoteInfo {
+  enabled: boolean;
+  running: boolean;
+  port: number;
+  code: string;
+  urls: string[];
+}
+
+/** Desktop only: the home server phones connect to (src-tauri/src/remote.rs). */
+function PhoneAccess() {
+  const [info, setInfo] = useState<RemoteInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    invoke<RemoteInfo>("remote_info").then(setInfo, (e) => setError(String(e)));
+  }, []);
+
+  const run = (cmd: string, args?: Record<string, unknown>) =>
+    invoke<RemoteInfo>(cmd, args).then(
+      (i) => (setInfo(i), setError(null)),
+      (e) => setError(String(e)),
+    );
+
+  if (!info) return error ? <span className="error small">{error}</span> : null;
+  return (
+    <div className="field phone-access">
+      <label className="toggle">
+        <input type="checkbox" checked={info.enabled} onChange={(e) => run("remote_set_enabled", { enabled: e.target.checked })} />
+        <span>Play from my phone</span>
+      </label>
+      {info.enabled && (
+        <span className="muted small">
+          {info.running ? "On. " : "Not running. "}
+          Keep this app open on your computer, then open {info.urls.map((u, i) => (
+            <span key={u}>
+              {i > 0 && " or "}
+              <code>{u}</code>
+            </span>
+          ))}{" "}
+          on your phone and enter the code <code className="pair-code">{info.code.slice(0, 4)}-{info.code.slice(4)}</code>.
+          Away from home, or to install it as an app, use Tailscale (docs/phone.md).{" "}
+          <a href="#" onClick={(e) => (e.preventDefault(), run("remote_new_code"))}>
+            New code
+          </a>{" "}
+          unpairs every phone.
+        </span>
+      )}
+      {error && <span className="error small">{error}</span>}
+    </div>
   );
 }
 
@@ -122,9 +175,13 @@ function SoundOptions() {
       {folder && (
         <span className="muted small">
           Sounds play from files named {SOUND_NAMES.map((n) => `${n}.mp3`).join(", ")} (or .wav/.ogg) in{" "}
-          <a href="#" onClick={(e) => (e.preventDefault(), revealItemInDir(folder))}>
-            this folder
-          </a>
+          {isTauri ? (
+            <a href="#" onClick={(e) => (e.preventDefault(), revealItemInDir(folder))}>
+              this folder
+            </a>
+          ) : (
+            <code>{folder}</code>
+          )}
           , then <a href="#" onClick={(e) => (e.preventDefault(), reload())}>reload sounds</a>.
           {` Found: ${loaded.join(", ") || "none"}. Missing ones use the move sound (game-end stays silent).`}
         </span>

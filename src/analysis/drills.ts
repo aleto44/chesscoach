@@ -1,6 +1,7 @@
 // Spaced-repetition drills (SM-2 scheduling lives in src-tauri/src/stats.rs). Mistake drills come
-// from post-game analysis; opening drills from the repertoire; coach drills from set_drill.
-import { invoke } from "@tauri-apps/api/core";
+// from post-game analysis; opening drills from the repertoire; coach drills from ask_move;
+// puzzle drills from missed Lichess puzzles.
+import { invoke } from "../backend";
 import { create } from "zustand";
 import { sideToMove, type Line } from "../chess/line";
 import { hasBackend } from "../db";
@@ -9,7 +10,7 @@ import type { MoveAnnotation } from "./review";
 
 export interface Drill {
   id: number;
-  kind: "mistake" | "opening" | "coach";
+  kind: "mistake" | "opening" | "coach" | "puzzle";
   title: string;
   fen: string;
   color: Color;

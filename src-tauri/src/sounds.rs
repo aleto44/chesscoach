@@ -23,15 +23,19 @@ pub fn sounds_folder(app: AppHandle) -> Result<String, String> {
 /// Raw bytes of the custom file for `name` (e.g. "move"), or an empty response if there is none.
 #[tauri::command]
 pub fn custom_sound(app: AppHandle, name: String) -> Result<Response, String> {
+    read_sound(&app, &name).map(Response::new)
+}
+
+pub fn read_sound(app: &AppHandle, name: &str) -> Result<Vec<u8>, String> {
     if !name.chars().all(|c| c.is_ascii_lowercase() || c == '-') {
         return Err("bad sound name".into());
     }
-    let dir = sounds_dir(&app)?;
+    let dir = sounds_dir(app)?;
     for ext in EXTENSIONS {
         let path = dir.join(format!("{name}.{ext}"));
         if path.is_file() {
-            return std::fs::read(path).map(Response::new).map_err(|e| e.to_string());
+            return std::fs::read(path).map_err(|e| e.to_string());
         }
     }
-    Ok(Response::new(Vec::new()))
+    Ok(Vec::new())
 }

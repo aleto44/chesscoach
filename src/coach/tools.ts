@@ -1,16 +1,18 @@
 // Handlers for the tools declared in src-tauri/src/tools.rs.
+import { invoke } from "../backend";
 import { Chess } from "chess.js";
 import { buildLine, formatMoves, sideToMove } from "../chess/line";
 import { formatScore, getEngine, pvToSan } from "../engine/stockfish";
-import { invoke } from "@tauri-apps/api/core";
 import { clockLeft, formatClock } from "../game/clock";
 import { gamesText, profileText } from "./profile";
 import { continuations, openingName } from "../openings/book";
 import { START_FEN } from "../chess/line";
 import { getRepertoire } from "../openings/repertoire";
 import { askMove } from "./quiz";
+import { findPuzzles, openingLabel, openingTag, refreshPuzzleDb, themeKey, themeLabel, usePuzzleDb } from "../puzzles/puzzles";
+import { startCoachSet } from "../puzzles/session";
 import type { Key } from "chessground/types";
-import { addTangent, openTangent, gameDescription, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
+import { addTangent, openTangent, gameDescription, isLocked, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
 
 export interface ToolResult {
   text: string;
@@ -187,6 +189,47 @@ Object.assign(handlers, {
     return { text: shapes.length ? `Drew ${shapes.length} on the board.` : "Cleared." };
   },
 
+  async find_puzzles(args: Args) {
+    if (!usePuzzleDb.getState().loaded) await refreshPuzzleDb();
+    const pdb = usePuzzleDb.getState();
+    if (!pdb.installed) return { text: "The puzzle set isn't downloaded yet. Tell the student to open Puzzles in the top bar and download it." };
+    if (isLocked()) return { text: "A rated game is in progress; puzzles have to wait until it's over.", isError: true };
+    const asked = Array.isArray(args.themes) ? args.themes.map(String).filter(Boolean) : [];
+    const themes = asked.map((t) => themeKey(t)).filter((t): t is string => !!t);
+    const unknown = asked.filter((t) => !themeKey(t));
+    if (unknown.length && !themes.length) {
+      const known = pdb.tags.filter((t) => t.kind === "theme").map((t) => t.tag);
+      return { text: `Unknown theme${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")}. Themes: ${known.join(", ")}`, isError: true };
+    }
+    let opening: string | null = null;
+    if (typeof args.opening === "string" && args.opening.trim()) {
+      opening = openingTag(args.opening);
+      if (!opening) return { text: `No puzzles are tagged with an opening like "${args.opening}". Try the opening's family name.`, isError: true };
+    }
+    const center = pdb.rating;
+    const min = Number.isFinite(Number(args.rating_min)) && args.rating_min !== undefined ? Number(args.rating_min) : center - 150;
+    const max = Number.isFinite(Number(args.rating_max)) && args.rating_max !== undefined ? Number(args.rating_max) : Math.max(min + 100, center + 150);
+    const count = clamp(Number(args.count ?? 5), 1, 10);
+    let found = await findPuzzles({ themes, opening, minRating: min, maxRating: max, limit: count });
+    let widened = false;
+    if (found.length < count && args.rating_min === undefined && args.rating_max === undefined) {
+      const more = await findPuzzles({ themes, opening, minRating: center - 500, maxRating: center + 500, limit: count - found.length, exclude: found.map((p) => p.id) });
+      widened = more.length > 0;
+      found = [...found, ...more];
+    }
+    if (!found.length) return { text: "No unseen puzzles match that. Loosen the rating range, themes or opening." };
+    const fallbackTitle = themes.length ? themes.map(themeLabel).join(", ") : opening ? openingLabel(opening) : "Puzzles";
+    const title = typeof args.title === "string" && args.title.trim() ? args.title.trim() : fallbackTitle;
+    startCoachSet(title, found);
+    return {
+      text:
+        `Opened "${title}" in the puzzle trainer: ${found.length} puzzles (student's puzzle rating ${pdb.rating}` +
+        `${widened ? "; widened the rating range to find enough" : ""}${unknown.length ? `; ignored unknown themes ${unknown.join(", ")}` : ""}).\n` +
+        found.map((p) => `  ${p.id} rated ${p.rating}: ${p.themes.join(", ")}`).join("\n") +
+        "\nThe app grades them; don't solve them for the student. When they finish, they can send you the results.",
+    };
+  },
+
   async get_profile() {
     return { text: await profileText() };
   },
@@ -227,6 +270,7 @@ export function describeCall(name: string, args: Args): string {
   if (name === "analyze") return `analyze${args.depth ? ` depth ${args.depth}` : ""}`;
   if (name === "setup_position") return `setup_position "${args.title ?? ""}"`;
   if (name === "ask_move") return `ask_move "${args.title ?? ""}"`;
+  if (name === "find_puzzles") return `find_puzzles${Array.isArray(args.themes) && args.themes.length ? ` ${args.themes.join(", ")}` : ""}`;
   return name;
 }
 

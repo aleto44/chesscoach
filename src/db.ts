@@ -1,11 +1,11 @@
 // SQLite access (src-tauri/src/db.rs) and the store subscription that keeps it up to date.
-import { invoke } from "@tauri-apps/api/core";
+import { hasBackend, invoke } from "./backend";
 import type { MoveAnnotation } from "./analysis/review";
 import type { Line } from "./chess/line";
 import { fromEngineElo } from "./engine/stockfish";
 import { useStore, type ChatItem, type GameMeta, type Tangent } from "./store";
 
-export const hasBackend = () => "__TAURI_INTERNALS__" in window;
+export { hasBackend };
 
 export interface MoveRow {
   ply: number;

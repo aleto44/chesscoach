@@ -1,5 +1,5 @@
 // Plan usage limits, read from the CLI's `/usage` (src-tauri/src/auth.rs plan_usage).
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../backend";
 import { create } from "zustand";
 import { hasBackend } from "../db";
 

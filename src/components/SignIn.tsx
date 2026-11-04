@@ -1,5 +1,5 @@
+import { openUrl } from "../backend";
 import { useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { cancelLogin, startLogin, submitCode, useAuth } from "../coach/auth";
 
 /** Shown in the chat until the Claude CLI is signed in. */

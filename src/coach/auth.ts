@@ -1,6 +1,5 @@
 // Claude sign-in state, backed by `claude auth` (src-tauri/src/auth.rs).
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invoke, listen } from "../backend";
 import { create } from "zustand";
 import { hasBackend } from "../db";
 import { refreshUsage } from "./usage";
