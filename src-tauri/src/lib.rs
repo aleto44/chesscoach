@@ -2,6 +2,7 @@ mod auth;
 mod coach;
 mod db;
 mod mcp;
+mod sounds;
 mod tools;
 
 use std::sync::Mutex;
@@ -72,6 +73,8 @@ pub fn run() {
             auth::auth_cancel,
             auth::auth_logout,
             auth::plan_usage,
+            sounds::sounds_folder,
+            sounds::custom_sound,
             db::db_create_game,
             db::db_update_game,
             db::db_set_moves,

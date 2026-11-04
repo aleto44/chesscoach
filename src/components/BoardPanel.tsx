@@ -60,6 +60,14 @@ export function BoardPanel() {
       </nav>
 
       <div className={`board-frame ${tangent ? "tangent" : ""}`}>
+        <button
+          className={`eval-toggle ${showEval ? "on" : ""}`}
+          onClick={() => saveSetting("showEval", !showEval)}
+          title={showEval ? "Hide engine evaluation" : "Show engine evaluation"}
+          aria-pressed={showEval}
+        >
+          <span className="eval-toggle-icon" />
+        </button>
         {showEval && <EvalBar orientation={orientation} />}
         <Board
           fen={line.fens[ply]}
@@ -77,13 +85,6 @@ export function BoardPanel() {
         <button onClick={() => step(1)} title="Forward (→)">▶</button>
         <button onClick={() => goto(line.sans.length)} title="End (End)">⏭</button>
         <span className="spacer" />
-        <button
-          className={showEval ? "on" : ""}
-          onClick={() => saveSetting("showEval", !showEval)}
-          title={showEval ? "Hide engine evaluation" : "Show engine evaluation"}
-        >
-          Eval
-        </button>
         <button onClick={flip} title="Flip board">⇅</button>
       </div>
 

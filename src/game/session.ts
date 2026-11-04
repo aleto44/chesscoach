@@ -112,7 +112,9 @@ async function finish(result: NonNullable<GameMeta["result"]>, termination: stri
 export function initGameOverWatch() {
   useStore.subscribe((s, prev) => {
     if (s.game === prev.game || s.meta.result || s.gameId !== prev.gameId) return;
-    const chess = new Chess(s.game.fens[s.game.sans.length]);
+    // Replay from the start: repetition can't be detected from the final FEN alone.
+    const chess = new Chess(s.game.startFen);
+    for (const san of s.game.sans) chess.move(san);
     if (chess.isCheckmate()) finish(chess.turn() === "w" ? "0-1" : "1-0", "checkmate");
     else if (chess.isStalemate()) finish("1/2-1/2", "stalemate");
     else if (chess.isThreefoldRepetition()) finish("1/2-1/2", "repetition");

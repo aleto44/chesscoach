@@ -11,10 +11,11 @@ import { initUsage } from "./coach/usage";
 import { initPersistence } from "./db";
 import { initOpponent } from "./game/opponent";
 import { bootstrap, initGameOverWatch } from "./game/session";
-import { loadSettings } from "./settings";
+import { initTheme, loadSettings } from "./settings";
 import { initSounds } from "./sound";
 import { initLiveEval } from "./engine/live";
 
+initTheme();
 initBridge();
 initAuth();
 initUsage();
@@ -34,7 +35,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 
 // Handle for poking at the running app from devtools.
 if (import.meta.env.DEV) {
-  Promise.all([import("./store"), import("./game/session"), import("./coach/auth"), import("./coach/usage")]).then(
-    ([store, session, auth, usage]) => Object.assign(window, { __cc: { store, session, auth, usage } }),
+  Promise.all([import("./store"), import("./game/session"), import("./coach/auth"), import("./coach/usage"), import("./sound")]).then(
+    ([store, session, auth, usage, sound]) => Object.assign(window, { __cc: { store, session, auth, usage, sound } }),
   );
 }

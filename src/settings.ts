@@ -9,9 +9,10 @@ export interface Settings {
   sounds: boolean;
   /** Eval bar and engine line beside the board. */
   showEval: boolean;
+  theme: "dark" | "light" | "system";
 }
 
-const DEFAULTS: Settings = { coachModel: "", sounds: true, showEval: false };
+const DEFAULTS: Settings = { coachModel: "", sounds: true, showEval: false, theme: "dark" };
 
 export const MODEL_CHOICES = [
   { value: "", label: "Default", hint: "Whatever your Claude Code default is" },
@@ -26,6 +27,13 @@ export const useSettings = create<Settings & { loaded: boolean; activeModel: str
   /** The model the coach process reported when it last started. */
   activeModel: null,
 }));
+
+/** Keeps <html data-theme> in step with the setting (index.html starts it dark to avoid a flash). */
+export function initTheme() {
+  const apply = () => (document.documentElement.dataset.theme = useSettings.getState().theme);
+  useSettings.subscribe(apply);
+  apply();
+}
 
 export async function loadSettings() {
   if (!hasBackend()) return useSettings.setState({ loaded: true });
