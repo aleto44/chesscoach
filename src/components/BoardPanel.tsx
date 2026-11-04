@@ -19,12 +19,17 @@ import { EvalBar, EvalLine } from "./EvalBar";
 import { ModeBadge } from "./ModeBadge";
 import { ClockRow } from "./Clock";
 import { markFor, ReviewBar, useMoment } from "./Review";
+import { useDrillCounts } from "../analysis/drills";
+import { startDrills } from "../analysis/drillSession";
 import { saveSetting, useSettings } from "../settings";
 
 /** Main board with the tangent breadcrumbs, step-through controls and move list. */
 export function BoardPanel() {
   const { game, gamePly, tangents, active, orientation, meta, opponentThinking, annotations, arrows } = useStore();
   const moment = useMoment();
+  const drills = useDrillCounts();
+  // Drilling mid-game would let a rated game's clock (or the position) sit while the engine talks.
+  const drillsBlocked = !meta.result && (isLocked(meta) || (meta.timeControl !== null && game.sans.length > 0));
   const locked = isLocked(meta);
   const showEval = useSettings((s) => s.showEval) && !locked;
   const canTakeBack = takebackPly(game, meta) !== null;
@@ -46,6 +51,13 @@ export function BoardPanel() {
         </span>
         <span className="spacer" />
         <button onClick={() => setDialog("games")}>Games</button>
+        <button
+          onClick={() => startDrills()}
+          disabled={drillsBlocked}
+          title={drillsBlocked ? "Finish this game first" : `${drills.due} due of ${drills.total}`}
+        >
+          Drills{drills.due ? <span className="count">{drills.due}</span> : null}
+        </button>
         <button onClick={() => setDialog("new")}>New game</button>
         {locked && (
           <button

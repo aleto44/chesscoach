@@ -1,9 +1,12 @@
 import { useEffect } from "react";
 import { BoardPanel } from "./components/BoardPanel";
 import { Chat } from "./components/Chat";
+import { DrillPanel } from "./components/DrillPanel";
+import { useDrill } from "./analysis/drillSession";
 import { goto, openTangent, screen, step, useStore } from "./store";
 
 export default function App() {
+  const drilling = useDrill((d) => d !== null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -25,7 +28,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <BoardPanel />
+      {drilling ? <DrillPanel /> : <BoardPanel />}
       <Chat />
     </div>
   );

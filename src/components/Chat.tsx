@@ -7,6 +7,7 @@ import { hasBackend } from "../db";
 import { useSettings } from "../settings";
 import { isLocked, openTangent, useStore, type ChatItem } from "../store";
 import { Board } from "./Board";
+import { askConfirm } from "./Confirm";
 import { SignIn } from "./SignIn";
 import { UsageMeter } from "./UsageMeter";
 
@@ -39,7 +40,10 @@ export function Chat() {
         <span className="muted small coach-model" title="Change in Settings (⚙)">{activeModel ?? (coachModel || "default model")}</span>
         <span className="spacer" />
         {auth.status === "signed-in" && (
-          <button onClick={() => confirm("Sign out of Claude?") && logout()} title={auth.email ?? "Signed in"}>
+          <button
+            onClick={async () => (await askConfirm({ title: "Sign out of Claude?", confirmLabel: "Sign out" })) && logout()}
+            title={auth.email ?? "Signed in"}
+          >
             Sign out
           </button>
         )}

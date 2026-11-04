@@ -6,6 +6,7 @@ import { formatMoves } from "../chess/line";
 import { gameDescription, isLocked, newId, pushChat, screen, updateChat, useStore } from "../store";
 import { useSettings } from "../settings";
 import { describeCall, handleTool } from "./tools";
+import { drillContext } from "../analysis/drillSession";
 import { refreshUsageSoon } from "./usage";
 
 let streamingId: string | null = null;
@@ -92,6 +93,13 @@ function finishTurn() {
 
 /** Prefix each turn with a compact view of the screen so the coach rarely needs get_state. */
 function withContext(text: string): string {
+  const drill = drillContext();
+  if (drill) return `<screen>
+Showing: drill "${drill.title}" (not a game)
+FEN: ${drill.fen}
+</screen>
+
+${text}`;
   const { line, ply, tangent } = screen();
   const from = Math.max(0, ply - 6);
   const recent = ply > 0 ? formatMoves(line, from, ply) : "(none)";

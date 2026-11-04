@@ -4,9 +4,20 @@ import { OPPONENT_RATING } from "../game/opponent";
 import { deleteGame, loadGame, newGame } from "../game/session";
 import { TIME_CONTROLS, timeControlLabel } from "../game/clock";
 import { FREE_PLAY, opponentLabel, opponentName, useStore, type Color, type GameMode, type TimeControl } from "../store";
+import { askConfirm } from "./Confirm";
 import { ModeBadge } from "./ModeBadge";
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Modal({
+  title,
+  onClose,
+  children,
+  className = "",
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -14,7 +25,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
   }, [onClose]);
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className={`modal ${className}`} onMouseDown={(e) => e.stopPropagation()}>
         <header>
           <strong>{title}</strong>
           <span className="spacer" />
@@ -160,10 +171,20 @@ export function GamesDialog({ onClose }: { onClose: () => void }) {
   };
 
   const remove = async (g: GameSummary) => {
-    const what = `${describeSides(g)}, ${formatDate(g.updatedAt)}`;
-    if (!confirm(`Delete this game and its coach chat? This can't be undone.
-
-${what}`)) return;
+    const sure = await askConfirm({
+      title: "Delete this game?",
+      body: (
+        <>
+          <p>
+            <strong>{describeSides(g)}</strong> · {formatDate(g.updatedAt)}
+          </p>
+          <p className="muted">The game and its coach chat are deleted for good.</p>
+        </>
+      ),
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!sure) return;
     await deleteGame(g.id);
     setGames((list) => list?.filter((x) => x.id !== g.id) ?? null);
   };
