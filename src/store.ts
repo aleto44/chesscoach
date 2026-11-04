@@ -19,7 +19,15 @@ export type ChatItem =
   | { kind: "coach"; id: string; text: string }
   | { kind: "tangent"; id: string; tangentId: string }
   | { kind: "tool"; id: string; text: string; status: "running" | "ok" | "error"; detail?: string }
-  | { kind: "system"; id: string; text: string; error?: boolean };
+  | { kind: "system"; id: string; text: string; error?: boolean }
+  | {
+      kind: "quiz";
+      id: string;
+      tangentId: string;
+      prompt: string;
+      status: "waiting" | "checking" | "right" | "wrong" | "skipped";
+      result?: string;
+    };
 
 export type Color = "white" | "black";
 
@@ -217,8 +225,16 @@ export function step(delta: number) {
  * playing the line's next move steps forward and anything else branches into a student tangent
  * (reusing one that starts the same way). Student tangents simply extend.
  */
+type MoveInterceptor = (tangent: Tangent, from: Key, to: Key) => boolean;
+let interceptor: MoveInterceptor | null = null;
+/** Lets a feature (ask_move quizzes) claim moves on a tangent before the normal handling. */
+export function setMoveInterceptor(fn: MoveInterceptor) {
+  interceptor = fn;
+}
+
 export function boardMove(from: Key, to: Key) {
   const { line, ply, tangent } = screen();
+  if (tangent && interceptor?.(tangent, from, to)) return;
   const played = playAt(line, ply, from, to);
   if (!played) return;
 

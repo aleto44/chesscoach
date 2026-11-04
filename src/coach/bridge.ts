@@ -7,6 +7,7 @@ import { gameDescription, isLocked, newId, pushChat, screen, updateChat, useStor
 import { useSettings } from "../settings";
 import { describeCall, handleTool } from "./tools";
 import { drillContext } from "../analysis/drillSession";
+import { cancelQuizzes } from "./quiz";
 import { refreshUsageSoon } from "./usage";
 
 let streamingId: string | null = null;
@@ -123,6 +124,7 @@ export async function sendToCoach(text: string) {
 
 /** Fresh coach conversation for this game (rereads coach.md); the chat history stays on screen. */
 export async function restartCoach() {
+  cancelQuizzes();
   await invoke("coach_reset");
   useStore.setState({ sessionId: null, busy: false });
   pushChat({ kind: "system", id: newId("c"), text: "Coach restarted. It won't remember the conversation above." });

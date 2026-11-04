@@ -39,3 +39,46 @@ button.link {
   flex: 1;
   min-width: 0;
 }
+
+/* ask_move quizzes */
+
+.quiz-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  font-size: 13px;
+}
+
+.quiz-card.wrong {
+  border-color: var(--error);
+}
+
+.quiz-card.skipped {
+  border-color: var(--border);
+  background: none;
+}
+
+.quiz-badge {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.quiz-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quiz-result {
+  font-weight: 600;
+}

@@ -88,6 +88,25 @@ pub fn definitions() -> Value {
             }
         },
         {
+            "name": "ask_move",
+            "description": "Quiz the student: put a position on their board and wait for them to play a move \
+                there. The app grades it (any move in `accept`, or within `tolerance_cp` of Stockfish's best) and \
+                returns what they played, whether it was right, the engine's best move and evaluations. Misses are \
+                saved as drills. Ask about real decisions (a plan, a tactic, the key move of an opening), not \
+                trivia. Don't reveal the answer in your message before calling.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "prompt": { "type": "string", "description": "The question, e.g. \"White to play. How do you meet the threat on f7?\"" },
+                    "title": { "type": "string", "description": "Short breadcrumb title, e.g. \"Quiz: the c5 break\"" },
+                    "fen": { "type": "string", "description": "The position. Defaults to the one on the student's screen." },
+                    "accept": { "type": "array", "items": { "type": "string" }, "description": "SAN moves that count as right regardless of the engine, e.g. book moves." },
+                    "tolerance_cp": { "type": "integer", "minimum": 0, "maximum": 200, "default": 30 }
+                },
+                "required": ["prompt"]
+            }
+        },
+        {
             "name": "book_lookup",
             "description": "The app's opening book: the name of the opening on the student's board, the book                 continuations from here, and what the student's own repertoire plays. Cheaper and more reliable                 than recalling theory. Only works for lines from the normal starting position.",
             "inputSchema": {

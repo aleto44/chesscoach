@@ -3,6 +3,7 @@ import Markdown from "react-markdown";
 import { formatMoves } from "../chess/line";
 import { logout, useAuth } from "../coach/auth";
 import { restartCoach, sendToCoach } from "../coach/bridge";
+import { skipQuiz } from "../coach/quiz";
 import { hasBackend } from "../db";
 import { useSettings } from "../settings";
 import { isLocked, openTangent, useStore, type ChatItem } from "../store";
@@ -103,6 +104,7 @@ const TOOL_LABELS: Record<string, string> = {
   analyze: "Analyzing the position",
   show_line: "Checking the line",
   get_state: "Looking at the board",
+  ask_move: "Waiting for your move on the board",
   setup_position: "Setting up a position",
   draw_arrows: "Drawing on the board",
   get_profile: "Looking at your history",
@@ -157,7 +159,35 @@ function ChatRow({ item }: { item: ChatItem }) {
       );
     case "system":
       return <div className={`msg system ${item.error ? "error" : ""}`}>{item.text}</div>;
+    case "quiz":
+      return <QuizCard item={item} />;
   }
+}
+
+function QuizCard({ item }: { item: Extract<ChatItem, { kind: "quiz" }> }) {
+  const active = useStore((s) => s.active === item.tangentId);
+  return (
+    <div className={`quiz-card ${item.status}`}>
+      <div className="quiz-prompt">
+        <span className="quiz-badge">Your move</span> {item.prompt}
+      </div>
+      {item.status === "waiting" && (
+        <div className="quiz-actions">
+          {!active && <button onClick={() => openTangent(item.tangentId)}>Open the position</button>}
+          <span className="muted small">{active ? "Play your answer on the board." : ""}</span>
+          <span className="spacer" />
+          <button onClick={() => skipQuiz(item.tangentId)}>Skip</button>
+        </div>
+      )}
+      {item.status === "checking" && <div className="muted small">Checking with the engine…</div>}
+      {item.result && (
+        <div className="quiz-result">
+          {item.status === "right" ? "✓ " : item.status === "wrong" ? "✗ " : ""}
+          {item.result}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TangentCard({ tangentId }: { tangentId: string }) {

@@ -8,6 +8,7 @@ import { gamesText, profileText } from "./profile";
 import { continuations, openingName } from "../openings/book";
 import { START_FEN } from "../chess/line";
 import { getRepertoire } from "../openings/repertoire";
+import { askMove } from "./quiz";
 import type { Key } from "chessground/types";
 import { addTangent, openTangent, gameDescription, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
 
@@ -97,6 +98,29 @@ const SQUARE = /^[a-h][1-8]$/;
 const BRUSHES: Record<string, string> = { green: "green", red: "red", blue: "blue", yellow: "yellow" };
 
 Object.assign(handlers, {
+  async ask_move(args: Args) {
+    const fen = typeof args.fen === "string" && args.fen ? args.fen : screenFen();
+    let chess: Chess;
+    try {
+      chess = new Chess(fen);
+    } catch (e) {
+      return { text: `Invalid FEN: ${(e as Error).message}`, isError: true };
+    }
+    if (chess.isGameOver()) return { text: "That position is already over; nothing to ask.", isError: true };
+    const accept = Array.isArray(args.accept) ? args.accept.map(String) : [];
+    const legal = new Set(chess.moves());
+    const bad = accept.filter((m) => !legal.has(m));
+    if (bad.length) return { text: `Not legal here: ${bad.join(", ")}. Legal: ${[...legal].join(" ")}`, isError: true };
+    const text = await askMove({
+      fen,
+      prompt: String(args.prompt ?? "What would you play here?"),
+      title: String(args.title ?? "Your move"),
+      accept,
+      tolerance: clamp(Number(args.tolerance_cp ?? 30), 0, 200),
+    });
+    return { text };
+  },
+
   async book_lookup(args: Args) {
     let sans: string[];
     if (Array.isArray(args.moves)) sans = args.moves.map(String);
@@ -202,6 +226,7 @@ export function describeCall(name: string, args: Args): string {
   if (name === "show_line") return `show_line "${args.title ?? ""}"`;
   if (name === "analyze") return `analyze${args.depth ? ` depth ${args.depth}` : ""}`;
   if (name === "setup_position") return `setup_position "${args.title ?? ""}"`;
+  if (name === "ask_move") return `ask_move "${args.title ?? ""}"`;
   return name;
 }
 

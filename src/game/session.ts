@@ -1,6 +1,7 @@
 // Starting, loading and finishing games. Each game owns its chat, tangents and coach session.
 import { invoke } from "@tauri-apps/api/core";
 import { Chess } from "chess.js";
+import { cancelQuizzes } from "../coach/quiz";
 import { buildLine, emptyLine, sideToMove, START_FEN, type Line } from "../chess/line";
 import { db, discardPending, flush, hasBackend, opponentElo, opponentKey, withoutSaving } from "../db";
 import {
@@ -89,7 +90,11 @@ export async function loadGame(id: number) {
 
   // A tool call can't still be running in a freshly loaded game.
   const items: ChatItem[] = chat.map(({ data }) =>
-    data.kind === "tool" && data.status === "running" ? { ...data, status: "error", detail: "interrupted" } : data,
+    data.kind === "tool" && data.status === "running"
+      ? { ...data, status: "error", detail: "interrupted" }
+      : data.kind === "quiz" && (data.status === "waiting" || data.status === "checking")
+        ? { ...data, status: "skipped", result: "Not answered." }
+        : data,
   );
 
   withoutSaving(() =>
@@ -127,6 +132,7 @@ export async function loadGame(id: number) {
  * session). A game the student never moved in or talked about is deleted on the way out.
  */
 async function leaveGame(keep: number | null = null) {
+  cancelQuizzes();
   await flush();
   if (!hasBackend()) return;
   await invoke("coach_reset");
