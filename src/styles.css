@@ -95,6 +95,7 @@ button:disabled {
 .app {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 420px;
+  grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
 }
 
@@ -102,7 +103,7 @@ button:disabled {
 
 .board-panel {
   /* The board, and everything lined up with it, gets this width. */
-  --board-w: min(100%, calc(100vh - 260px));
+  --board-w: min(100%, calc(100vh - 310px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1020,40 +1021,10 @@ button.icon {
 
 /* Clocks */
 
-.board-panel.timed {
-  /* Two clock rows above and below the board. */
-  --board-w: min(100%, calc(100vh - 340px));
-}
 
-.clock-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: var(--board-w);
-  padding: 0 4px;
-}
 
-.clock-piece {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  border: 1px solid var(--border);
-}
 
-.clock-piece.white {
-  background: #f2f0ec;
-}
 
-.clock-piece.black {
-  background: #2b2926;
-}
-
-.clock-name {
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 .clock {
   min-width: 92px;
@@ -1189,7 +1160,7 @@ button.icon {
 
 /* Drills */
 
-.game-bar button .count {
+.count {
   display: inline-block;
   min-width: 16px;
   margin-left: 5px;
@@ -1224,4 +1195,325 @@ button.icon {
 .drill-done {
   width: var(--board-w);
   margin-top: 40px;
+}
+
+/* Top bar */
+
+.topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.topbar .brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.topbar .brand-mark {
+  color: var(--accent);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.topbar button {
+  padding: 5px 12px;
+}
+
+.topbar button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Play layout: board on the left, a column of the same height beside it. */
+
+.board-panel.play {
+  container: play / inline-size;
+  --side-w: 236px;
+  --board-w: min(calc(100cqw - var(--side-w) - 24px), calc(100vh - 140px));
+  display: grid;
+  grid-template-columns: auto var(--side-w);
+  grid-template-rows: auto auto;
+  column-gap: 24px;
+  row-gap: 8px;
+  justify-content: center;
+  align-content: start;
+  padding: 12px 24px 16px 44px;
+}
+
+.board-panel.play .crumbs {
+  grid-column: 1 / -1;
+  width: auto;
+}
+
+.game-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: var(--board-w);
+  min-height: 0;
+}
+
+@container play (max-width: 760px) {
+  .board-panel.play {
+    --board-w: min(100cqw, calc(100vh - 360px));
+  }
+  .game-side {
+    grid-column: 1;
+    height: auto;
+  }
+  .game-side .moves {
+    max-height: 160px;
+  }
+}
+
+.game-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.game-head .mode-badge {
+  margin-right: 0;
+}
+
+.game-state {
+  color: var(--accent);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game-state.over {
+  color: var(--text);
+}
+
+/* Player cards */
+
+.player-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 6px 6px 6px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: inset 3px 0 0 transparent;
+  transition: box-shadow 0.15s;
+}
+
+.player-card.turn {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.player-piece {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--muted);
+}
+
+.player-piece.white {
+  background: #f2f0ec;
+}
+
+.player-piece.black {
+  background: #2b2926;
+}
+
+.player-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-thinking {
+  flex: none;
+  width: 22px;
+  height: 6px;
+  background: radial-gradient(circle, var(--muted) 2.5px, transparent 3px) 0 50% / 8px 6px repeat-x;
+  animation: pulse 0.8s infinite alternate;
+}
+
+.player-card .clock {
+  min-width: 84px;
+}
+
+/* Side column: moves, analysis, controls */
+
+.side-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.game-side .moves {
+  flex: 1;
+  min-height: 0;
+  width: auto;
+  display: block;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.game-side .moves.empty {
+  padding: 12px;
+  font-size: 13px;
+}
+
+.move-row {
+  display: grid;
+  grid-template-columns: 30px 1fr 1fr;
+  align-items: center;
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.move-row:nth-child(even) {
+  background: color-mix(in srgb, var(--border) 35%, transparent);
+}
+
+.move-row .num {
+  margin: 0;
+  padding-left: 4px;
+  font-size: 12px;
+}
+
+.move-row .mv {
+  text-align: left;
+  padding: 2px 8px;
+  margin: 1px 0;
+}
+
+.move-row .mv:hover:not(.current) {
+  background: var(--accent-soft);
+}
+
+.game-side .eval-line,
+.game-side .note,
+.game-side .review-bar {
+  width: auto;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.game-side .eval-line {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.game-side .note {
+  min-height: 0;
+}
+
+.game-side .review-bar {
+  flex-wrap: wrap;
+  white-space: normal;
+}
+
+.side-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.nav-buttons {
+  flex: 1;
+  display: flex;
+}
+
+.nav-buttons button {
+  flex: 1;
+  border-radius: 0;
+  margin-left: -1px;
+}
+
+.nav-buttons button:first-child {
+  border-radius: 6px 0 0 6px;
+  margin-left: 0;
+}
+
+.nav-buttons button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.side-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.side-actions button {
+  flex: 1;
+}
+
+.side-actions .resign:hover:not(:disabled) {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+/* Confirm dialog */
+
+.modal.confirm {
+  width: min(400px, calc(100vw - 32px));
+  gap: 10px;
+}
+
+.confirm-body p {
+  margin: 0 0 6px;
+}
+
+.modal.confirm footer {
+  gap: 8px;
+  margin-top: 6px;
+}
+
+button.danger {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
+}
+
+.modal-backdrop {
+  backdrop-filter: blur(2px);
+  animation: backdrop-in 0.12s ease-out;
+}
+
+.modal {
+  box-shadow: 0 18px 48px rgb(0 0 0 / 0.35);
+  animation: modal-in 0.14s ease-out;
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
 }

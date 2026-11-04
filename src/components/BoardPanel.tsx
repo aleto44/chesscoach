@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { resign, switchToPractice, takeBack, takebackPly } from "../game/session";
+import { timeControlLabel } from "../game/clock";
 import {
   useStore,
   boardMove,
@@ -11,77 +12,50 @@ import {
   canStudentMove,
   isLocked,
   opponentLabel,
+  type GameMeta,
 } from "../store";
 import { Board } from "./Board";
-import { GamesDialog, NewGameDialog } from "./GameDialogs";
-import { SettingsDialog } from "./SettingsDialog";
+import { askConfirm } from "./Confirm";
 import { EvalBar, EvalLine } from "./EvalBar";
 import { ModeBadge } from "./ModeBadge";
-import { ClockRow } from "./Clock";
+import { PlayerCard } from "./Clock";
 import { markFor, ReviewBar, useMoment } from "./Review";
-import { useDrillCounts } from "../analysis/drills";
-import { startDrills } from "../analysis/drillSession";
 import { saveSetting, useSettings } from "../settings";
 
-/** Main board with the tangent breadcrumbs, step-through controls and move list. */
+/**
+ * The board, with a side column like lichess's: the player at the top of the board, the moves and
+ * controls, then the player at the bottom.
+ */
 export function BoardPanel() {
   const { game, gamePly, tangents, active, orientation, meta, opponentThinking, annotations, arrows } = useStore();
   const moment = useMoment();
-  const drills = useDrillCounts();
-  // Drilling mid-game would let a rated game's clock (or the position) sit while the engine talks.
-  const drillsBlocked = !meta.result && (isLocked(meta) || (meta.timeControl !== null && game.sans.length > 0));
   const locked = isLocked(meta);
   const showEval = useSettings((s) => s.showEval) && !locked;
   const canTakeBack = takebackPly(game, meta) !== null;
-  const [dialog, setDialog] = useState<"new" | "games" | "settings" | null>(null);
   const tangent = active ? tangents[active] : null;
   const line = tangent ? tangent.line : game;
   const ply = tangent ? tangent.ply : gamePly;
   const path = tangentPath(active);
   const note = ply > 0 ? line.notes[ply - 1] : "";
+  const vsOpponent = meta.studentColor !== "both";
+  const inProgress = vsOpponent && !meta.result;
+  const top = orientation === "white" ? "black" : "white";
+
+  const confirmResign = async () => {
+    if (await askConfirm({ title: "Resign this game?", body: `${opponentLabel(meta)} wins.`, confirmLabel: "Resign", danger: true }))
+      resign();
+  };
+  const confirmHelp = async () => {
+    const ok = await askConfirm({
+      title: "Switch to practice?",
+      body: "The engine, coach and takebacks turn on, and this game stops counting as rated. This can't be undone.",
+      confirmLabel: "Switch to practice",
+    });
+    if (ok) switchToPractice();
+  };
 
   return (
-    <main className={`board-panel ${meta.timeControl ? "timed" : ""}`}>
-      <div className="game-bar">
-        <span className="game-status">
-          {meta.studentColor !== "both" && <ModeBadge mode={meta.mode} />}
-          <strong>{opponentLabel(meta)}</strong>
-          {meta.studentColor !== "both" && <span className="muted"> · you play {meta.studentColor}</span>}
-          <span className="status-text"> · {gameStatus(meta, opponentThinking, game.fens[game.sans.length])}</span>
-        </span>
-        <span className="spacer" />
-        <button onClick={() => setDialog("games")}>Games</button>
-        <button
-          onClick={() => startDrills()}
-          disabled={drillsBlocked}
-          title={drillsBlocked ? "Finish this game first" : `${drills.due} due of ${drills.total}`}
-        >
-          Drills{drills.due ? <span className="count">{drills.due}</span> : null}
-        </button>
-        <button onClick={() => setDialog("new")}>New game</button>
-        {locked && (
-          <button
-            onClick={() =>
-              confirm(
-                "Switch this game to practice?\n\nThe engine, coach and takebacks turn on, and the game stops counting as a rated game. This can't be undone.",
-              ) && switchToPractice()
-            }
-            title="Turn on the engine, coach and takebacks for this game"
-          >
-            Get help
-          </button>
-        )}
-        {meta.studentColor !== "both" && !meta.result && game.sans.length > 0 && (
-          <button onClick={() => confirm("Resign this game?") && resign()}>Resign</button>
-        )}
-        <button className="icon" onClick={() => setDialog("settings")} title="Settings" aria-label="Settings">
-          ⚙
-        </button>
-      </div>
-      {dialog === "new" && <NewGameDialog onClose={() => setDialog(null)} />}
-      {dialog === "games" && <GamesDialog onClose={() => setDialog(null)} />}
-      {dialog === "settings" && <SettingsDialog onClose={() => setDialog(null)} />}
-
+    <main className="board-panel play">
       <nav className="crumbs">
         <button className={`crumb ${active ? "" : "current"}`} onClick={() => openTangent(null)}>
           Game
@@ -101,7 +75,6 @@ export function BoardPanel() {
         )}
       </nav>
 
-      {meta.timeControl && <ClockRow side={orientation === "white" ? "black" : "white"} />}
       <div className={`board-frame ${tangent ? "tangent" : ""}`}>
         {!locked && (
           <button
@@ -129,61 +102,115 @@ export function BoardPanel() {
         />
       </div>
 
-      {meta.timeControl && <ClockRow side={orientation} />}
+      <aside className="game-side">
+        <div className="game-head">
+          {vsOpponent ? <ModeBadge mode={meta.mode} /> : <strong>Free play</strong>}
+          {meta.timeControl && <span className="muted">{timeControlLabel(meta.timeControl)}</span>}
+          <span className="spacer" />
+          <span className={`game-state ${meta.result ? "over" : ""}`}>
+            {gameStatus(meta, opponentThinking, game.fens[game.sans.length])}
+          </span>
+        </div>
 
-      <div className="controls">
-        <button onClick={() => goto(0)} title="Start (Home)">⏮</button>
-        <button onClick={() => step(-1)} title="Back (←)">◀</button>
-        <button onClick={() => step(1)} title="Forward (→)">▶</button>
-        <button onClick={() => goto(line.sans.length)} title="End (End)">⏭</button>
-        <span className="spacer" />
-        {meta.mode === "practice" && meta.studentColor !== "both" && !tangent && (
-          <button onClick={takeBack} disabled={!canTakeBack} title="Take back your last move">
-            ↶ Take back
-          </button>
+        <PlayerCard side={top} />
+
+        <div className="side-body">
+          <MoveList sans={line.sans} fens={line.fens} ply={ply} marks={tangent ? undefined : annotations.map(markFor)} />
+          {showEval && <EvalLine />}
+          {(moment?.text || note) && <div className={`note ${moment ? "moment" : ""}`}>{moment?.text || note}</div>}
+          <ReviewBar />
+        </div>
+
+        <div className="side-controls">
+          <div className="nav-buttons">
+            <button onClick={() => goto(0)} title="Start (Home)" aria-label="Start">⏮</button>
+            <button onClick={() => step(-1)} title="Back (←)" aria-label="Back">◀</button>
+            <button onClick={() => step(1)} title="Forward (→)" aria-label="Forward">▶</button>
+            <button onClick={() => goto(line.sans.length)} title="End (End)" aria-label="End">⏭</button>
+          </div>
+          <button className="icon" onClick={flip} title="Flip board" aria-label="Flip board">⇅</button>
+        </div>
+
+        {inProgress && !tangent && (
+          <div className="side-actions">
+            {meta.mode === "practice" && (
+              <button onClick={takeBack} disabled={!canTakeBack} title="Take back your last move">
+                ↶ Take back
+              </button>
+            )}
+            {locked && (
+              <button onClick={confirmHelp} title="Turn on the engine, coach and takebacks for this game">
+                Get help
+              </button>
+            )}
+            <button className="resign" onClick={confirmResign} disabled={game.sans.length === 0}>
+              ⚑ Resign
+            </button>
+          </div>
         )}
-        <button onClick={flip} title="Flip board">⇅</button>
-      </div>
 
-      <ReviewBar />
-
-      {showEval && <EvalLine />}
-
-      <div className={`note ${moment ? "moment" : ""}`}>{moment?.text || note || " "}</div>
-
-      <MoveList sans={line.sans} fens={line.fens} ply={ply} marks={tangent ? undefined : annotations.map(markFor)} />
+        <PlayerCard side={orientation} />
+      </aside>
     </main>
   );
 }
 
-function gameStatus(meta: ReturnType<typeof useStore.getState>["meta"], thinking: boolean, endFen: string): string {
+function gameStatus(meta: GameMeta, thinking: boolean, endFen: string): string {
   if (meta.result) {
-    const mine = meta.studentColor === "both" ? "" : meta.result === "1/2-1/2" ? " (draw)" : (meta.result === "1-0") === (meta.studentColor === "white") ? " (you won)" : " (you lost)";
-    return `${meta.result} by ${meta.termination}${mine}`;
+    const mine =
+      meta.studentColor === "both"
+        ? ""
+        : meta.result === "1/2-1/2"
+          ? "Draw"
+          : (meta.result === "1-0") === (meta.studentColor === "white")
+            ? "You won"
+            : "You lost";
+    return `${mine ? `${mine} · ` : ""}${meta.termination ?? meta.result}`;
   }
-  if (meta.studentColor === "both") return "move both sides";
-  if (thinking) return "opponent is thinking…";
+  if (meta.studentColor === "both") return "Move both sides";
+  if (thinking) return "Thinking…";
   const turn = endFen.split(" ")[1] === "w" ? "white" : "black";
-  return turn === meta.studentColor ? "your move" : "opponent to move";
+  return turn === meta.studentColor ? "Your move" : "Their move";
 }
 
+/** Moves in rows, one per move number, scrolled to keep the current move in view. */
 function MoveList({ sans, fens, ply, marks }: { sans: string[]; fens: string[]; ply: number; marks?: string[] }) {
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = list.current;
+    const current = el?.querySelector<HTMLElement>(".mv.current");
+    if (!el) return;
+    if (current) current.scrollIntoView({ block: "nearest" });
+    else if (ply === 0) el.scrollTop = 0;
+  }, [ply, sans.length]);
+
   if (sans.length === 0) return <div className="moves empty">No moves yet. Drag a piece to play.</div>;
+
+  const rows: { num: string; cells: (number | null)[] }[] = [];
+  sans.forEach((_, i) => {
+    const [, turn, , , , full] = fens[i].split(" ");
+    if (turn === "w" || i === 0) rows.push({ num: full, cells: turn === "w" ? [i] : [null, i] });
+    else rows[rows.length - 1].cells.push(i);
+  });
+
   return (
-    <div className="moves">
-      {sans.map((san, i) => {
-        const [, turn, , , , full] = fens[i].split(" ");
-        const num = turn === "w" ? `${full}.` : i === 0 ? `${full}...` : "";
-        return (
-          <span key={i}>
-            {num && <span className="num">{num}</span>}
-            <button className={`mv ${i + 1 === ply ? "current" : ""}`} onClick={() => goto(i + 1)}>
-              {san}
-              {marks?.[i] && <span className={`mark m${marks[i].length}${marks[i] === "?!" ? "i" : ""}`}>{marks[i]}</span>}
-            </button>
-          </span>
-        );
-      })}
+    <div className="moves" ref={list}>
+      {rows.map((r) => (
+        <div className="move-row" key={r.num}>
+          <span className="num">{r.num}.</span>
+          {[0, 1].map((c) => {
+            const i = r.cells[c];
+            if (i === undefined) return <span key={c} />;
+            if (i === null) return <span key={c} className="mv muted">…</span>;
+            return (
+              <button key={c} className={`mv ${i + 1 === ply ? "current" : ""}`} onClick={() => goto(i + 1)}>
+                {sans[i]}
+                {marks?.[i] && <span className={`mark m${marks[i].length}${marks[i] === "?!" ? "i" : ""}`}>{marks[i]}</span>}
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { BoardPanel } from "./components/BoardPanel";
 import { Chat } from "./components/Chat";
+import { ConfirmHost } from "./components/Confirm";
+import { TopBar } from "./components/TopBar";
 import { DrillPanel } from "./components/DrillPanel";
 import { useDrill } from "./analysis/drillSession";
 import { goto, openTangent, screen, step, useStore } from "./store";
@@ -28,8 +30,10 @@ export default function App() {
 
   return (
     <div className="app">
+      <TopBar />
       {drilling ? <DrillPanel /> : <BoardPanel />}
       <Chat />
+      <ConfirmHost />
     </div>
   );
 }
