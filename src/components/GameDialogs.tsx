@@ -4,6 +4,7 @@ import { OPPONENT_RATING } from "../game/opponent";
 import { deleteGame, loadGame, newGame } from "../game/session";
 import { TIME_CONTROLS, timeControlLabel } from "../game/clock";
 import { FREE_PLAY, opponentLabel, opponentName, useStore, type Color, type GameMode, type TimeControl } from "../store";
+import { go } from "../nav";
 import { askConfirm } from "./Confirm";
 import { ModeBadge } from "./ModeBadge";
 import { OpeningSelect, RepertoireDialog } from "./RepertoireDialog";
@@ -38,10 +39,12 @@ export function Modal({
   );
 }
 
-export function NewGameDialog({ onClose }: { onClose: () => void }) {
+/** `mode`: the game type to start with (the menu's practice / rated choice); defaults to the last game's. */
+export function NewGameDialog({ onClose, mode: initialMode }: { onClose: () => void; mode?: GameMode }) {
   const last = useStore((s) => s.meta);
-  const [mode, setMode] = useState<GameMode>(last.mode);
-  const [hasOpponent, setHasOpponent] = useState(last.studentColor !== "both" || last.opponentElo !== null);
+  const [mode, setMode] = useState<GameMode>(initialMode ?? last.mode);
+  // From the menu, a game means a computer opponent (free play is its own "Analysis board" entry).
+  const [hasOpponent, setHasOpponent] = useState(!!initialMode || last.studentColor !== "both" || last.opponentElo !== null);
   const [rating, setRating] = useState(last.opponentElo ?? 1500);
   // A rated game is always against an opponent.
   const elo = hasOpponent || mode === "rated" ? rating : null;
@@ -55,6 +58,7 @@ export function NewGameDialog({ onClose }: { onClose: () => void }) {
       elo === null ? "both" : color === "random" ? (Math.random() < 0.5 ? "white" : "black") : color;
     await newGame({ mode, studentColor, opponentElo: elo, timeControl, openingFocus: focus });
     onClose();
+    go("board");
   };
 
   return (
@@ -188,6 +192,7 @@ export function GamesDialog({ onClose }: { onClose: () => void }) {
   const open = async (id: number) => {
     await loadGame(id);
     onClose();
+    go("board");
   };
 
   const remove = async (g: GameSummary) => {

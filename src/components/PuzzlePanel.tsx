@@ -30,6 +30,7 @@ import {
 import { useStore } from "../store";
 import { START_FEN } from "../chess/line";
 import { Board } from "./Board";
+import { fromLichess } from "../rating";
 
 const MB = (bytes: number) => Math.round(bytes / 1e6);
 
@@ -55,7 +56,7 @@ export function PuzzlePanel() {
 
   if (pdb.loaded && !pdb.installed) return <InstallPanel />;
 
-  const change = s.change ? s.change.after - s.change.before : null;
+  const change = s.change ? fromLichess(s.change.after) - fromLichess(s.change.before) : null;
   return (
     <main className="board-panel play puzzles">
       <nav className="crumbs">
@@ -68,7 +69,7 @@ export function PuzzlePanel() {
           </span>
         )}
         <button className="return" onClick={stopPuzzles}>
-          Back to game
+          ‹ Puzzles menu
         </button>
       </nav>
 
@@ -88,7 +89,7 @@ export function PuzzlePanel() {
           <strong>Puzzles</strong>
           <span className="spacer" />
           <span className="puzzle-rating" title={`${pdb.attempts} rated puzzles`}>
-            Rating {pdb.rating}
+            Rating {fromLichess(pdb.rating)}
             {change !== null && <span className={change >= 0 ? "up" : "down"}>{change >= 0 ? ` +${change}` : ` ${change}`}</span>}
           </span>
         </div>
@@ -129,7 +130,7 @@ export function PuzzlePanel() {
           {puzzle && over && (
             <div className="puzzle-info">
               <div>
-                Puzzle rating <strong>{puzzle.rating}</strong> · played {puzzle.plays.toLocaleString()} times
+                Puzzle rating <strong>{fromLichess(puzzle.rating)}</strong> · played {puzzle.plays.toLocaleString()} times
               </div>
               <div className="puzzle-tags">
                 {puzzle.themes
@@ -260,7 +261,7 @@ function InstallPanel() {
       <div className="crumbs">
         <span className="crumb current">Puzzles</span>
         <button className="return" onClick={stopPuzzles}>
-          Back to game
+          ‹ Puzzles menu
         </button>
       </div>
       <div className="puzzle-install">

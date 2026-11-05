@@ -20,7 +20,7 @@ export const hasBackend = () => isTauri || isRemote;
 export const usePairing = create<{ status: "unknown" | "paired" | "unpaired" }>(() => ({ status: "unknown" }));
 
 /** Stable per tab, so a reload keeps owning the coach. */
-const clientId = (() => {
+export const clientId = (() => {
   if (!isRemote) return "desktop";
   try {
     const saved = sessionStorage.getItem("cc-client");

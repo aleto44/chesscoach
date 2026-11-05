@@ -121,7 +121,7 @@ pub fn definitions() -> Value {
                 "properties": {
                     "themes": { "type": "array", "items": { "type": "string" }, "description": "Any of these Lichess themes. Empty = any." },
                     "opening": { "type": "string", "description": "Only puzzles from games in this opening, e.g. \"Caro-Kann Defense\" or \"Caro-Kann Defense: Advance Variation\"." },
-                    "rating_min": { "type": "integer", "description": "Puzzle rating (Lichess scale). Defaults to around the student's puzzle rating." },
+                    "rating_min": { "type": "integer", "description": "Puzzle rating on the chess.com scale, like every rating the student sees (the app converts it). Defaults to around the student's puzzle rating." },
                     "rating_max": { "type": "integer" },
                     "count": { "type": "integer", "minimum": 1, "maximum": 10, "default": 5 },
                     "title": { "type": "string", "description": "Shown above the set, e.g. \"Pins\"" }

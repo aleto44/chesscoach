@@ -6,6 +6,7 @@ import { maiaMove, preloadMaia } from "../engine/maia";
 import { getOpponentEngine, STOCKFISH_RATING, toEngineElo } from "../engine/stockfish";
 import { MAIA_MAX_RATING, useStore } from "../store";
 import { clockLeft } from "./clock";
+import { isFollowing } from "./sync";
 import { bookMove } from "../openings/book";
 import { Chess } from "chess.js";
 
@@ -24,6 +25,12 @@ export const OPPONENT_RATING = { min: 400, max: STOCKFISH_RATING.max };
 const MOVETIME_MS = 600;
 /** How long a reply takes, picked at random each move (thinking time included). */
 const THINK_MS = { min: 1000, max: 3000 };
+/**
+ * Maia runs on the main thread and blocks it for a few hundred milliseconds on a phone, which
+ * would freeze the student's move halfway through its slide (Board animates for 180ms). The reply
+ * isn't due for a second anyway, so let the animation finish first.
+ */
+const ANIMATION_GAP_MS = 220;
 let thinkingOn: string | null = null;
 
 /** Replies whenever the end of the game line is the opponent's turn. */
@@ -47,7 +54,7 @@ async function pickMove(fen: string, rating: number, movetime: number): Promise<
 
 async function maybeMove() {
   const { game, meta, gameId } = useStore.getState();
-  if (!meta.opponentElo || meta.result || meta.studentColor === "both") return;
+  if (!meta.opponentElo || meta.result || meta.studentColor === "both" || isFollowing()) return;
   if (meta.opponentElo <= MAIA_MAX_RATING) preloadMaia();
   const end = game.sans.length;
   const fen = game.fens[end];
@@ -61,6 +68,7 @@ async function maybeMove() {
   const budget = left === null ? Infinity : left / 40;
   // Practicing an opening: follow the chosen line while the student stays in it.
   const book = bookMove(game.sans, meta.openingFocus);
+  if (!book) await new Promise((r) => setTimeout(r, Math.min(ANIMATION_GAP_MS, budget / 4)));
   const uci = book
     ? sanToUci(fen, book)
     : await pickMove(fen, meta.opponentElo, Math.max(50, Math.min(MOVETIME_MS, budget)));
@@ -75,7 +83,8 @@ async function maybeMove() {
     maybeMove();
     return;
   }
-  if (!uci) return;
+  // The student picked the game up on another device meanwhile; that one replies.
+  if (!uci || isFollowing()) return;
   const played = playAt(now.game, end, uci.slice(0, 2) as Key, uci.slice(2, 4) as Key, uci[4] ?? "q");
   if (!played) return;
   const followingEnd = now.gamePly === end;

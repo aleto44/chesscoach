@@ -5,7 +5,7 @@ import { hasBackend } from "../db";
 import { MODEL_CHOICES, saveSetting, useSettings } from "../settings";
 import { newId, pushChat, useStore } from "../store";
 import { Modal } from "./GameDialogs";
-import { customSounds, loadSounds, play, SOUND_NAMES } from "../sound";
+import { customSounds, loadSounds, play, SOUND_NAMES, soundFailures } from "../sound";
 
 const CHOICES = [...MODEL_CHOICES, { value: "custom", label: "Custom…", hint: "Any model name or ID claude accepts" }];
 
@@ -153,6 +153,7 @@ function PhoneAccess() {
 function SoundOptions() {
   const [folder, setFolder] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<string[]>(customSounds());
+  const [failed, setFailed] = useState<string[]>(soundFailures());
 
   useEffect(() => {
     if (hasBackend()) invoke<string>("sounds_folder").then(setFolder, () => setFolder(null));
@@ -161,6 +162,7 @@ function SoundOptions() {
   const reload = async () => {
     await loadSounds();
     setLoaded(customSounds());
+    setFailed(soundFailures());
   };
 
   return (
@@ -186,6 +188,7 @@ function SoundOptions() {
           {` Found: ${loaded.join(", ") || "none"}. Missing ones use the move sound (game-end stays silent).`}
         </span>
       )}
+      {failed.length > 0 && <span className="error small">Couldn't play on this device: {failed.join(", ")}</span>}
     </div>
   );
 }

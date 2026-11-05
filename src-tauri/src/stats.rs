@@ -210,6 +210,41 @@ pub fn db_profile(db: State<Db>) -> Result<Value, String> {
     }))
 }
 
+/// The puzzle menu's history: the latest attempts, newest first, with the stats the profile uses.
+#[tauri::command]
+pub fn puzzle_history(db: State<Db>, limit: i64) -> Result<Value, String> {
+    let conn = db.conn();
+    let attempts = rows(
+        &conn,
+        "SELECT id, puzzle_id AS puzzleId, at, correct, ms, puzzle_rating AS puzzleRating, rated,
+                rating_after AS ratingAfter, themes
+         FROM puzzle_attempts ORDER BY id DESC LIMIT ?1",
+        [limit],
+    )?;
+    Ok(json!({ "attempts": attempts, "stats": crate::puzzles::profile(&conn)? }))
+}
+
+/// The drill menu: cards per kind and the latest attempts, newest first.
+#[tauri::command]
+pub fn db_drill_overview(db: State<Db>, limit: i64) -> Result<Value, String> {
+    let conn = db.conn();
+    let kinds = rows(
+        &conn,
+        "SELECT kind, count(*) AS cards, sum(due_at <= datetime('now')) AS due,
+                (SELECT round(100.0 * avg(correct)) FROM drill_attempts a JOIN drills d2 ON d2.id = a.drill_id
+                 WHERE d2.kind = d.kind) AS pctCorrect
+         FROM drills d WHERE retired = 0 GROUP BY kind",
+        [],
+    )?;
+    let recent = rows(
+        &conn,
+        "SELECT a.id, a.at, a.correct, a.played, d.kind, d.title
+         FROM drill_attempts a JOIN drills d ON d.id = a.drill_id ORDER BY a.id DESC LIMIT ?1",
+        [limit],
+    )?;
+    Ok(json!({ "kinds": kinds, "recent": recent }))
+}
+
 /// Games with their student mistakes, newest first. `mode` is 'rated', 'practice' or 'all'.
 #[tauri::command]
 pub fn db_query_games(db: State<Db>, mode: String, limit: i64, game_id: Option<i64>) -> Result<Value, String> {

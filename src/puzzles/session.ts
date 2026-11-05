@@ -10,6 +10,7 @@ import { stopDrills } from "../analysis/drillSession";
 import { emptyLine, playAt, sideToMove, type Line } from "../chess/line";
 import type { Color } from "../store";
 import { findPuzzles, recordAttempt, themeLabel, usePuzzleDb, type Puzzle } from "./puzzles";
+import { fromLichess } from "../rating";
 
 export type Difficulty = "easier" | "normal" | "harder";
 const OFFSET: Record<Difficulty, number> = { easier: -250, normal: 0, harder: 250 };
@@ -270,7 +271,7 @@ async function save(correct: boolean) {
       await addDrills([
         {
           kind: "puzzle",
-          title: `Puzzle ${puzzle.id} (${puzzle.rating})`,
+          title: `Puzzle ${puzzle.id} (${fromLichess(puzzle.rating)})`,
           fen: start.fen(),
           color: s.color,
           answerUci: puzzle.moves[1],
@@ -309,7 +310,7 @@ export function puzzleContext(): { title: string; fen: string; detail: string } 
     title: `Lichess puzzle ${puzzle.id}`,
     fen: s.line.fens[ply],
     detail:
-      `rating ${puzzle.rating}, student plays ${s.color}` +
+      `rating ${fromLichess(puzzle.rating)} (chess.com scale), student plays ${s.color}` +
       (over
         ? `, ${s.status}. Themes: ${puzzle.themes.join(", ")}. Solution from the puzzle start ${s.line.fens[1]}: ${s.solution.slice(1).join(" ")}`
         : ", not solved yet: don't give the answer away"),
@@ -331,6 +332,6 @@ export function setSummary(): string {
   const missed = s.results.filter((r) => !r.correct);
   return (
     `I finished the puzzle set "${s.set.title}": solved ${right} of ${s.results.length}.` +
-    (missed.length ? ` Missed: ${missed.map((m) => `${m.id} (${m.rating}; ${m.themes.join(", ")})`).join("; ")}.` : "")
+    (missed.length ? ` Missed: ${missed.map((m) => `${m.id} (${fromLichess(m.rating)}; ${m.themes.join(", ")})`).join("; ")}.` : "")
   );
 }

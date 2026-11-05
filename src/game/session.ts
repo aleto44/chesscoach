@@ -3,7 +3,7 @@ import { invoke } from "../backend";
 import { Chess } from "chess.js";
 import { cancelQuizzes } from "../coach/quiz";
 import { buildLine, emptyLine, sideToMove, START_FEN, type Line } from "../chess/line";
-import { db, discardPending, flush, hasBackend, opponentElo, opponentKey, withoutSaving } from "../db";
+import { db, discardPending, flush, hasBackend, opponentElo, opponentKey, withoutSaving, type GameRecord } from "../db";
 import {
   FREE_PLAY,
   isLocked,
@@ -69,6 +69,28 @@ export async function loadGame(id: number) {
   const record = await db.loadGame(id);
   if (!record) return;
   await leaveGame(id);
+  applyRecord(record);
+}
+
+/**
+ * Rereads the open game after another device (phone or desktop) saved changes to it. Unlike
+ * loadGame this leaves the coach process and the board's tangent view alone.
+ */
+export async function reloadGame(id: number) {
+  const record = await db.loadGame(id);
+  if (!record || useStore.getState().gameId !== id) return;
+  const { active, busy, busySince, chat } = useStore.getState();
+  applyRecord(record);
+  // Mid-reply here, this device's chat is ahead of the saved one.
+  withoutSaving(() =>
+    useStore.setState((s) => ({
+      active: active && active in s.tangents ? active : null,
+      ...(busy ? { busy, busySince, chat } : {}),
+    })),
+  );
+}
+
+function applyRecord(record: GameRecord) {
   const { game, moves, tangents, chat } = record;
 
   const built = buildLine(game.startFen, moves.map((m) => m.san));

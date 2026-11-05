@@ -1715,6 +1715,25 @@ button.danger {
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* The app never zooms: no pinch, no double-tap (iOS ignores user-scalable=no, not this). A
+     second finger anywhere is for drawing on the board instead. */
+  html {
+    touch-action: pan-x pan-y;
+  }
+
+  /* Touches on the board are moves and drawings, never a scroll that could take over a held
+     finger midway. The page scrolls from anywhere else. */
+  cg-board {
+    touch-action: none;
+  }
+
+  /* A finger held down to draw mustn't start selecting text. */
+  .board-panel {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
   .app {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto auto;
@@ -1746,11 +1765,95 @@ button.danger {
     padding: 6px 10px;
   }
 
+  /* Even padding so the board is centred; room for the eval bar is taken from the board only
+     while the bar is shown. */
   .board-panel.play {
-    --board-w: 100cqw;
+    --board-w: auto;
     grid-template-columns: minmax(0, 1fr);
-    padding: 8px 8px 12px 30px;
+    padding: 4px 8px 12px;
     overflow: visible;
+  }
+
+  .board-panel.play .crumbs {
+    padding-left: 30px; /* the eval toggle sits here */
+  }
+
+  /* Fill the single column rather than a computed width (100vw counts any scrollbar). */
+  .board-panel.play .board-frame {
+    width: auto;
+  }
+
+  .board-frame.with-eval {
+    margin-left: 20px;
+  }
+
+  .board-frame.with-eval .eval-bar {
+    left: -18px;
+  }
+
+  .eval-toggle {
+    left: 0;
+  }
+
+  .board-frame.with-eval .eval-toggle {
+    left: -20px;
+  }
+
+  /* The move buttons stay at the bottom of the screen while the board and its column are in
+     view, so stepping through a game doesn't mean scrolling down to them and back up. */
+  .side-controls {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    margin: 0 -8px;
+    padding: 6px 8px max(6px, env(safe-area-inset-bottom));
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+
+  .side-controls button {
+    min-height: 42px;
+  }
+
+  /* Game report: no box-in-a-scrolling-page, and tighter rows so most of it fits on screen. */
+  .game-side .report {
+    max-height: none;
+    overflow: visible;
+    padding: 8px 10px;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .eval-graph {
+    height: 48px;
+  }
+
+  .report-grid {
+    grid-template-columns: minmax(0, 1fr) 76px 24px 76px;
+    row-gap: 3px;
+  }
+
+  .report-grid hr {
+    margin: 3px 0;
+  }
+
+  /* Labels neither side got (often brilliant, great, miss) only cost height here. */
+  .report-row.zero {
+    display: none;
+  }
+
+  .report-box {
+    padding: 2px 0;
+    font-size: 13px;
+  }
+
+  .report-phase .label-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .report-actions button {
+    padding: 8px 6px;
   }
 
   .board-panel:not(.play) {

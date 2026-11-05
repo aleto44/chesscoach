@@ -52,6 +52,16 @@ pub(crate) fn reset_coach(app: &AppHandle, client: &str) {
     }
 }
 
+/// Tells the other devices that `client` saved changes to a game, so they reload it.
+pub(crate) fn notify_game_changed(app: &AppHandle, client: &str, game_id: i64) {
+    relay::emit_all(app, "game-changed", serde_json::json!({ "gameId": game_id, "from": client }));
+}
+
+#[tauri::command]
+fn game_changed(app: AppHandle, game_id: i64) {
+    notify_game_changed(&app, relay::DESKTOP, game_id);
+}
+
 #[tauri::command]
 fn coach_send(app: AppHandle, text: String, resume: Option<String>) -> Result<(), String> {
     send_turn(&app, relay::DESKTOP, &text, resume.as_deref())
@@ -98,6 +108,7 @@ pub fn run() {
             auth::plan_usage,
             sounds::sounds_folder,
             sounds::custom_sound,
+            game_changed,
             remote::remote_info,
             remote::remote_set_enabled,
             remote::remote_new_code,
@@ -122,6 +133,8 @@ pub fn run() {
             stats::db_drill_counts,
             stats::db_grade_drill,
             stats::db_retire_drill,
+            stats::db_drill_overview,
+            stats::puzzle_history,
             stats::db_repertoire,
             stats::db_add_repertoire,
             stats::db_remove_repertoire,

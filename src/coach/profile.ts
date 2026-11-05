@@ -4,6 +4,7 @@ import { invoke } from "../backend";
 import { Chess } from "chess.js";
 import { opponentElo } from "../db";
 import { opponentName } from "../store";
+import { fromLichess } from "../rating";
 
 type Row = Record<string, any>;
 
@@ -80,7 +81,7 @@ export async function profileText(): Promise<string> {
   const pz = p.puzzles;
   if (pz) {
     out.push(
-      `Lichess puzzles: rating ${pz.rating} (Lichess puzzle scale) after ${pz.attempts} rated puzzles; ` +
+      `Lichess puzzles: rating ${fromLichess(pz.rating)} (converted to the chess.com scale) after ${pz.attempts} rated puzzles; ` +
         `last ${pz.recent}: ${pz.recentPct}% solved.` +
         (pz.themes.length ? " By theme, weakest first: " + pz.themes.map((t: Row) => `${t.theme} ${t.pct}% of ${t.n}`).join(", ") : ""),
     );

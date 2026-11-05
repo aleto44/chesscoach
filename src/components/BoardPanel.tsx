@@ -89,7 +89,7 @@ export function BoardPanel() {
         )}
       </nav>
 
-      <div className={`board-frame ${tangent ? "tangent" : ""}`}>
+      <div className={`board-frame ${tangent ? "tangent" : ""} ${showEval ? "with-eval" : ""}`}>
         {!locked && (
           <button
             className={`eval-toggle ${showEval ? "on" : ""}`}

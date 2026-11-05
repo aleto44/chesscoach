@@ -68,12 +68,12 @@ export const db = {
     timeControl: string | null;
     openingFocus: string[];
   }) =>
-    invoke<number>("db_create_game", { game }),
+    invoke<number>("db_create_game", { game }).then((id) => (notifyChanged(id), id)),
   updateGame: (
     id: number,
     patch: { coachSessionId?: string; result?: string; termination?: string; mode?: GameMeta["mode"]; takebacks?: number },
   ) =>
-    invoke<void>("db_update_game", { id, patch }),
+    invoke<void>("db_update_game", { id, patch }).then(() => notifyChanged(id)),
   listGames: (limit = 100) => invoke<GameSummary[]>("db_list_games", { limit }),
   loadGame: (id: number) => invoke<GameRecord | null>("db_load_game", { id }),
   deleteGame: (id: number) => invoke<void>("db_delete_game", { id }),
@@ -178,4 +178,10 @@ export async function flush() {
   dirtyChat.clear();
   const failed = (await Promise.allSettled(writes)).find((r) => r.status === "rejected");
   if (failed) console.error("save failed", (failed as PromiseRejectedResult).reason);
+  if (writes.length) notifyChanged(gameId);
+}
+
+/** Lets the student's other devices (phone, desktop) know to reload this game (see game/sync.ts). */
+function notifyChanged(gameId: number) {
+  invoke("game_changed", { gameId }).catch((e) => console.warn("could not announce the change", e));
 }

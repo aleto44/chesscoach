@@ -15,6 +15,7 @@ import { initUsage } from "./coach/usage";
 import { initPersistence } from "./db";
 import { initOpponent } from "./game/opponent";
 import { initClock } from "./game/clock";
+import { initSync } from "./game/sync";
 import { initReview } from "./analysis/review";
 import { initQuiz } from "./coach/quiz";
 import { initNudges } from "./coach/nudge";
@@ -23,6 +24,7 @@ import { initPuzzles } from "./puzzles/puzzles";
 import { bootstrap, initGameOverWatch } from "./game/session";
 import { initTheme, loadSettings } from "./settings";
 import { initSounds } from "./sound";
+import { initNav } from "./nav";
 import { initLiveEval } from "./engine/live";
 
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
@@ -34,6 +36,7 @@ function start() {
   initPersistence();
   initGameOverWatch();
   initOpponent();
+  initSync();
   initClock();
   initReview();
   initQuiz();
@@ -41,6 +44,7 @@ function start() {
   refreshDrillCounts();
   initPuzzles();
   initSounds();
+  initNav();
   initLiveEval();
   loadSettings().catch((e) => console.error("could not load settings", e));
   bootstrap().catch((e) => console.error("could not open the last game", e));

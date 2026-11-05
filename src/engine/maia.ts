@@ -3,6 +3,7 @@
 import { Chess, type Square } from "chess.js";
 import * as ort from "onnxruntime-web/wasm";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.wasm?url";
+import { toLichess } from "../rating";
 
 ort.env.wasm.wasmPaths = { wasm: wasmUrl };
 // Threads need cross-origin isolation, which the app doesn't have.
@@ -35,25 +36,6 @@ function tokens(chess: Chess): Float32Array {
   return out;
 }
 
-/** chess.com rapid next to the Lichess rapid rating that's roughly the same level. */
-const LICHESS_SCALE: [chessCom: number, lichess: number][] = [
-  [400, 900],
-  [1000, 1400],
-  [1500, 1750],
-  [2000, 2100],
-  [2500, 2500],
-];
-
-function toLichess(rating: number): number {
-  const s = LICHESS_SCALE;
-  if (rating <= s[0][0]) return s[0][1];
-  for (let i = 1; i < s.length; i++) {
-    const [a, b] = [s[i - 1], s[i]];
-    if (rating <= b[0]) return a[1] + ((rating - a[0]) / (b[0] - a[0])) * (b[1] - a[1]);
-  }
-  return s[s.length - 1][1];
-}
-
 /** Sampling leaves out the unlikeliest moves that make up the last 5% of the probability. */
 const TOP_P = 0.95;
 
@@ -74,7 +56,7 @@ export async function maiaMove(fen: string, rating: number): Promise<string | nu
   if (!legal.length) return null;
   const flip = chess.turn() === "b";
 
-  const elo = new Float32Array([toLichess(rating)]);
+  const elo = new Float32Array([toLichess(Math.max(400, Math.min(2500, rating)))]);
   const out = await (await getSession()).run({
     tokens: new ort.Tensor("float32", tokens(chess), [1, 64, 12]),
     elo_self: new ort.Tensor("float32", elo, [1]),

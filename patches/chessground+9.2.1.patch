@@ -1,5 +1,124 @@
+diff --git a/node_modules/chessground/dist/draw.js b/node_modules/chessground/dist/draw.js
+index b0baae6..6f5592b 100644
+--- a/node_modules/chessground/dist/draw.js
++++ b/node_modules/chessground/dist/draw.js
+@@ -19,6 +19,24 @@ export function start(state, e) {
+     };
+     processDraw(state);
+ }
++/** Two-finger drawing: this touch draws; it is followed by its identifier, not as the first touch. */
++export function startTouch(state, e, touch) {
++    if (e.cancelable)
++        e.preventDefault();
++    cancelMove(state);
++    const pos = [touch.clientX, touch.clientY], orig = getKeyAtDomPos(pos, whitePov(state), state.dom.bounds());
++    if (!orig)
++        return;
++    state.drawable.current = {
++        orig,
++        pos,
++        brush: 'green',
++        snapToValidMove: state.drawable.defaultSnapToValidMove,
++        touchId: touch.identifier,
++    };
++    processDraw(state);
++}
++const findTouch = (list, id) => list && Array.prototype.find.call(list, t => t.identifier === id);
+ export function processDraw(state) {
+     requestAnimationFrame(() => {
+         const cur = state.drawable.current;
+@@ -40,11 +58,22 @@ export function processDraw(state) {
+     });
+ }
+ export function move(state, e) {
+-    if (state.drawable.current)
+-        state.drawable.current.pos = eventPosition(e);
++    const cur = state.drawable.current;
++    if (!cur)
++        return;
++    if (cur.touchId === undefined)
++        cur.pos = eventPosition(e);
++    else {
++        const t = findTouch(e.touches, cur.touchId);
++        if (t)
++            cur.pos = [t.clientX, t.clientY];
++    }
+ }
+-export function end(state) {
++export function end(state, e) {
+     const cur = state.drawable.current;
++    // Two-finger drawing: the holding finger lifting doesn't end the drawing.
++    if (cur && cur.touchId !== undefined && e && !findTouch(e.changedTouches, cur.touchId))
++        return;
+     if (cur) {
+         if (cur.mouseSq)
+             addShape(state.drawable, cur);
+diff --git a/node_modules/chessground/dist/events.js b/node_modules/chessground/dist/events.js
+index 1ea7318..a16e01d 100644
+--- a/node_modules/chessground/dist/events.js
++++ b/node_modules/chessground/dist/events.js
+@@ -20,6 +20,11 @@ export function bindBoard(s, onResize) {
+     boardEl.addEventListener('mousedown', onStart, {
+         passive: false,
+     });
++    // While a finger draws, it must not scroll or zoom the page.
++    boardEl.addEventListener('touchmove', e => {
++        if (s.drawable.current && e.cancelable)
++            e.preventDefault();
++    }, { passive: false });
+ }
+ // returns the unbind function
+ export function bindDocument(s, onResize) {
+@@ -35,6 +40,21 @@ export function bindDocument(s, onResize) {
+             unbinds.push(unbindable(document, ev, onmove));
+         for (const ev of ['touchend', 'mouseup'])
+             unbinds.push(unbindable(document, ev, onend));
++        const onTouchEnd = e => {
++            const lifted = Array.prototype.map.call(e.changedTouches, t => t.identifier);
++            // A finger that lifted wasn't holding for a drawing; phones reuse touch ids, so a later
++            // finger with the same id must not bring back the drawings this one erased.
++            if (s.drawable.held && lifted.includes(s.drawable.held.touchId))
++                s.drawable.held = undefined;
++            const holding = s.drawable.holding;
++            if (!holding || !holding.length)
++                return;
++            if (lifted.some(id => holding.includes(id)) && e.cancelable)
++                e.preventDefault();
++            s.drawable.holding = holding.filter(id => !lifted.includes(id));
++        };
++        for (const ev of ['touchend', 'touchcancel'])
++            unbinds.push(unbindable(document, ev, onTouchEnd, { capture: true, passive: false }));
+         const onScroll = () => s.dom.bounds.clear();
+         unbinds.push(unbindable(document, 'scroll', onScroll, { capture: true, passive: true }));
+         unbinds.push(unbindable(window, 'resize', onScroll, { passive: true }));
+@@ -46,6 +66,25 @@ function unbindable(el, eventName, callback, options) {
+     return () => el.removeEventListener(eventName, callback, options);
+ }
+ const startDragOrDraw = (s) => e => {
++    // Touch screens, as on lichess: with one finger held anywhere, the next finger draws.
++    if (e.touches && e.touches.length > 1) {
++        if (s.drawable.enabled && !s.drawable.current) {
++            if (s.draggable.current)
++                drag.cancel(s);
++            // The first finger's touch erased the drawings; it was only holding.
++            const held = s.drawable.held;
++            if (held && !s.drawable.shapes.length && Array.prototype.some.call(e.touches, t => t.identifier === held.touchId))
++                s.drawable.shapes = held.shapes;
++            s.drawable.held = undefined;
++            const touch = e.changedTouches[e.changedTouches.length - 1];
++            // The holding fingers' lifts are not taps on whatever they rest on (see bindDocument).
++            s.drawable.holding = Array.prototype.map.call(e.touches, t => t.identifier).filter(id => id !== touch.identifier);
++            draw.startTouch(s, e, touch);
++        }
++        return;
++    }
++    if (e.touches)
++        s.drawable.held = { touchId: e.changedTouches[0].identifier, shapes: s.drawable.shapes };
+     if (s.draggable.current)
+         drag.cancel(s);
+     else if (s.drawable.current)
 diff --git a/node_modules/chessground/dist/svg.js b/node_modules/chessground/dist/svg.js
-index b38c6a0..9dacb2a 100644
+index b38c6a0..5d8b5fd 100644
 --- a/node_modules/chessground/dist/svg.js
 +++ b/node_modules/chessground/dist/svg.js
 @@ -28,7 +28,8 @@ export function renderSvg(state, shapesEl, customsEl) {
@@ -35,3 +154,23 @@ index b38c6a0..9dacb2a 100644
          return setAttributes(createElement('line'), {
              stroke: isHilite ? hilite(brush).color : brush.color,
              'stroke-width': lineWidth(brush, current) + (isHilite ? 0.04 : 0),
+@@ -256,8 +273,9 @@ function renderLabel(label, hash, from, to, slots, corner) {
+ function orient(pos, color) {
+     return color === 'white' ? pos : [7 - pos[0], 7 - pos[1]];
+ }
++// chesscoach patch: arrows keep their shape once drawn, even when another arrow ends on the same square.
+ function isShort(dest, dests) {
+-    return true === (dest && dests.has(dest) && dests.get(dest).size > 1);
++    return false;
+ }
+ function createElement(tagName) {
+     return document.createElementNS('http://www.w3.org/2000/svg', tagName);
+@@ -334,7 +352,7 @@ function labelCoords(from, to, slots) {
+     if (slots) {
+         mag -= 33 / 64; // reduce by arrowhead length
+         if (slots.size > 1) {
+-            mag -= 10 / 64; // reduce by shortening factor
++            // chesscoach patch: arrows aren't shortened any more (see isShort), so neither is the label's spot.
+             const slot = moveAngle(from, to);
+             if (slots.has((slot + 1) % 16) || slots.has((slot + 15) % 16)) {
+                 if (slot & 1)

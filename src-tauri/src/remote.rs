@@ -69,24 +69,39 @@ fn new_code() -> String {
 impl Remote {
     pub fn load(dir: &std::path::Path) -> Self {
         let path = dir.join("remote.json");
-        let config = std::fs::read(&path)
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_else(|| Config::fresh(false));
+        let loaded = std::fs::read(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|b| serde_json::from_slice::<Config>(&b).map_err(|e| e.to_string()));
+        let problem = loaded.as_ref().err().cloned();
+        let config = loaded.unwrap_or_else(|_| Config::fresh(false));
         let port = std::env::var("CHESSCOACH_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(DEFAULT_PORT);
-        Self {
+        let remote = Self {
             path,
             port,
             config: Mutex::new(config),
             server: Mutex::new(None),
             failures: Mutex::new((0, Instant::now())),
+        };
+        if let Some(problem) = problem {
+            remote.log(&format!("remote.json not loaded ({problem}), starting with phone access off"));
         }
+        remote
     }
 
     fn save(&self, config: Config) -> Result<(), String> {
         std::fs::write(&self.path, serde_json::to_vec_pretty(&config).unwrap()).map_err(|e| e.to_string())?;
         *self.config.lock().unwrap() = config;
         Ok(())
+    }
+
+    /// Appends to phone-server.log next to remote.json, for "why can't my phone connect?".
+    fn log(&self, text: &str) {
+        use std::io::Write;
+        let path = self.path.with_file_name("phone-server.log");
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+            let _ = writeln!(f, "[{secs}] {text}");
+        }
     }
 
     fn running(&self) -> bool {
@@ -106,9 +121,20 @@ impl Remote {
 
 /// Starts the server if it was left on.
 pub async fn start_if_enabled(app: &AppHandle) {
-    if app.state::<Remote>().config.lock().unwrap().enabled {
-        if let Err(e) = start(app).await {
-            eprintln!("phone access not started: {e}");
+    let remote = app.state::<Remote>();
+    if !remote.config.lock().unwrap().enabled {
+        remote.log("phone access is off");
+        return;
+    }
+    // After a restart (tauri dev rebuilds), the old process can hold the port for a moment.
+    for attempt in 1..=20 {
+        match start(app).await {
+            Ok(()) => return,
+            Err(e) if attempt == 20 => remote.log(&format!("not started: {e}")),
+            Err(e) => {
+                remote.log(&format!("attempt {attempt}: {e}"));
+                tokio::time::sleep(Duration::from_millis(500)).await
+            }
         }
     }
 }
@@ -125,12 +151,13 @@ async fn start(app: &AppHandle) -> Result<(), String> {
         .route("/api/pair", post(pair))
         .route("/api/events", get(events))
         .route("/api/invoke/{cmd}", post(invoke))
-        .fallback(get(asset))
+        .fallback(get(page))
         .with_state(app.clone());
+    remote.log(&format!("listening on port {}", remote.port));
+    let log_app = app.clone();
     let handle = tauri::async_runtime::spawn(async move {
-        if let Err(e) = axum::serve(listener, router).await {
-            eprintln!("phone server stopped: {e}");
-        }
+        let result = axum::serve(listener, router).await;
+        log_app.state::<Remote>().log(&format!("stopped: {result:?}"));
     });
     *remote.server.lock().unwrap() = Some(handle);
     Ok(())
@@ -326,6 +353,8 @@ async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result
         "db_drill_counts" => out(stats::db_drill_counts(st())),
         "db_grade_drill" => out(stats::db_grade_drill(st(), arg(a, "id")?, arg(a, "correct")?, arg(a, "played")?, arg(a, "ms")?)),
         "db_retire_drill" => out(stats::db_retire_drill(st(), arg(a, "id")?)),
+        "db_drill_overview" => out(stats::db_drill_overview(st(), arg(a, "limit")?)),
+        "puzzle_history" => out(stats::puzzle_history(st(), arg(a, "limit")?)),
         "db_repertoire" => out(stats::db_repertoire(st())),
         "db_add_repertoire" => out(stats::db_add_repertoire(st(), arg(a, "line")?)),
         "db_remove_repertoire" => out(stats::db_remove_repertoire(st(), arg(a, "id")?)),
@@ -341,17 +370,35 @@ async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result
         )),
         "puzzle_import_start" => out(puzzles::puzzle_import_start(app.clone(), app.state())),
         "puzzle_import_cancel" => out(Ok(puzzles::puzzle_import_cancel(app.state()))),
+        "game_changed" => out(Ok(crate::notify_game_changed(app, client, arg(a, "gameId")?))),
         _ => Err(format!("unknown command: {cmd}")),
     }
 }
 
-/// The built frontend, from the same assets the desktop window uses. index.html gets a flag so
-/// the frontend knows to talk HTTP instead of Tauri IPC.
-async fn asset(State(app): State<AppHandle>, uri: Uri) -> Response {
+/// Everything that isn't the API: the frontend, plus (under `tauri dev`) Vite's live-reload socket.
+async fn page(State(app): State<AppHandle>, req: axum::extract::Request) -> Response {
+    #[cfg(debug_assertions)]
+    if req.headers().get(header::UPGRADE).is_some_and(|v| v.as_bytes().eq_ignore_ascii_case(b"websocket")) {
+        if !app.state::<Remote>().authed(req.headers()) {
+            return StatusCode::UNAUTHORIZED.into_response();
+        }
+        return dev_socket(&app, req).await.unwrap_or_else(|e| (StatusCode::BAD_GATEWAY, e).into_response());
+    }
+    asset(&app, req.uri()).await
+}
+
+/// The frontend, from the same assets the desktop window uses. index.html gets a flag so the
+/// frontend knows to talk HTTP instead of Tauri IPC.
+async fn asset(app: &AppHandle, uri: &Uri) -> Response {
     let path = match uri.path() {
         "/" => "/index.html",
         p => p,
     };
+    // Under `tauri dev`, phones get the live frontend from Vite, like the desktop window does.
+    #[cfg(debug_assertions)]
+    if let Some(res) = from_dev_server(app, uri).await {
+        return res;
+    }
     let Some(asset) = app.asset_resolver().get(path.to_string()) else {
         return StatusCode::NOT_FOUND.into_response();
     };
@@ -362,15 +409,110 @@ async fn asset(State(app): State<AppHandle>, uri: Uri) -> Response {
         _ => asset.mime_type(),
     }
     .to_string();
-    let cache = if path.starts_with("/assets/") { "public, max-age=31536000, immutable" } else { "no-cache" };
+    // The page itself is never kept, so reopening the app always loads what the computer runs now.
+    let cache = match path {
+        "/index.html" | "/sw.js" => "no-store",
+        p if p.starts_with("/assets/") => "public, max-age=31536000, immutable",
+        _ => "no-cache",
+    };
     let mut bytes = asset.bytes;
     if path == "/index.html" {
-        let html = String::from_utf8_lossy(&bytes).replacen("<head>", "<head><script>window.__CC_REMOTE__=true</script>", 1);
-        bytes = html.into_bytes();
+        bytes = with_remote_flag(&bytes);
     }
     Response::builder()
         .header(header::CONTENT_TYPE, mime)
         .header(header::CACHE_CONTROL, cache)
         .body(Body::from(bytes))
         .unwrap()
+}
+
+fn with_remote_flag(html: &[u8]) -> Vec<u8> {
+    String::from_utf8_lossy(html)
+        .replacen("<head>", "<head><script>window.__CC_REMOTE__=true</script>", 1)
+        .into_bytes()
+}
+
+/// Proxies to the Vite dev server (devUrl). None when it isn't running, so the built `dist/` is
+/// served instead.
+#[cfg(debug_assertions)]
+async fn from_dev_server(app: &AppHandle, uri: &Uri) -> Option<Response> {
+    let base = app.config().build.dev_url.clone()?;
+    let url = format!("{}{}", base.as_str().trim_end_matches('/'), uri.path_and_query().map_or("/", |p| p.as_str()));
+    let html = uri.path() == "/" || uri.path() == "/index.html";
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut res = ureq::get(&url).call().ok()?;
+        let mime = res.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("application/octet-stream").to_string();
+        let mut body = res.body_mut().with_config().limit(256 * 1024 * 1024).read_to_vec().ok()?;
+        if html {
+            body = with_remote_flag(&body);
+        }
+        Some(
+            Response::builder()
+                .header(header::CONTENT_TYPE, mime)
+                .header(header::CACHE_CONTROL, if html { "no-store" } else { "no-cache" })
+                .body(Body::from(body))
+                .unwrap(),
+        )
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+/// Passes Vite's HMR websocket through to the dev server, so a phone picks up code changes the
+/// moment they're saved (and reloads by itself after a restart) instead of showing stale code.
+#[cfg(debug_assertions)]
+async fn dev_socket(app: &AppHandle, req: axum::extract::Request) -> Result<Response, String> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let base = app.config().build.dev_url.clone().ok_or("no dev server")?;
+    let host = format!("{}:{}", base.host_str().unwrap_or("localhost"), base.port_or_known_default().unwrap_or(80));
+    let mut upstream = tokio::net::TcpStream::connect(&host).await.map_err(|e| e.to_string())?;
+
+    // Same handshake, addressed to Vite as if the page had been opened there.
+    let target = req.uri().path_and_query().map_or("/", |p| p.as_str());
+    let origin = base.origin().ascii_serialization();
+    let mut head = format!("GET {target} HTTP/1.1\r\nHost: {host}\r\nOrigin: {origin}\r\n");
+    for (name, value) in req.headers() {
+        if name != header::HOST && name != header::ORIGIN && name != header::COOKIE {
+            head.push_str(&format!("{name}: {}\r\n", value.to_str().unwrap_or_default()));
+        }
+    }
+    head.push_str("\r\n");
+    upstream.write_all(head.as_bytes()).await.map_err(|e| e.to_string())?;
+
+    // Vite's answer: headers up to the blank line, then possibly the first frames.
+    let mut buf = Vec::new();
+    let end = loop {
+        let mut chunk = [0u8; 4096];
+        let n = upstream.read(&mut chunk).await.map_err(|e| e.to_string())?;
+        if n == 0 {
+            return Err("dev server closed the connection".into());
+        }
+        buf.extend_from_slice(&chunk[..n]);
+        if let Some(i) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+            break i + 4;
+        }
+    };
+    let text = String::from_utf8_lossy(&buf[..end]).to_string();
+    let mut lines = text.split("\r\n");
+    let status = lines.next().and_then(|l| l.split(' ').nth(1)).and_then(|c| c.parse::<u16>().ok()).unwrap_or(502);
+    let mut res = Response::builder().status(status);
+    for line in lines.filter(|l| !l.is_empty()) {
+        if let Some((k, v)) = line.split_once(':') {
+            res = res.header(k.trim(), v.trim());
+        }
+    }
+    if status != 101 {
+        return res.body(Body::empty()).map_err(|e| e.to_string());
+    }
+    let early = buf[end..].to_vec();
+    tauri::async_runtime::spawn(async move {
+        let Ok(upgraded) = hyper::upgrade::on(req).await else { return };
+        let mut phone = hyper_util::rt::TokioIo::new(upgraded);
+        if phone.write_all(&early).await.is_ok() {
+            let _ = tokio::io::copy_bidirectional(&mut phone, &mut upstream).await;
+        }
+    });
+    res.body(Body::empty()).map_err(|e| e.to_string())
 }

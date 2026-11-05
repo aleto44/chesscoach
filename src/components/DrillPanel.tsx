@@ -32,7 +32,7 @@ export function DrillPanel() {
           )}
         </span>
         <span className="spacer" />
-        <button onClick={stopDrills}>Back to game</button>
+        <button onClick={stopDrills}>‹ Drills menu</button>
       </div>
 
       <div className="crumbs">
@@ -95,7 +95,7 @@ export function DrillPanel() {
           <div className="controls">
             <button onClick={() => startDrills(true)}>Practice all drills anyway</button>
             <button className="primary" onClick={stopDrills}>
-              Back to game
+              Back to drills
             </button>
           </div>
         </div>

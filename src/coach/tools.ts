@@ -11,6 +11,7 @@ import { getRepertoire } from "../openings/repertoire";
 import { askMove } from "./quiz";
 import { findPuzzles, openingLabel, openingTag, refreshPuzzleDb, themeKey, themeLabel, usePuzzleDb } from "../puzzles/puzzles";
 import { startCoachSet } from "../puzzles/session";
+import { fromLichess, toLichess } from "../rating";
 import type { Key } from "chessground/types";
 import { addTangent, openTangent, gameDescription, isLocked, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
 
@@ -207,8 +208,9 @@ Object.assign(handlers, {
       if (!opening) return { text: `No puzzles are tagged with an opening like "${args.opening}". Try the opening's family name.`, isError: true };
     }
     const center = pdb.rating;
-    const min = Number.isFinite(Number(args.rating_min)) && args.rating_min !== undefined ? Number(args.rating_min) : center - 150;
-    const max = Number.isFinite(Number(args.rating_max)) && args.rating_max !== undefined ? Number(args.rating_max) : Math.max(min + 100, center + 150);
+    // The coach speaks chess.com ratings; the puzzle set is rated on Lichess's scale.
+    const min = Number.isFinite(Number(args.rating_min)) && args.rating_min !== undefined ? toLichess(Number(args.rating_min)) : center - 150;
+    const max = Number.isFinite(Number(args.rating_max)) && args.rating_max !== undefined ? toLichess(Number(args.rating_max)) : Math.max(min + 100, center + 150);
     const count = clamp(Number(args.count ?? 5), 1, 10);
     let found = await findPuzzles({ themes, opening, minRating: min, maxRating: max, limit: count });
     let widened = false;
@@ -223,9 +225,9 @@ Object.assign(handlers, {
     startCoachSet(title, found);
     return {
       text:
-        `Opened "${title}" in the puzzle trainer: ${found.length} puzzles (student's puzzle rating ${pdb.rating}` +
+        `Opened "${title}" in the puzzle trainer: ${found.length} puzzles (student's puzzle rating ${fromLichess(pdb.rating)}` +
         `${widened ? "; widened the rating range to find enough" : ""}${unknown.length ? `; ignored unknown themes ${unknown.join(", ")}` : ""}).\n` +
-        found.map((p) => `  ${p.id} rated ${p.rating}: ${p.themes.join(", ")}`).join("\n") +
+        found.map((p) => `  ${p.id} rated ${fromLichess(p.rating)}: ${p.themes.join(", ")}`).join("\n") +
         "\nThe app grades them; don't solve them for the student. When they finish, they can send you the results.",
     };
   },
