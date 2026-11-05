@@ -1,5 +1,5 @@
 // Post-game analysis, all local (Stockfish, no AI): evaluates every position of a finished game,
-// classifies each move by how much winning chance it gave away (lichess thresholds), labels it the
+// classifies each move by how much winning chance it gave away (chess.com's thresholds), labels it the
 // way chess.com's review does (brilliant, great, miss, ...), tags the mistakes with simple
 // patterns, saves it all to SQLite and turns the student's mistakes into drills.
 import { invoke } from "../backend";
@@ -15,7 +15,7 @@ import { addMistakeDrills } from "./drills";
 const DEPTH = 13;
 const MATE_CP = 10000;
 
-/** Severity, lichess-style. Stats and drills work on this. */
+/** Severity. Stats and drills work on this. */
 export type MoveClass = "best" | "good" | "inaccuracy" | "mistake" | "blunder";
 /** The review's verdict on a move, chess.com-style (see labelFor). */
 export type MoveLabel =
@@ -57,9 +57,13 @@ interface Eval extends Score {
   second: Score | null;
 }
 
-/** Thresholds on what a move threw away (see lossPoints), in percentage points (as lichess). */
+/**
+ * Thresholds on what a move threw away (see lossPoints), in percentage points of winning chances:
+ * chess.com's published "expected points lost" table (0.05 / 0.10 / 0.20; excellent under 0.02,
+ * good under 0.05, see labelFor). Lichess calls a blunder from 15; chess.com waits for 20.
+ */
 function classify(drop: number, isBest: boolean): MoveClass {
-  if (drop >= 15) return "blunder";
+  if (drop >= 20) return "blunder";
   if (drop >= 10) return "mistake";
   if (drop >= 5) return "inaccuracy";
   return isBest ? "best" : "good";
@@ -95,7 +99,7 @@ const pov = (e: Score, side: Color) => (side === "white" ? e.cp : -e.cp);
  * moves them, so a student who keeps hanging pieces in a bad position would see "good" moves.
  * So unless the mover is still clearly winning afterwards (then a lost pawn or two really doesn't
  * matter), the centipawns lost count too: 10 cp per point, more forgiving as the eval grows
- * (engine numbers are noisy at −10), so 50 / 100 / 150 cp make an inaccuracy / mistake / blunder
+ * (engine numbers are noisy at −10), so 50 / 100 / 200 cp make an inaccuracy / mistake / blunder
  * in a level position.
  */
 function lossPoints(before: Score, after: Score, mover: Color): number {

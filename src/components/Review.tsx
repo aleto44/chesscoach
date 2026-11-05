@@ -110,9 +110,8 @@ function moment() {
   return {
     shapes,
     text:
-      `Here you played ${full}${turn === "w" ? "." : "..."}${game.sans[gamePly]}${MARKS[a.class]}, a${a.class === "inaccuracy" ? "n" : ""} ${a.class}` +
-      `${a.cpLoss && a.cpLoss < 1000 ? ` (lost ${pawns(a.cpLoss).slice(1)})` : ""}.${best ? ` Better: ${best}.` : ""}` +
-      `${a.tags.length ? ` (${a.tags.join(", ")})` : ""}`,
+      `Your move here was ${full}${turn === "w" ? "." : "..."}${game.sans[gamePly]}${MARKS[a.class]}, ` +
+      `${LABEL_INFO[labelOf(a)].verdict.replace(/^is /, "")}.${best ? ` Better was ${best}.` : ""}`,
   };
 }
 
@@ -121,7 +120,7 @@ function moment() {
  * the square it went to, and a line for the side column. Null outside the analyzed game.
  */
 export function useVerdict() {
-  const { game, gamePly, annotations, active } = useStore();
+  const { game, gamePly, annotations, active, meta } = useStore();
   return useMemo(() => {
     const i = gamePly - 1;
     const a = annotations[i];
@@ -142,8 +141,10 @@ export function useVerdict() {
       best: better ? best : null,
       eval: evalText(a.evalAfter),
       badge,
+      /** A bad move of the student's: worth saying why. */
+      explain: !!MARKS[a.class] && isStudentMove(game, meta, i),
     };
-  }, [game, gamePly, annotations, active]);
+  }, [game, gamePly, annotations, active, meta]);
 }
 
 export function VerdictLine({ v }: { v: NonNullable<ReturnType<typeof useVerdict>> }) {
@@ -315,15 +316,16 @@ export function ReviewBar() {
       </button>
       <span className="spacer" />
       {moments.length > 0 && (
-        <>
-          <button onClick={() => goto(prev)} title="Previous key moment">
+        // One group, so the arrows never wrap away from their label.
+        <span className="moments">
+          <button onClick={() => goto(prev)} title="Previous key moment" aria-label="Previous key moment">
             ◀
           </button>
           <span className="muted small">key moments</span>
-          <button onClick={() => goto(next)} title="Next key moment">
+          <button onClick={() => goto(next)} title="Next key moment" aria-label="Next key moment">
             ▶
           </button>
-        </>
+        </span>
       )}
       {!reportOpen && (
         <button onClick={() => sendToCoach(reviewPrompt())} disabled={busy} title="One message with the analysis already done">

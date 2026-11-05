@@ -17,9 +17,11 @@ import {
 import { Board } from "./Board";
 import { askConfirm } from "./Confirm";
 import { EvalBar, EvalLine } from "./EvalBar";
+import { MaterialStrip } from "./Material";
 import { ModeBadge } from "./ModeBadge";
 import { PlayerCard } from "./Clock";
 import { GameReportPanel, LabelIcon, listLabel, ReviewBar, useGameReport, useMoment, useVerdict, VerdictLine } from "./Review";
+import { WhyButton } from "./Why";
 import type { MoveLabel } from "../analysis/review";
 import { bestShape, useNudge } from "../coach/nudge";
 import { saveSetting, useSettings } from "../settings";
@@ -101,6 +103,7 @@ export function BoardPanel() {
           </button>
         )}
         {showEval && <EvalBar orientation={orientation} />}
+        <MaterialStrip fen={line.fens[ply]} side={top} />
         <Board
           fen={line.fens[ply]}
           lastMove={ply > 0 ? line.lastMoves[ply - 1] : undefined}
@@ -114,6 +117,7 @@ export function BoardPanel() {
               : undefined
           }
         />
+        <MaterialStrip fen={line.fens[ply]} side={orientation} />
       </div>
 
       <aside className="game-side">
@@ -136,7 +140,18 @@ export function BoardPanel() {
               <MoveList sans={line.sans} fens={line.fens} ply={ply} marks={tangent ? undefined : annotations.map(listLabel)} />
               {showEval && <EvalLine />}
               {verdict && <VerdictLine v={verdict} />}
-              {(moment?.text || note) && <div className={`note ${moment ? "moment" : ""}`}>{moment?.text || note}</div>}
+              {moment ? (
+                <div className="note moment">
+                  {moment.text}
+                  <WhyButton i={gamePly} />
+                </div>
+              ) : verdict?.explain ? (
+                <div className="note moment">
+                  <WhyButton i={gamePly - 1} />
+                </div>
+              ) : (
+                note && <div className="note">{note}</div>
+              )}
             </>
           )}
           <ReviewBar />
