@@ -7,6 +7,7 @@ mod relay;
 mod remote;
 mod sounds;
 mod stats;
+mod tailscale;
 mod tools;
 
 use std::sync::Mutex;
@@ -112,6 +113,7 @@ pub fn run() {
             remote::remote_info,
             remote::remote_set_enabled,
             remote::remote_new_code,
+            remote::remote_tailscale_serve,
             db::db_create_game,
             db::db_update_game,
             db::db_set_moves,

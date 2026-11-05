@@ -1,5 +1,5 @@
 // SQLite access (src-tauri/src/db.rs) and the store subscription that keeps it up to date.
-import { hasBackend, invoke } from "./backend";
+import { hasBackend, invoke, Unreachable } from "./backend";
 import type { MoveAnnotation } from "./analysis/review";
 import type { Line } from "./chess/line";
 import { fromEngineElo } from "./engine/stockfish";
@@ -69,17 +69,114 @@ export const db = {
     openingFocus: string[];
   }) =>
     invoke<number>("db_create_game", { game }).then((id) => (notifyChanged(id), id)),
-  updateGame: (
-    id: number,
-    patch: { coachSessionId?: string; result?: string; termination?: string; mode?: GameMeta["mode"]; takebacks?: number },
-  ) =>
-    invoke<void>("db_update_game", { id, patch }).then(() => notifyChanged(id)),
+  /** Resolves once the change is saved, retrying while the computer is out of reach. */
+  updateGame: (id: number, patch: GamePatch) => {
+    pendingPatches[id] = { ...pendingPatches[id], ...patch };
+    savePendingPatches();
+    return writePatch(id);
+  },
   listGames: (limit = 100) => invoke<GameSummary[]>("db_list_games", { limit }),
   loadGame: (id: number) => invoke<GameRecord | null>("db_load_game", { id }),
   deleteGame: (id: number) => invoke<void>("db_delete_game", { id }),
   /** Deletes games the student never played in or talked about, except `keep`. */
   pruneEmptyGames: (keep: number | null) => invoke<number>("db_prune_empty_games", { keep }),
 };
+
+export type GamePatch = {
+  coachSessionId?: string;
+  result?: NonNullable<GameMeta["result"]>;
+  termination?: string;
+  mode?: GameMeta["mode"];
+  takebacks?: number;
+};
+
+// ---- Writes that must not get lost ----
+// A phone's connection to the computer drops now and then (screen off, Wi-Fi or Tailscale
+// hiccup). A request lost then used to be gone for good: a resignation or a finished review
+// stayed on the phone, the desktop never heard of it, and a reload showed the game as before.
+
+let wake: (() => void) | null = null;
+const wakeUp = () => wake?.();
+if (typeof window !== "undefined") {
+  window.addEventListener("online", wakeUp);
+  document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && wakeUp());
+}
+
+/** Waits `ms`, or less if the device comes back online or to the foreground. */
+function pause(ms: number) {
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      clearTimeout(t);
+      if (wake === done) wake = null;
+      resolve();
+    };
+    const t = window.setTimeout(done, ms);
+    const previous = wake;
+    wake = () => {
+      previous?.();
+      done();
+    };
+  });
+}
+
+/** Runs a backend write, trying again with backoff while the computer can't be reached. */
+export async function reliably<T>(what: string, write: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await write();
+    } catch (e) {
+      if (!(e instanceof Unreachable)) throw e;
+      if (attempt === 0) console.warn(`${what}: will retry`, e);
+      await pause(Math.min(30_000, 1000 * 2 ** attempt));
+    }
+  }
+}
+
+/** Game patches not yet saved, kept across a reload of the page so they're sent after it. */
+const PENDING_KEY = "cc-pending-game-patches";
+const pendingPatches: Record<number, GamePatch> = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(PENDING_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+})();
+function savePendingPatches() {
+  try {
+    if (Object.keys(pendingPatches).length) localStorage.setItem(PENDING_KEY, JSON.stringify(pendingPatches));
+    else localStorage.removeItem(PENDING_KEY);
+  } catch {
+    // No storage (private mode): the in-memory retries still run.
+  }
+}
+
+/** This device's changes to a game that the database doesn't have yet (a reload mustn't undo them). */
+export const unsavedPatch = (id: number): GamePatch | undefined => pendingPatches[id];
+
+const patchWriters = new Map<number, Promise<void>>();
+
+/** Sends a game's pending patch, one request per game at a time so they land in order. */
+function writePatch(id: number): Promise<void> {
+  const write = (patchWriters.get(id) ?? Promise.resolve())
+    .catch(() => undefined)
+    .then(async () => {
+      const patch = pendingPatches[id];
+      if (!patch) return;
+      try {
+        await reliably("saving the game", () => invoke<void>("db_update_game", { id, patch }));
+      } finally {
+        // Saved, or refused for good (retrying won't help). A newer patch stays for its own write.
+        if (pendingPatches[id] === patch) {
+          delete pendingPatches[id];
+          savePendingPatches();
+        }
+      }
+      notifyChanged(id);
+    });
+  const tracked = write.finally(() => patchWriters.get(id) === tracked && patchWriters.delete(id));
+  patchWriters.set(id, tracked);
+  return write;
+}
 
 // "stockfish-cc:" holds a chess.com-scale rating; older games saved the raw UCI_Elo as "stockfish:".
 export const opponentKey = (rating: number | null) => (rating ? `stockfish-cc:${rating}` : null);
@@ -138,6 +235,8 @@ let timer: number | undefined;
 /** Watches the store and writes changes for the current game, debounced (coach text streams in). */
 export function initPersistence() {
   if (!hasBackend()) return;
+  // Left over from before a reload of the page.
+  for (const id of Object.keys(pendingPatches)) writePatch(Number(id)).catch((e) => console.error("could not save the game", e));
   useStore.subscribe((s, prev) => {
     if (suppressed || s.gameId === null || s.gameId !== prev.gameId) return;
     if (s.game !== prev.game || s.clocks !== prev.clocks) dirtyMoves = true;
@@ -164,24 +263,52 @@ export async function flush() {
   const s = useStore.getState();
   const gameId = s.gameId;
   if (gameId === null) return;
-  const writes: Promise<unknown>[] = [];
-  if (dirtyMoves) writes.push(invoke("db_set_moves", { gameId, moves: moveRows(s.game, s.meta.studentColor, s.clocks) }));
+  // Each write with what to mark dirty again if it doesn't reach the computer.
+  const writes: { write: Promise<unknown>; redo: () => void }[] = [];
+  if (dirtyMoves)
+    writes.push({
+      write: invoke("db_set_moves", { gameId, moves: moveRows(s.game, s.meta.studentColor, s.clocks) }),
+      redo: () => (dirtyMoves = true),
+    });
   for (const id of dirtyTangents) {
     const t = s.tangents[id];
-    if (t) writes.push(invoke("db_upsert_tangent", { gameId, tangent: tangentRow(t) }));
+    if (t) writes.push({ write: invoke("db_upsert_tangent", { gameId, tangent: tangentRow(t) }), redo: () => dirtyTangents.add(id) });
   }
   s.chat.forEach((item, seq) => {
-    if (dirtyChat.has(item.id)) writes.push(invoke("db_upsert_chat", { gameId, item: { id: item.id, seq, kind: item.kind, data: item } }));
+    if (dirtyChat.has(item.id))
+      writes.push({
+        write: invoke("db_upsert_chat", { gameId, item: { id: item.id, seq, kind: item.kind, data: item } }),
+        redo: () => dirtyChat.add(item.id),
+      });
   });
   dirtyMoves = false;
   dirtyTangents.clear();
   dirtyChat.clear();
-  const failed = (await Promise.allSettled(writes)).find((r) => r.status === "rejected");
-  if (failed) console.error("save failed", (failed as PromiseRejectedResult).reason);
-  if (writes.length) notifyChanged(gameId);
+  const results = await Promise.allSettled(writes.map((w) => w.write));
+  let retry = false;
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") return;
+    console.error("save failed", r.reason);
+    // Only worth another try while it's still the open game and the computer was just out of reach.
+    if (r.reason instanceof Unreachable && useStore.getState().gameId === gameId) {
+      writes[i].redo();
+      retry = true;
+    }
+  });
+  if (retry) {
+    flushRetries++;
+    clearTimeout(timer);
+    pause(Math.min(30_000, 1000 * 2 ** flushRetries)).then(() => {
+      if (useStore.getState().gameId === gameId) flush();
+    });
+  } else flushRetries = 0;
+  if (results.some((r) => r.status === "fulfilled")) notifyChanged(gameId);
 }
+let flushRetries = 0;
 
 /** Lets the student's other devices (phone, desktop) know to reload this game (see game/sync.ts). */
-function notifyChanged(gameId: number) {
-  invoke("game_changed", { gameId }).catch((e) => console.warn("could not announce the change", e));
+export function notifyChanged(gameId: number) {
+  reliably("announcing the change", () => invoke("game_changed", { gameId })).catch((e) =>
+    console.warn("could not announce the change", e),
+  );
 }

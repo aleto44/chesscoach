@@ -33,14 +33,23 @@ export const clientId = (() => {
   }
 })();
 
+/** The phone couldn't reach the computer (or the server failed): trying again may work. */
+export class Unreachable extends Error {}
+
 export async function invoke<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
   if (isTauri) return tauriInvoke<T>(cmd, args);
   if (!isRemote) throw new Error("No backend: open the app from the desktop window or the home server.");
-  const res = await fetch(`/api/invoke/${cmd}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Client": clientId },
-    body: JSON.stringify(args),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api/invoke/${cmd}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Client": clientId },
+      body: JSON.stringify(args),
+    });
+  } catch (e) {
+    throw new Unreachable(`${cmd}: can't reach your computer (${e})`);
+  }
+  if (res.status >= 500) throw new Unreachable(`${cmd} failed (${res.status})`);
   if (res.status === 401) {
     usePairing.setState({ status: "unpaired" });
     throw new Error("This device isn't paired with your computer.");

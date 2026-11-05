@@ -29,6 +29,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 
 use crate::relay::{self, Msg, Relay};
+use crate::tailscale::{self, Tailscale};
 use crate::{auth, db, puzzles, sounds, stats};
 
 const DEFAULT_PORT: u16 = 8765;
@@ -180,19 +181,23 @@ pub struct RemoteInfo {
     code: String,
     /// Addresses a phone on the same network can open.
     urls: Vec<String>,
+    /// For playing away from home; None when Tailscale isn't installed.
+    tailscale: Option<Tailscale>,
 }
 
-fn info(app: &AppHandle) -> RemoteInfo {
+async fn info(app: &AppHandle) -> RemoteInfo {
     let remote = app.state::<Remote>();
     let config = remote.config.lock().unwrap().clone();
+    let (port, running) = (remote.port, remote.running());
     let mut urls = Vec::new();
     if let Some(ip) = lan_ip() {
-        urls.push(format!("http://{ip}:{}", remote.port));
+        urls.push(format!("http://{ip}:{port}"));
     }
     if let Ok(host) = std::env::var("COMPUTERNAME").or_else(|_| std::env::var("HOSTNAME")) {
-        urls.push(format!("http://{}:{}", host.to_lowercase(), remote.port));
+        urls.push(format!("http://{}:{port}", host.to_lowercase()));
     }
-    RemoteInfo { enabled: config.enabled, running: remote.running(), port: remote.port, code: config.code, urls }
+    let tailscale = tauri::async_runtime::spawn_blocking(move || tailscale::status(port)).await.ok().flatten();
+    RemoteInfo { enabled: config.enabled, running, port, code: config.code, urls, tailscale }
 }
 
 /// The address this computer uses on its network (no packets are sent).
@@ -203,8 +208,8 @@ fn lan_ip() -> Option<std::net::IpAddr> {
 }
 
 #[tauri::command]
-pub fn remote_info(app: AppHandle) -> RemoteInfo {
-    info(&app)
+pub async fn remote_info(app: AppHandle) -> RemoteInfo {
+    info(&app).await
 }
 
 #[tauri::command]
@@ -217,16 +222,26 @@ pub async fn remote_set_enabled(app: AppHandle, enabled: bool) -> Result<RemoteI
     let remote = app.state::<Remote>();
     let config = Config { enabled, ..remote.config.lock().unwrap().clone() };
     remote.save(config)?;
-    Ok(info(&app))
+    Ok(info(&app).await)
 }
 
 /// New pairing code; every paired phone has to pair again.
 #[tauri::command]
-pub fn remote_new_code(app: AppHandle) -> Result<RemoteInfo, String> {
+pub async fn remote_new_code(app: AppHandle) -> Result<RemoteInfo, String> {
     let remote = app.state::<Remote>();
     let enabled = remote.config.lock().unwrap().enabled;
     remote.save(Config::fresh(enabled))?;
-    Ok(info(&app))
+    Ok(info(&app).await)
+}
+
+/// Points this computer's Tailscale https address at the phone server (see tailscale.rs).
+#[tauri::command]
+pub async fn remote_tailscale_serve(app: AppHandle) -> Result<RemoteInfo, String> {
+    let port = app.state::<Remote>().port;
+    tauri::async_runtime::spawn_blocking(move || tailscale::serve(port))
+        .await
+        .map_err(|e| e.to_string())??;
+    Ok(info(&app).await)
 }
 
 // HTTP handlers.
@@ -236,7 +251,7 @@ struct PairRequest {
     code: String,
 }
 
-async fn pair(State(app): State<AppHandle>, Json(req): Json<PairRequest>) -> Response {
+async fn pair(State(app): State<AppHandle>, headers: HeaderMap, Json(req): Json<PairRequest>) -> Response {
     let remote = app.state::<Remote>();
     let mut failures = remote.failures.lock().unwrap();
     if failures.0 >= 5 && failures.1.elapsed() < Duration::from_secs(60) {
@@ -249,7 +264,11 @@ async fn pair(State(app): State<AppHandle>, Json(req): Json<PairRequest>) -> Res
         return (StatusCode::UNAUTHORIZED, "That code doesn't match the one in Settings on your computer.").into_response();
     }
     *failures = (0, Instant::now());
-    let cookie = format!("{COOKIE}={}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict", config.secret);
+    // Over Tailscale's https address the cookie never travels unencrypted.
+    let https = headers.get("x-forwarded-proto").is_some_and(|v| v == "https")
+        || headers.get(header::HOST).and_then(|h| h.to_str().ok()).is_some_and(|h| h.ends_with(".ts.net"));
+    let secure = if https { "; Secure" } else { "" };
+    let cookie = format!("{COOKIE}={}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict{secure}", config.secret);
     ([(header::SET_COOKIE, cookie)], StatusCode::NO_CONTENT).into_response()
 }
 

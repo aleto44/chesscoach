@@ -15,21 +15,28 @@ Engines (Stockfish, Maia) run on the phone in the browser, just like in the desk
    pairing cookie for a year. **New code** in Settings unpairs every phone.
 3. Keep the desktop app running (it can be minimized).
 
-## Away from home, and installing as an app: Tailscale
+## From anywhere (and installing as an app): Tailscale
 
-Plain `http://192.168.x.x` works on home Wi-Fi, but Chrome only installs a real PWA (service
-worker, standalone window) from `https://`. Tailscale gives you both, free:
+Tailscale (free) joins your phone and the computer into a private network that only your own
+devices can reach, over cellular or any Wi-Fi, with no router changes. `tailscale serve` then gives
+the computer an `https://<computer>.<tailnet>.ts.net` address for the app. Nothing is opened to the
+public internet, and https is also what Chrome needs to install a real PWA.
 
-1. Install Tailscale on the computer and the phone, sign in to the same account on both.
-2. On the computer, once:
+1. Install Tailscale on the computer and the phone (tailscale.com/download) and sign in with the
+   same account on both. Leave it on on the phone.
+2. On the computer: **Settings → Play from my phone → Anywhere → Set up**. That runs
+   `tailscale serve --bg 8765` for you (it keeps working after restarts). The first time, Tailscale
+   may ask you to turn on https for your tailnet: Settings shows the link; approve it, then press
+   **Set up** again.
+3. On the phone, open the `https://….ts.net` address Settings shows, enter the pairing code (each
+   address pairs separately), then browser menu → **Add to Home screen** / **Install**.
 
-   ```
-   tailscale serve --bg 8765
-   ```
+For this to work while you're out:
 
-   This publishes the app at `https://<computer-name>.<tailnet>.ts.net` (shown by
-   `tailscale serve status`), reachable only from your own Tailscale devices, with a real certificate.
-3. Open that address on the phone, pair, then Chrome menu → **Add to Home screen → Install**.
+- The computer has to be on, awake and running Chess Coach. Set Windows to never sleep while
+  plugged in (Settings → System → Power), or the phone can't reach it.
+- Under `tauri dev` the phone loads the unbundled dev frontend, which is many small files: the first
+  load over cellular can take a few seconds. A release build (`npm run tauri build`) serves bundles.
 
 ## How it fits together
 
@@ -40,5 +47,6 @@ worker, standalone window) from `https://`. Tailscale gives you both, free:
   there; switching devices restarts the coach process on that device's own conversation.
 - `src/backend.ts` picks Tauri IPC or HTTP at runtime; the page served to phones carries
   `window.__CC_REMOTE__`.
-- In `tauri dev`, the server serves `dist/`, so run `npm run build` first to see current frontend changes.
+- Under `tauri dev`, pages come from the Vite dev server (live, with hot reload through the server);
+  a release build serves the bundled frontend.
 - `CHESSCOACH_PORT` changes the port (default 8765).

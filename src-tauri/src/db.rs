@@ -461,8 +461,8 @@ pub fn db_update_game(db: State<Db>, id: i64, patch: GamePatch) -> Result<(), St
              WHERE id = ?1",
             params![id, patch.coach_session_id, patch.result, patch.termination, patch.mode, patch.takebacks],
         )
-        .map(|_| ())
         .map_err(err)
+        .and_then(|n| if n == 0 { Err(format!("game {id} no longer exists")) } else { Ok(()) })
 }
 
 /// Makes the stored move list match `moves` (takebacks truncate it). A move's analysis survives
@@ -657,6 +657,10 @@ pub fn db_delete_game(db: State<Db>, id: i64) -> Result<(), String> {
 
 /// Deletes games the student never took part in: no move of theirs and nothing said to the
 /// coach. `keep` spares the game currently open. Returns how many were deleted.
+///
+/// Games touched in the last half hour are spared too: one may have just been started on the
+/// other device (phone or desktop), where the student hasn't moved yet. Deleting it there left
+/// that device playing into a game the database no longer had, and nothing it did was saved.
 #[tauri::command]
 pub fn db_prune_empty_games(db: State<Db>, keep: Option<i64>) -> Result<usize, String> {
     db.0.lock()
@@ -664,6 +668,7 @@ pub fn db_prune_empty_games(db: State<Db>, keep: Option<i64>) -> Result<usize, S
         .execute(
             "DELETE FROM games
              WHERE id IS NOT ?1
+               AND updated_at < datetime('now', '-30 minutes')
                AND NOT EXISTS (SELECT 1 FROM moves m WHERE m.game_id = games.id AND m.by_student = 1)
                AND NOT EXISTS (SELECT 1 FROM chat_items c WHERE c.game_id = games.id AND c.kind = 'user')",
             [keep],

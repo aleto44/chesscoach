@@ -3,7 +3,17 @@ import { invoke } from "../backend";
 import { Chess } from "chess.js";
 import { cancelQuizzes } from "../coach/quiz";
 import { buildLine, emptyLine, sideToMove, START_FEN, type Line } from "../chess/line";
-import { db, discardPending, flush, hasBackend, opponentElo, opponentKey, withoutSaving, type GameRecord } from "../db";
+import {
+  db,
+  discardPending,
+  flush,
+  hasBackend,
+  opponentElo,
+  opponentKey,
+  unsavedPatch,
+  withoutSaving,
+  type GameRecord,
+} from "../db";
 import {
   FREE_PLAY,
   isLocked,
@@ -91,7 +101,13 @@ export async function reloadGame(id: number) {
 }
 
 function applyRecord(record: GameRecord) {
-  const { game, moves, tangents, chat } = record;
+  const { moves, tangents, chat } = record;
+  // This device's own changes still on their way to the database (e.g. a resignation sent
+  // while the phone was out of reach) win over the stored copy.
+  const unsaved = unsavedPatch(record.game.id);
+  const game = unsaved
+    ? { ...record.game, ...unsaved, takebacks: Math.max(record.game.takebacks, unsaved.takebacks ?? 0) }
+    : record.game;
 
   const built = buildLine(game.startFen, moves.map((m) => m.san));
   const line = "line" in built ? built.line : emptyLine(game.startFen);

@@ -1,6 +1,6 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
-import { invoke, isTauri } from "../backend";
+import { invoke, isTauri, openUrl } from "../backend";
 import { hasBackend } from "../db";
 import { MODEL_CHOICES, saveSetting, useSettings } from "../settings";
 import { newId, pushChat, useStore } from "../store";
@@ -103,24 +103,38 @@ interface RemoteInfo {
   port: number;
   code: string;
   urls: string[];
+  /** Null when Tailscale isn't installed on this computer. */
+  tailscale: { state: string; url: string | null; serving: boolean } | null;
 }
 
-/** Desktop only: the home server phones connect to (src-tauri/src/remote.rs). */
+const TAILSCALE_DOWNLOAD = "https://tailscale.com/download";
+
+/** Desktop only: the server phones connect to (src-tauri/src/remote.rs, tailscale.rs). */
 function PhoneAccess() {
   const [info, setInfo] = useState<RemoteInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     invoke<RemoteInfo>("remote_info").then(setInfo, (e) => setError(String(e)));
   }, []);
 
-  const run = (cmd: string, args?: Record<string, unknown>) =>
-    invoke<RemoteInfo>(cmd, args).then(
-      (i) => (setInfo(i), setError(null)),
-      (e) => setError(String(e)),
-    );
+  const run = (cmd: string, args?: Record<string, unknown>) => {
+    setBusy(true);
+    return invoke<RemoteInfo>(cmd, args)
+      .then(
+        (i) => (setInfo(i), setError(null)),
+        (e) => setError(String(e)),
+      )
+      .finally(() => setBusy(false));
+  };
 
   if (!info) return error ? <span className="error small">{error}</span> : null;
+  const code = (
+    <code className="pair-code">
+      {info.code.slice(0, 4)}-{info.code.slice(4)}
+    </code>
+  );
   return (
     <div className="field phone-access">
       <label className="toggle">
@@ -128,24 +142,97 @@ function PhoneAccess() {
         <span>Play from my phone</span>
       </label>
       {info.enabled && (
-        <span className="muted small">
-          {info.running ? "On. " : "Not running. "}
-          Keep this app open on your computer, then open {info.urls.map((u, i) => (
-            <span key={u}>
-              {i > 0 && " or "}
-              <code>{u}</code>
-            </span>
-          ))}{" "}
-          on your phone and enter the code <code className="pair-code">{info.code.slice(0, 4)}-{info.code.slice(4)}</code>.
-          Away from home, or to install it as an app, use Tailscale (docs/phone.md).{" "}
-          <a href="#" onClick={(e) => (e.preventDefault(), run("remote_new_code"))}>
-            New code
-          </a>{" "}
-          unpairs every phone.
-        </span>
+        <>
+          <span className="muted small">
+            {info.running ? "On. " : "Not running. "}
+            Keep this app open on your computer. At home, open{" "}
+            {info.urls.map((u, i) => (
+              <span key={u}>
+                {i > 0 && " or "}
+                <code>{u}</code>
+              </span>
+            ))}{" "}
+            on your phone and enter the code {code}.{" "}
+            <a href="#" onClick={(e) => (e.preventDefault(), run("remote_new_code"))}>
+              New code
+            </a>{" "}
+            unpairs every phone.
+          </span>
+          <span className="muted small">
+            <b>Anywhere: </b>
+            <Anywhere info={info} busy={busy} code={code} onSetUp={() => run("remote_tailscale_serve")} onRecheck={() => run("remote_info")} />
+          </span>
+        </>
       )}
-      {error && <span className="error small">{error}</span>}
+      {error && <Problem text={error} />}
     </div>
+  );
+}
+
+/** The Tailscale steps, showing only the next one to do. */
+function Anywhere({ info, busy, code, onSetUp, onRecheck }: {
+  info: RemoteInfo;
+  busy: boolean;
+  code: React.ReactNode;
+  onSetUp: () => void;
+  onRecheck: () => void;
+}) {
+  const recheck = (
+    <a href="#" onClick={(e) => (e.preventDefault(), onRecheck())}>
+      Check again
+    </a>
+  );
+  const ts = info.tailscale;
+  if (!ts)
+    return (
+      <>
+        install{" "}
+        <a href="#" onClick={(e) => (e.preventDefault(), openUrl(TAILSCALE_DOWNLOAD))}>
+          Tailscale
+        </a>{" "}
+        (free) on this computer and on your phone, and sign in with the same account on both. It joins them into a private
+        network only your devices can reach, over any internet connection. {recheck}
+      </>
+    );
+  if (ts.state !== "Running")
+    return (
+      <>
+        Tailscale is installed but not connected ({ts.state}). Open Tailscale on this computer and sign in. {recheck}
+      </>
+    );
+  if (!ts.serving || !ts.url)
+    return (
+      <>
+        Tailscale is connected. One more step gives this computer a private https address for the app.{" "}
+        <button onClick={onSetUp} disabled={busy}>
+          {busy ? "Setting up…" : "Set up"}
+        </button>
+      </>
+    );
+  return (
+    <>
+      with Tailscale on in your phone, open <code>{ts.url}</code> and enter the code {code} (once per address). Then use the
+      browser menu's <i>Add to Home screen</i> to install it as an app.
+    </>
+  );
+}
+
+/** An error, with any link in it clickable (Tailscale asks to turn on https this way). */
+function Problem({ text }: { text: string }) {
+  const url = text.match(/https:\/\/\S+/)?.[0];
+  return (
+    <span className="error small">
+      {text}
+      {url && (
+        <>
+          {" "}
+          <a href="#" onClick={(e) => (e.preventDefault(), openUrl(url))}>
+            Open that page
+          </a>
+          , approve it, then press Set up again.
+        </>
+      )}
+    </span>
   );
 }
 

@@ -1,5 +1,5 @@
 // A drill session: works through due cards on the main board, graded locally by Stockfish.
-// "Mistake" and "coach" cards: any move within 30cp of the engine's best counts. "Opening" cards:
+// "Mistake" and "coach" cards: any move the review would call good (under an inaccuracy) counts. "Opening" cards:
 // the student plays their repertoire line from memory while the app plays the other side.
 // "Puzzle" cards replay a missed Lichess puzzle the same way, and any mating move counts.
 import type { Key } from "chessground/types";
@@ -8,8 +8,14 @@ import { Chess } from "chess.js";
 import { buildLine, playAt, sideToMove, type Line } from "../chess/line";
 import { getReviewEngine, type EngineLine } from "../engine/stockfish";
 import { dueDrills, gradeDrill, retireDrill, type Drill } from "./drills";
+import { lossFromEvals } from "./review";
 
-const TOLERANCE_CP = 30;
+/**
+ * Loss in review points (see lossPoints) a drill answer may give away: below an inaccuracy. A flat
+ * centipawn cutoff failed sound alternatives on search noise (Nge2 for f4, 30cp apart in a level
+ * opening); the review itself would have called them good.
+ */
+const TOLERANCE = 5;
 
 export interface DrillState {
   queue: Drill[];
@@ -137,8 +143,8 @@ export async function drillMove(from: Key, to: Key, promotion?: string) {
     const engine = getReviewEngine();
     const [best] = await engine.analyze(fen, 1, 14);
     const [after] = await engine.analyze(played.line.fens[ply + 1], 1, 13);
-    const loss = toCp(best, drill.color) - toCp(after, drill.color);
-    correct = loss <= TOLERANCE_CP || toCp(after, drill.color) >= 9000;
+    const loss = lossFromEvals(toCp(best, "white"), toCp(after, "white"), drill.color);
+    correct = loss < TOLERANCE || toCp(after, drill.color) >= 9000;
     bestUci = best?.pv[0] ?? answer;
   }
   const bestSan = bestUci

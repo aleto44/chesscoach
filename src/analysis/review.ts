@@ -5,12 +5,13 @@
 import { invoke } from "../backend";
 import { Chess } from "chess.js";
 import { buildLine, sideToMove, START_FEN, type Line } from "../chess/line";
-import { db, hasBackend } from "../db";
+import { db, hasBackend, notifyChanged, reliably } from "../db";
 import { whiteWinPercent } from "../engine/live";
 import { getReviewEngine, type EngineLine } from "../engine/stockfish";
 import { useStore, type Color, type GameMeta } from "../store";
 import { inBook, openingName } from "../openings/book";
 import { addMistakeDrills } from "./drills";
+import { isFollowing } from "../game/sync";
 
 const DEPTH = 13;
 const MATE_CP = 10000;
@@ -43,6 +44,11 @@ export interface MoveAnnotation {
   evalAfter: number;
   phase: Phase;
   tags: string[];
+  /**
+   * Points the engine's second choice gives away against its first: how much the position asks
+   * for one particular move. Only on fresh analyses (not saved); drills are picked with it.
+   */
+  secondLoss?: number;
 }
 
 interface Score {
@@ -283,11 +289,12 @@ export async function analyzeGame(g: GameInput, onProgress?: (done: number, tota
       evalAfter: after.cp,
       phase: phaseOf(fens[i], i),
       tags: tagsFor(g, i, before, after, cls),
+      secondLoss: before.second ? lossPoints(before, before.second, mover) : undefined,
     };
   });
 
   if (hasBackend()) {
-    await invoke("db_save_analysis", {
+    const args = {
       gameId: g.gameId,
       openingName: openingName(g.line.sans)?.name ?? null,
       moves: annotations.map((a, i) => ({
@@ -301,8 +308,12 @@ export async function analyzeGame(g: GameInput, onProgress?: (done: number, tota
         phase: a.phase,
         tags: a.tags,
       })),
-    });
-    await addMistakeDrills(g, annotations);
+    };
+    // A phone can lose the computer for a moment; the review shouldn't go with it.
+    await reliably("saving the analysis", () => invoke("db_save_analysis", args));
+    // The other device then shows the review too, without analyzing the game again.
+    notifyChanged(g.gameId);
+    await reliably("adding drills", () => addMistakeDrills(g, annotations));
   }
   return annotations;
 }
@@ -313,7 +324,9 @@ let queue: Promise<unknown> = Promise.resolve();
 export function initReview() {
   useStore.subscribe((s, prev) => {
     if (s.gameId !== prev.gameId && s.reportOpen) useStore.setState({ reportOpen: false });
-    if (s.gameId !== null && s.gameId === prev.gameId && s.meta.result && !prev.meta.result) {
+    // A game ended on the other device is analyzed there; this one picks up the saved review.
+    // (If that device goes away first, the game is analyzed with the backlog at the next launch.)
+    if (s.gameId !== null && s.gameId === prev.gameId && s.meta.result && !prev.meta.result && !isFollowing()) {
       enqueueCurrent();
     }
   });
