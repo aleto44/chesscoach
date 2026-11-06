@@ -1,7 +1,10 @@
 // Frontend end of the coach: sends user turns to the backend, renders its stream-json output,
 // and answers tool calls coming in through the MCP server.
 import { hasBackend, invoke, listen } from "../backend";
-import { formatMoves } from "../chess/line";
+import { Chess } from "chess.js";
+import { formatMoves, moveLabel } from "../chess/line";
+import { labelOf } from "../analysis/review";
+import { evalWords, positionFacts, topMoves } from "./insight";
 import { gameDescription, isLocked, newId, pushChat, screen, updateChat, useStore } from "../store";
 import { useSettings } from "../settings";
 import { describeCall, handleTool } from "./tools";
@@ -92,27 +95,67 @@ function finishTurn() {
   useStore.setState({ busy: false, busySince: null, streaming: false });
 }
 
-/** Prefix each turn with a compact view of the screen so the coach rarely needs get_state. */
-function withContext(text: string): string {
+/**
+ * Prefix each turn with a compact view of the screen so the coach rarely needs get_state: the
+ * position, the engine's top moves and facts worked out by code, so it starts from real numbers.
+ */
+export async function withContext(text: string): Promise<string> {
+  return `<screen>
+${(await screenLines()).join("\n")}
+</screen>
+
+${text}`;
+}
+
+async function screenLines(): Promise<string[]> {
   const puzzle = puzzleContext();
-  if (puzzle) return `<screen>
-Showing: ${puzzle.title} in the puzzle trainer (not a game): ${puzzle.detail}
-FEN: ${puzzle.fen}
-</screen>
-
-${text}`;
+  if (puzzle)
+    return [
+      `Showing: ${puzzle.title} in the puzzle trainer (not a game): ${puzzle.detail}`,
+      `FEN: ${puzzle.fen}`,
+      ...(await engineLines(puzzle.fen, puzzle.detail.includes("not solved") ? " (this is the answer: use it for hints, don't reveal it)" : "")),
+    ];
   const drill = drillContext();
-  if (drill) return `<screen>
-Showing: drill "${drill.title}" (not a game)
-FEN: ${drill.fen}
-</screen>
-
-${text}`;
+  if (drill)
+    return [`Showing: drill "${drill.title}" (not a game)`, `FEN: ${drill.fen}`, ...(await engineLines(drill.fen, " (the drill's answer: don't reveal it unless asked)"))];
+  const s = useStore.getState();
   const { line, ply, tangent } = screen();
   const from = Math.max(0, ply - 6);
   const recent = ply > 0 ? formatMoves(line, from, ply) : "(none)";
-  const where = tangent ? `tangent board "${tangent.title}"` : "main game";
-  return `<screen>\nGame: ${gameDescription()}\nShowing: ${where}\nFEN: ${line.fens[ply]}\nLast moves: ${recent}\n</screen>\n\n${text}`;
+  const where = tangent ? `tangent board "${tangent.title}"` : s.gameFork ? "main game, with the student's what-if moves" : "main game";
+  const out = [`Game: ${gameDescription()}`, `Showing: ${where}`, `FEN: ${line.fens[ply]}`, `Last moves: ${recent}`];
+  // The review's verdict on the move just played, so the coach agrees with what the student sees.
+  const a = !tangent && !s.gameFork && ply > 0 ? s.annotations[ply - 1] : null;
+  if (a) {
+    const fen = s.game.fens[ply - 1];
+    const best = a.bestUci ? uciSan(fen, a.bestUci) : null;
+    out.push(
+      `Review of ${moveLabel(fen, s.game.sans[ply - 1])}: ${labelOf(a)}` +
+        (a.evalBefore !== undefined ? `, ${evalWords(a.evalBefore)} → ${evalWords(a.evalAfter)}` : "") +
+        (best && best !== s.game.sans[ply - 1] ? `; the engine's move was ${best}` : ""),
+    );
+  }
+  return [...out, ...(await engineLines(line.fens[ply], ""))];
+}
+
+/** The engine's top moves (quick, so the student isn't kept waiting) and the position's facts. */
+async function engineLines(fen: string, note: string): Promise<string[]> {
+  let engine: string | null = null;
+  try {
+    const top = await Promise.race([topMoves(fen, 3, 12), new Promise<null>((r) => setTimeout(() => r(null), 4000))]);
+    if (top) engine = `Engine's top moves (depth 12)${note}: ${top.text}`;
+  } catch {
+    // No engine: the facts still help.
+  }
+  return [...(engine ? [engine] : []), "Position facts (computed, exact):", ...positionFacts(fen).map((f) => `- ${f}`)];
+}
+
+function uciSan(fen: string, uci: string): string | null {
+  try {
+    return new Chess(fen).move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] }).san;
+  } catch {
+    return null;
+  }
 }
 
 export async function sendToCoach(text: string) {
@@ -122,7 +165,7 @@ export async function sendToCoach(text: string) {
   pushChat({ kind: "user", id: newId("c"), text });
   useStore.setState({ busy: true, busySince: Date.now(), streaming: false });
   try {
-    await invoke("coach_send", { text: withContext(text), resume: sessionId });
+    await invoke("coach_send", { text: await withContext(text), resume: sessionId });
   } catch (e) {
     finishTurn();
     pushChat({ kind: "system", id: newId("c"), error: true, text: String(e) });

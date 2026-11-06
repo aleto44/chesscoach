@@ -26,6 +26,8 @@ export type ChatItem =
       key?: string;
       /** The coach's arrows and circles, by ply of the tangent's line (0 = its start position). */
       shapes?: Record<number, DrawShape[]>;
+      /** The side at the bottom of the board: the student's side in the position it's about. */
+      orientation?: Color;
     }
   | { kind: "tool"; id: string; text: string; status: "running" | "ok" | "error"; detail?: string }
   | { kind: "system"; id: string; text: string; error?: boolean }
@@ -36,6 +38,8 @@ export type ChatItem =
       prompt: string;
       status: "waiting" | "checking" | "right" | "wrong" | "skipped";
       result?: string;
+      /** The side at the bottom: the side the student is asked to move for. */
+      orientation?: Color;
     };
 
 export type Color = "white" | "black";
@@ -238,6 +242,31 @@ export function scenarioOf(chat: ChatItem[], tangentId: string | null): Scenario
   return chat.find((c): c is ScenarioItem => c.kind === "tangent" && c.tangentId === tangentId);
 }
 
+type PovItem = Extract<ChatItem, { kind: "tangent" | "quiz" }>;
+
+/**
+ * The chat card that sets a side board's point of view: its own, or that of the nearest coach board
+ * it branched from. A scenario keeps the side it was made for, not the game's.
+ */
+function povCard(s: State, tangentId: string | null): PovItem | undefined {
+  for (let t = tangentId ? s.tangents[tangentId] : undefined; t; t = t.parentId ? s.tangents[t.parentId] : undefined) {
+    const id = t.id;
+    const card = s.chat.find((c): c is PovItem => (c.kind === "tangent" || c.kind === "quiz") && c.tangentId === id);
+    if (card?.orientation) return card;
+  }
+  return undefined;
+}
+
+/** The side at the bottom of the main board: the open scenario's, else the game's. */
+export function boardOrientation(s: State = get()): Color {
+  return povCard(s, s.active)?.orientation ?? s.orientation;
+}
+
+/** The side at the bottom of a side board's thumbnail and when it opens. */
+export function tangentOrientation(s: State, tangentId: string): Color {
+  return povCard(s, tangentId)?.orientation ?? s.orientation;
+}
+
 /** The scenario a key ("s2") names. */
 export function scenarioByKey(key: string): ScenarioItem | undefined {
   return get().chat.find((c): c is ScenarioItem => c.kind === "tangent" && c.key === key);
@@ -335,6 +364,9 @@ export function boardMove(from: Key, to: Key, promotion?: string) {
   openTangent(child.id);
 }
 
+/** Flips the board on screen: an open scenario's own side, or the game's. */
 export function flip() {
-  set((s) => ({ orientation: s.orientation === "white" ? "black" : "white" }));
+  const card = povCard(get(), get().active);
+  if (card) updateChat(card.id, { orientation: card.orientation === "white" ? "black" : "white" });
+  else set((s) => ({ orientation: s.orientation === "white" ? "black" : "white" }));
 }

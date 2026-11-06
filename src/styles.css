@@ -1355,6 +1355,10 @@ button.icon {
   background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
+.board-panel.drills .side-controls {
+  width: var(--board-w);
+}
+
 .drill-status {
   width: var(--board-w);
   min-height: 2.6em;
@@ -1644,6 +1648,11 @@ button.icon {
   gap: 6px;
 }
 
+/* Phones only (see the 760px query): desktop has the column's buttons. */
+.nav-buttons.board-steps {
+  display: none;
+}
+
 .nav-buttons {
   flex: 1;
   display: flex;
@@ -1843,7 +1852,8 @@ button.danger {
     display: contents;
   }
 
-  /* Live game: the opponent's card, the board, your card, then resign / take back. */
+  /* Live game: the opponent's card, the board (its move buttons under it), your card, then
+     resign / take back. */
   .board-panel.play.live > .crumbs,
   .board-panel.play.live .game-head,
   .board-panel.play.live .side-body,
@@ -1926,20 +1936,32 @@ button.danger {
     display: none;
   }
 
-  /* The move buttons stay at the bottom of the screen while the board and its column are in
-     view, so stepping through a game doesn't mean scrolling down to them and back up. */
+  /* The move buttons are a row under the board itself (BoardSteps), on every board: the column's
+     own buttons and any arrows elsewhere would be a second set. */
   .side-controls {
-    position: sticky;
-    bottom: 0;
-    z-index: 3;
-    margin: 0 -8px;
-    padding: 6px 8px max(6px, env(safe-area-inset-bottom));
-    background: var(--bg);
-    border-top: 1px solid var(--border);
+    display: none;
   }
 
-  .side-controls button {
-    min-height: 42px;
+  .nav-buttons.board-steps {
+    display: flex;
+    margin-top: 4px;
+  }
+
+  .board-steps button {
+    min-height: 38px;
+    padding: 4px 0;
+    font-size: 15px;
+  }
+
+  /* ⏭ ends the joined group; the flip button stands apart from it. */
+  .board-steps button:nth-child(4) {
+    border-radius: 0 6px 6px 0;
+  }
+
+  .board-steps .icon {
+    flex: 0 0 48px;
+    margin-left: 6px;
+    border-radius: 6px;
   }
 
   /* Game report: no box-in-a-scrolling-page, and tighter rows so most of it fits on screen. */
@@ -2420,11 +2442,6 @@ button.danger {
     font-size: 13px;
   }
 
-  .sheet-nav {
-    display: flex;
-    gap: 4px;
-  }
-
   /* The usage ring on the sheet's bar; its breakdown opens across the screen, above the bar
      (below it when the sheet is full, since the bar is then at the top). */
   .sheet-bar {
@@ -2457,7 +2474,6 @@ button.danger {
     display: none;
   }
 
-  .sheet-nav button,
   .sheet-size {
     min-width: 40px;
     padding: 6px 10px;

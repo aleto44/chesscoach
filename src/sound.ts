@@ -5,6 +5,7 @@ import { useSettings } from "./settings";
 import { screen, useStore } from "./store";
 import type { Line } from "./chess/line";
 import { usePuzzle } from "./puzzles/session";
+import { viewedPly } from "./chess/view";
 import { useDrill } from "./analysis/drillSession";
 
 export const SOUND_NAMES = ["move", "capture", "castle", "check", "promotion", "game-end"] as const;
@@ -89,9 +90,9 @@ export function soundForMove(san: string): SoundName {
 /** The board on screen: a puzzle or drill replaces the game while it runs. */
 function onScreen(): { line: Line; ply: number; key: unknown } {
   const puzzle = usePuzzle.getState();
-  if (puzzle?.line) return { line: puzzle.line, ply: puzzle.view ?? puzzle.line.sans.length, key: puzzle.queue[puzzle.index] };
+  if (puzzle?.line) return { line: puzzle.line, ply: viewedPly(puzzle.line.sans.length, puzzle.view), key: puzzle.queue[puzzle.index] };
   const drill = useDrill.getState();
-  if (drill?.line) return { line: drill.line, ply: drill.line.sans.length, key: drill.queue[drill.index] };
+  if (drill?.line) return { line: drill.line, ply: viewedPly(drill.line.sans.length, drill.view), key: drill.queue[drill.index] };
   const { line, ply } = screen();
   return { line, ply, key: useStore.getState().gameId };
 }

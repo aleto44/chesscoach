@@ -8,6 +8,7 @@ import type { Key } from "chessground/types";
 import { create } from "zustand";
 import { Chess } from "chess.js";
 import { buildLine, moveLabel, playAt, sideToMove, type Line } from "../chess/line";
+import { stepView, viewedPly, type Step } from "../chess/view";
 import { db } from "../db";
 import { getReviewEngine, type EngineLine } from "../engine/stockfish";
 import { getPuzzle } from "../puzzles/puzzles";
@@ -41,6 +42,8 @@ export interface DrillState {
   lead: LeadIn | null;
   /** Plies of `line` before the drill's own start position: 1 with a lead-in, else 0. */
   base: number;
+  /** Ply the student stepped back to (null = the latest position). Moves are played at the latest only. */
+  view: number | null;
   status: "loading" | "intro" | "solving" | "checking" | "right" | "wrong" | "done";
   /** What went wrong / right, shown under the board. */
   message: string;
@@ -72,6 +75,7 @@ const blank = (queue: Drill[]): DrillState => ({
   line: null,
   lead: null,
   base: 0,
+  view: null,
   status: "loading",
   message: "",
   shapes: [],
@@ -129,7 +133,7 @@ async function begin(index: number) {
     console.warn("no lead-in for the drill", e);
   }
   if (useDrill.getState()?.queue !== s.queue) return;
-  const reset = { index, message: "", shapes: [], nextDue: null, why: null, whyFailed: false };
+  const reset = { index, view: null, message: "", shapes: [], nextDue: null, why: null, whyFailed: false };
   if (!lead) {
     useDrill.setState({ ...reset, line: emptyAt(drill.fen), lead: null, base: 0, status: "solving", startedAt: Date.now() });
     autoplay();
@@ -141,7 +145,7 @@ async function begin(index: number) {
     if (!now || now.queue[now.index] !== drill || now.status !== "intro") return;
     const built = buildLine(lead.fen, [lead.san]);
     if (!("line" in built)) return;
-    useDrill.setState({ line: built.line, status: "solving", startedAt: Date.now() });
+    useDrill.setState({ line: built.line, view: null, status: "solving", startedAt: Date.now() });
     autoplay();
   }, INTRO_MS);
 }
@@ -177,7 +181,8 @@ function autoplay() {
     if (!now?.line || now.index !== s.index || now.line !== s.line || now.status !== "solving") return;
     const built = buildLine(now.line.startFen, [...now.line.sans.slice(0, now.base), ...drill.line.slice(0, ply + 1)]);
     if ("line" in built) {
-      useDrill.setState({ line: built.line });
+      // The opponent's move brings the board back to the present, as in a game.
+      useDrill.setState({ line: built.line, view: null });
       autoplay();
     }
   }, 350);
@@ -222,7 +227,7 @@ async function explainWrong(fen: string, uci: string, bestUci: string, evals?: {
 export async function drillMove(from: Key, to: Key, promotion?: string) {
   const s = useDrill.getState();
   const drill = current();
-  if (!s || !drill || s.status !== "solving" || !s.line) return;
+  if (!s || !drill || s.status !== "solving" || !s.line || s.view !== null) return;
   const ply = s.line.sans.length;
   const fen = s.line.fens[ply];
   if (sideToMove(fen) !== drill.color) return;
@@ -297,6 +302,13 @@ async function finish(correct: boolean, played: string, message: string) {
   }
 }
 
+/** Step back through the moves so far (the lead-in move included) and forward again. */
+export function drillStep(delta: Step) {
+  const s = useDrill.getState();
+  if (!s?.line) return;
+  useDrill.setState({ view: stepView(s.line.sans.length, s.view, delta) });
+}
+
 /**
  * The title shown for a drill. Older mistake drills were saved as "Move 14.: you played Qa1";
  * they read as "In your game: 14.Qa1".
@@ -311,7 +323,7 @@ export function drillContext(): { title: string; fen: string } | null {
   const s = useDrill.getState();
   const drill = current();
   if (!s?.line || !drill) return null;
-  return { title: drillTitle(drill), fen: s.line.fens[s.line.sans.length] };
+  return { title: drillTitle(drill), fen: s.line.fens[viewedPly(s.line.sans.length, s.view)] };
 }
 
 export function drillQuestion(): string {

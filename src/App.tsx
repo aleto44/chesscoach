@@ -8,7 +8,8 @@ import { PuzzlePanel } from "./components/PuzzlePanel";
 import { Home } from "./components/Home";
 import { back, useNav } from "./nav";
 import { usePuzzle, viewStep } from "./puzzles/session";
-import { useDrill } from "./analysis/drillSession";
+import { drillStep, useDrill } from "./analysis/drillSession";
+import type { Step } from "./chess/view";
 import { goto, openTangent, screen, step, useStore } from "./store";
 
 export default function App() {
@@ -21,18 +22,20 @@ export default function App() {
       if (target.closest("textarea, input, select")) return;
       // An open dialog handles its own Escape.
       if (document.querySelector(".modal-backdrop, .promo-backdrop")) return;
-      if (useDrill.getState() || (!usePuzzle.getState() && useNav.getState().view !== "board")) {
-        // A menu or a drill: Escape goes up a level; the arrow keys would move a board that isn't showing.
-        if (e.key !== "Escape") return;
-        back();
+      const session = usePuzzle.getState() ? viewStep : useDrill.getState() ? drillStep : null;
+      if (session) {
+        // A puzzle or drill: the arrow keys step through its moves, Escape leaves it.
+        const keys: Record<string, Step> = { ArrowLeft: -1, ArrowRight: 1, Home: "start", End: "end" };
+        if (e.key in keys) session(keys[e.key]);
+        else if (e.key === "Escape") back();
+        else return;
         e.preventDefault();
         return;
       }
-      if (usePuzzle.getState()) {
-        // The puzzle board: step through the solution once it's over.
-        const keys: Record<string, Parameters<typeof viewStep>[0]> = { ArrowLeft: -1, ArrowRight: 1, Home: "start", End: "end" };
-        if (!(e.key in keys)) return;
-        viewStep(keys[e.key]);
+      if (useNav.getState().view !== "board") {
+        // A menu: Escape goes up a level; the arrow keys would move a board that isn't showing.
+        if (e.key !== "Escape") return;
+        back();
         e.preventDefault();
         return;
       }

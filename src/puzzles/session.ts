@@ -8,6 +8,7 @@ import { create } from "zustand";
 import { addDrills } from "../analysis/drills";
 import { stopDrills } from "../analysis/drillSession";
 import { emptyLine, playAt, sideToMove, type Line } from "../chess/line";
+import { stepView, viewedPly, type Step } from "../chess/view";
 import type { Color } from "../store";
 import { findPuzzles, recordAttempt, themeLabel, usePuzzleDb, type Puzzle } from "./puzzles";
 import { fromLichess } from "../rating";
@@ -40,7 +41,7 @@ export interface PuzzleSession {
   startedAt: number;
   /** After the first attempt is saved: the rating change (null when this try wasn't rated). */
   change: { before: number; after: number } | null;
-  /** Ply being viewed once the puzzle is over (step through the solution). */
+  /** Ply the student stepped back to (null = the latest position). Moves are played at the latest only. */
   view: number | null;
   results: { id: string; correct: boolean; themes: string[]; rating: number }[];
 }
@@ -177,7 +178,8 @@ function autoplay() {
     lastMoves: [...s.line.lastMoves, [m.from as Key, m.to as Key]],
     notes: [...s.line.notes, ""],
   };
-  set({ line });
+  // The opponent's move brings the board back to the present, as in a game.
+  set({ line, view: null });
 }
 
 export async function nextPuzzle() {
@@ -194,7 +196,7 @@ export async function nextPuzzle() {
 export async function puzzleMove(from: Key, to: Key) {
   const s = get();
   const puzzle = current();
-  if (!s?.line || !puzzle || s.status !== "solving") return;
+  if (!s?.line || !puzzle || s.status !== "solving" || s.view !== null) return;
   const ply = s.line.sans.length;
   if (sideToMove(s.line.fens[ply]) !== s.color) return;
   const played = playAt(s.line, ply, from, to);
@@ -285,14 +287,11 @@ async function save(correct: boolean) {
   }
 }
 
-/** Step through the line once the puzzle is over. */
-export function viewStep(delta: number | "start" | "end") {
+/** Step back through the moves so far (back to before the opponent's first move) and forward again. */
+export function viewStep(delta: Step) {
   const s = get();
-  if (!s?.line || (s.status !== "solved" && s.status !== "failed")) return;
-  const end = s.line.sans.length;
-  const at = s.view ?? end;
-  const to = delta === "start" ? 0 : delta === "end" ? end : Math.max(0, Math.min(end, at + delta));
-  set({ view: to === end ? null : to });
+  if (!s?.line) return;
+  set({ view: stepView(s.line.sans.length, s.view, delta) });
 }
 
 export function setChoice(choice: Partial<Choice>) {
@@ -305,7 +304,7 @@ export function puzzleContext(): { title: string; fen: string; detail: string } 
   const puzzle = current();
   if (!s?.line || !puzzle) return null;
   const over = s.status === "solved" || s.status === "failed";
-  const ply = s.view ?? s.line.sans.length;
+  const ply = viewedPly(s.line.sans.length, s.view);
   return {
     title: `Lichess puzzle ${puzzle.id}`,
     fen: s.line.fens[ply],

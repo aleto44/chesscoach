@@ -13,9 +13,11 @@ import {
   isLocked,
   opponentLabel,
   scenarioOf,
+  boardOrientation,
   type GameMeta,
 } from "../store";
 import { Board } from "./Board";
+import { BoardSteps } from "./StepButtons";
 import { askConfirm } from "./Confirm";
 import { EvalBar, EvalLine } from "./EvalBar";
 import { MaterialStrip } from "./Material";
@@ -32,7 +34,7 @@ import { saveSetting, useSettings } from "../settings";
  * controls, then the player at the bottom.
  */
 export function BoardPanel() {
-  const { game, gamePly, tangents, active, orientation, meta, opponentThinking, annotations, arrows, reportOpen, gameFork } = useStore();
+  const { game, gamePly, tangents, active, meta, opponentThinking, annotations, arrows, reportOpen, gameFork } = useStore();
   const moment = useMoment();
   const verdict = useVerdict();
   const report = useGameReport();
@@ -42,6 +44,8 @@ export function BoardPanel() {
   const showEval = useSettings((s) => s.showEval) && !locked;
   const canTakeBack = takebackPly(game, meta) !== null;
   const tangent = active ? tangents[active] : null;
+  // A coach scenario keeps the side it was made for (e.g. Black for a position the student had as Black).
+  const orientation = useStore((s) => boardOrientation(s));
   // What-if moves on a finished game (store.gameFork): the game up to gamePly, then the student's.
   const fork = tangent ? null : gameFork;
   const line = tangent ? tangent.line : fork ? fork.line : game;
@@ -126,6 +130,9 @@ export function BoardPanel() {
           }
         />
         <MaterialStrip fen={line.fens[ply]} side={orientation} />
+        <BoardSteps onStep={(s) => (s === "start" ? goto(0) : s === "end" ? goto(line.sans.length) : step(s))}>
+          <button className="icon" onClick={flip} title="Flip board" aria-label="Flip board">⇅</button>
+        </BoardSteps>
       </div>
 
       <aside className="game-side">

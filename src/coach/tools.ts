@@ -11,11 +11,16 @@ import { START_FEN } from "../chess/line";
 import { getRepertoire } from "../openings/repertoire";
 import { askMove } from "./quiz";
 import { findPuzzles, openingLabel, openingTag, refreshPuzzleDb, themeKey, themeLabel, usePuzzleDb } from "../puzzles/puzzles";
-import { startCoachSet } from "../puzzles/session";
+import { startCoachSet, usePuzzle } from "../puzzles/session";
+import { useDrill } from "../analysis/drillSession";
 import { fromLichess, toLichess } from "../rating";
+import { evalWords, lineReport, materialChange, positionFacts, storedEval, topMoves } from "./insight";
+import { explainCached } from "../analysis/explain";
+import { lossFromEvals, classify } from "../analysis/review";
 import type { Key } from "chessground/types";
 import {
   addTangent,
+  boardOrientation,
   openTangent,
   gameDescription,
   isLocked,
@@ -26,6 +31,7 @@ import {
   screenFen,
   tangentPath,
   useStore,
+  type Color,
 } from "../store";
 
 export interface ToolResult {
@@ -83,9 +89,13 @@ const handlers: Record<string, (args: Args) => Promise<ToolResult>> = {
     const multipv = clamp(Number(args.multipv ?? 3), 1, 5);
     const depth = clamp(Number(args.depth ?? 16), 8, 22);
     const lines = await getEngine().analyze(fen, multipv, depth);
-    const head = `Position ${fen} (${sideToMove(fen)} to move). Scores are from White's point of view.`;
-    const body = lines.map((l, i) => `${i + 1}. ${formatScore(l)} (depth ${l.depth})  ${pvToSan(fen, l.pv)}`);
-    return { text: [head, ...body].join("\n") };
+    const head = `Position ${fen} (${sideToMove(fen)} to move).`;
+    const body = lines.map((l, i) => {
+      // What the line comes to in material, so "wins a piece" is read off, not guessed.
+      const end = pvEnd(fen, l.pv, 10);
+      return `${i + 1}. ${evalWords(storedEval(l))} (raw ${formatScore(l)}, depth ${l.depth})  ${pvToSan(fen, l.pv)}\n   Over these moves: ${materialChange(fen, end)}.`;
+    });
+    return { text: [head, ...body, "Position facts:", ...positionFacts(fen).map((f) => `- ${f}`)].join("\n") };
   },
 
   async show_line(args) {
@@ -102,12 +112,14 @@ const handlers: Record<string, (args: Args) => Promise<ToolResult>> = {
     const title = String(args.title ?? "Line");
     const ply = clamp(Number(args.ply ?? 0), 0, moves.length);
     const open = args.open === true;
-    const { key } = addScenario(title, built.line, ply, drawn.shapes, open);
+    const { key } = addScenario(title, built.line, ply, drawn.shapes, open, sideArg(args));
     const end = built.line.fens[built.line.fens.length - 1];
+    // The engine's verdict on every move, so what the coach says about the line matches it.
+    const report = await lineReport(built.line.fens, built.line.sans);
     return {
       text:
         `Scenario ${key} "${title}"${open ? ", open on the student's board" : ""}: ${formatMoves(built.line)}\n` +
-        `Final position: ${end}\n${linkHint(key)}`,
+        `Final position: ${end}\n${report}\n${linkHint(key)}`,
     };
   },
 };
@@ -115,13 +127,30 @@ const handlers: Record<string, (args: Args) => Promise<ToolResult>> = {
 const SQUARE = /^[a-h][1-8]$/;
 const BRUSHES: Record<string, string> = { green: "green", red: "red", blue: "blue", yellow: "yellow" };
 
-/** A coach board (tangent) with its chat card, key and drawings. */
-function addScenario(title: string, line: Line, ply: number, shapes: Record<number, DrawShape[]>, open: boolean) {
+/** A coach board (tangent) with its chat card, key, drawings and the side at the bottom. */
+function addScenario(title: string, line: Line, ply: number, shapes: Record<number, DrawShape[]>, open: boolean, side: Color | null) {
   const key = nextScenarioKey();
   const tangent = addTangent({ parentId: useStore.getState().active, title, author: "coach", line, ply });
-  pushChat({ kind: "tangent", id: newId("c"), tangentId: tangent.id, key, shapes });
+  pushChat({ kind: "tangent", id: newId("c"), tangentId: tangent.id, key, shapes, orientation: side ?? screenSide() });
   if (open) openTangent(tangent.id);
   return { key, tangent };
+}
+
+/** The coach's `side` argument: whose point of view the board shows. */
+const sideArg = (args: Args): Color | null => (args.side === "white" || args.side === "black" ? args.side : null);
+
+/**
+ * The side at the bottom of the board the student is looking at: a puzzle's or drill's side, else
+ * the main board's (the game's, or the open scenario's). New scenarios keep it, so a position the
+ * student had as Black is shown from Black's side.
+ */
+export function screenSide(): Color {
+  const puzzle = usePuzzle.getState();
+  if (puzzle) return puzzle.color;
+  const d = useDrill.getState();
+  const drill = d?.queue[d.index];
+  if (drill) return drill.color;
+  return boardOrientation();
 }
 
 const linkHint = (key: string) =>
@@ -211,7 +240,7 @@ Object.assign(handlers, {
     const title = String(args.title ?? "Position");
     const note = typeof args.note === "string" ? args.note : "";
     const open = args.open !== false;
-    const { key } = addScenario(title, { ...built.line, notes: [] }, 0, drawn.shapes, open);
+    const { key } = addScenario(title, { ...built.line, notes: [] }, 0, drawn.shapes, open, sideArg(args));
     if (note) pushChat({ kind: "system", id: newId("c"), text: note });
     return {
       text: `Scenario ${key} "${title}"${open ? ", open on the student's board" : ""} (${sideToMove(fen)} to move).\n${linkHint(key)}`,
@@ -302,6 +331,89 @@ Object.assign(handlers, {
   },
 } satisfies typeof handlers);
 
+/** Where a UCI line ends, at most `plies` moves in. */
+function pvEnd(fen: string, pv: string[], plies: number): string {
+  const chess = new Chess(fen);
+  for (const uci of pv.slice(0, plies)) {
+    try {
+      chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
+    } catch {
+      break;
+    }
+  }
+  return chess.fen();
+}
+
+Object.assign(handlers, {
+  async position_facts(args: Args) {
+    const fen = typeof args.fen === "string" && args.fen ? args.fen : screenFen();
+    try {
+      new Chess(fen);
+    } catch (e) {
+      return { text: `Invalid FEN: ${(e as Error).message}`, isError: true };
+    }
+    return { text: [`Position ${fen}:`, ...positionFacts(fen).map((f) => `- ${f}`)].join("\n") };
+  },
+
+  /**
+   * Candidate moves judged against the engine's best: the eval after each, how much it gives away,
+   * the opponent's best answer played out to where the material settles, with a note per move.
+   */
+  async evaluate_moves(args: Args) {
+    const fen = typeof args.fen === "string" && args.fen ? args.fen : screenFen();
+    let chess: Chess;
+    try {
+      chess = new Chess(fen);
+    } catch (e) {
+      return { text: `Invalid FEN: ${(e as Error).message}`, isError: true };
+    }
+    if (chess.isGameOver()) return { text: "That position is already over.", isError: true };
+    const moves = (Array.isArray(args.moves) ? args.moves.map(String) : []).slice(0, 4);
+    const legal = new Set(chess.moves());
+    const bad = moves.filter((m) => !legal.has(m));
+    if (!moves.length) return { text: "moves is empty.", isError: true };
+    if (bad.length) return { text: `Not legal here: ${bad.join(", ")}. Legal: ${[...legal].join(" ")}`, isError: true };
+    const depth = clamp(Number(args.depth ?? 14), 10, 20);
+    const mover = sideToMove(fen);
+    const top = await topMoves(fen, 3, depth);
+    const best = top.lines[0];
+    const before = best ? storedEval(best) : 0;
+    const bestUci = best?.pv[0] ?? null;
+    const out = [`Position ${fen}, ${mover} to move. Engine's top moves: ${top.text}.`];
+    let shownBetter = false;
+    for (const san of moves) {
+      const m = new Chess(fen).move(san);
+      const uci = m.from + m.to + (m.promotion ?? "");
+      const after = new Chess(m.after);
+      let afterCp: number;
+      if (after.isCheckmate()) afterCp = mover === "white" ? 10000 : -10000;
+      else if (after.isGameOver()) afterCp = 0;
+      else {
+        const [l] = await getEngine().analyze(m.after, 1, depth);
+        afterCp = l ? storedEval(l) : before;
+      }
+      const loss = lossFromEvals(before, afterCp, mover);
+      const cls = classify(loss, uci === bestUci);
+      const ex = await explainCached({ fenBefore: fen, uci, bestUci, evalBefore: before, evalAfter: afterCp });
+      out.push(
+        `\n${m.san}: ${evalWords(before)} → ${evalWords(afterCp)}, ${cls} (gives away ${loss.toFixed(1)} points of winning chances; winning chances ${ex.winBefore}% → ${ex.winAfter}% for ${mover}).`,
+        `What happens (notes say "You" for ${mover}): ${ex.played.steps.map((s) => `${s.label} ${s.note}`).join(" ")}`,
+        // The why-screen's wording assumes a bad move; a sound one just keeps the position.
+        `Result: ${
+          (cls === "best" || cls === "good") && ex.played.verdict.startsWith("No material")
+            ? `a sound move: the position stays about where it was (${evalWords(afterCp)}).`
+            : ex.played.verdict
+        }`,
+      );
+      if (ex.better && !shownBetter) {
+        shownBetter = true;
+        out.push(`Engine's move instead: ${ex.better.steps.map((s) => `${s.label} ${s.note}`).join(" ")} Result: ${ex.better.verdict}`);
+      }
+    }
+    return { text: out.join("\n") };
+  },
+});
+
 export async function handleTool(name: string, args: Args): Promise<ToolResult> {
   const handler = handlers[name];
   if (!handler) return { text: `Unknown tool ${name}`, isError: true };
@@ -318,6 +430,7 @@ export function describeCall(name: string, args: Args): string {
   if (name === "analyze") return `analyze${args.depth ? ` depth ${args.depth}` : ""}`;
   if (name === "setup_position") return `setup_position "${args.title ?? ""}"`;
   if (name === "ask_move") return `ask_move "${args.title ?? ""}"`;
+  if (name === "evaluate_moves") return `evaluate_moves ${Array.isArray(args.moves) ? args.moves.join(", ") : ""}`;
   if (name === "find_puzzles") return `find_puzzles${Array.isArray(args.themes) && args.themes.length ? ` ${args.themes.join(", ")}` : ""}`;
   return name;
 }

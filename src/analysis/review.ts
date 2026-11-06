@@ -68,7 +68,7 @@ interface Eval extends Score {
  * chess.com's published "expected points lost" table (0.05 / 0.10 / 0.20; excellent under 0.02,
  * good under 0.05, see labelFor). Lichess calls a blunder from 15; chess.com waits for 20.
  */
-function classify(drop: number, isBest: boolean): MoveClass {
+export function classify(drop: number, isBest: boolean): MoveClass {
   if (drop >= 20) return "blunder";
   if (drop >= 10) return "mistake";
   if (drop >= 5) return "inaccuracy";

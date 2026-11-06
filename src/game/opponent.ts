@@ -87,6 +87,7 @@ async function maybeMove() {
   if (!uci || isFollowing()) return;
   const played = playAt(now.game, end, uci.slice(0, 2) as Key, uci.slice(2, 4) as Key, uci[4] ?? "q");
   if (!played) return;
-  const followingEnd = now.gamePly === end;
-  useStore.setState({ game: played.line, gamePly: followingEnd ? end + 1 : now.gamePly });
+  // A reply brings the board back to the present even if the student was looking at earlier moves:
+  // it's their turn now, and moves are only played at the end.
+  useStore.setState({ game: played.line, gamePly: end + 1 });
 }

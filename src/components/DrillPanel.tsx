@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   drillMove,
   drillQuestion,
+  drillStep,
   drillTitle,
   nextDrill,
   retireCurrent,
@@ -17,6 +18,8 @@ import { useAuth } from "../coach/auth";
 import { hasBackend } from "../db";
 import { useStore } from "../store";
 import { Board } from "./Board";
+import { BoardSteps, StepButtons } from "./StepButtons";
+import { viewedPly } from "../chess/view";
 import { Modal } from "./GameDialogs";
 import { WhyLines } from "./Why";
 
@@ -29,7 +32,8 @@ export function DrillPanel() {
   const signedIn = useAuth((a) => a.status === "signed-in") || !hasBackend();
   const drill = s.queue[s.index];
   const line = s.line;
-  const ply = line ? line.sans.length : 0;
+  const ply = line ? viewedPly(line.sans.length, s.view) : 0;
+  const past = line !== null && ply < line.sans.length;
   const shapes = useMemo(() => s.shapes as DrawShape[], [s.shapes]);
   const [whyOpen, setWhyOpen] = useState(false);
   useEffect(() => setWhyOpen(false), [s.index]);
@@ -65,15 +69,22 @@ export function DrillPanel() {
               lastMove={ply > 0 ? line.lastMoves[ply - 1] : undefined}
               orientation={drill.color}
               onMove={drillMove}
-              canMove={s.status === "solving"}
-              premoveColor={s.status === "intro" || s.status === "solving" ? drill.color : undefined}
-              shapes={shapes}
+              canMove={s.status === "solving" && !past}
+              premoveColor={(s.status === "intro" || s.status === "solving") && !past ? drill.color : undefined}
+              shapes={past ? undefined : shapes}
             />
+            <BoardSteps onStep={drillStep} disabled={line.sans.length === 0} />
           </div>
+          <StepButtons onStep={drillStep} disabled={line.sans.length === 0} />
           <div className={`drill-status ${s.status}`}>
             {s.status === "intro" && s.lead && `${opponent} plays ${s.lead.label}…`}
             {s.status === "loading" && "Setting up the next drill…"}
-            {s.status === "solving" && (
+            {s.status === "solving" && past && (
+              <>
+                <strong>Looking back.</strong> Step forward (▶ or ⏭) to play on.
+              </>
+            )}
+            {s.status === "solving" && !past && (
               <>
                 {lead}
                 {drill.kind === "opening"

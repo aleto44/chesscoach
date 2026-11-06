@@ -8,7 +8,7 @@ import { bestSan, nudgeQuestion, useNudge } from "../coach/nudge";
 import { takeBack } from "../game/session";
 import { hasBackend } from "../db";
 import { useSettings } from "../settings";
-import { goto, isLocked, openTangent, step, useStore, type ChatItem } from "../store";
+import { goto, isLocked, openTangent, tangentOrientation, useStore, type ChatItem } from "../store";
 import { go, useNav } from "../nav";
 import { usePuzzle } from "../puzzles/session";
 import { useDrill } from "../analysis/drillSession";
@@ -119,7 +119,9 @@ export function Chat() {
 
 const TOOL_LABELS: Record<string, string> = {
   analyze: "Analyzing the position",
-  show_line: "Checking the line",
+  show_line: "Checking every move of the line",
+  evaluate_moves: "Comparing moves with the engine",
+  position_facts: "Looking over the position",
   get_state: "Looking at the board",
   ask_move: "Waiting for your move on the board",
   setup_position: "Setting up a position",
@@ -296,17 +298,13 @@ const openSheet = (sheet: Sheet) => useSheet.setState({ sheet });
 /**
  * Phones: the chat is a sheet over the bottom of the screen. Closed it's a bar with the latest
  * message; half-open it fills the space under the board, so the coach's boards stay in view
- * while you read; full it covers the screen for long answers. The arrows step the board.
+ * while you read; full it covers the screen for long answers. The move buttons belong to the
+ * board (a row under it), not to this bar.
  */
 function SheetBar() {
   const sheet = useSheet((s) => s.sheet);
   const { chat, busy } = useStore();
   const signedIn = useAuth((a) => a.status === "signed-in");
-  // Every hook runs on every render: a `&&` chain of hooks crashes the app when the view changes.
-  const onMain = useNav((n) => n.view === "board");
-  const inPuzzle = usePuzzle((p) => p !== null);
-  const inDrill = useDrill((d) => d !== null);
-  const onBoard = onMain && !inPuzzle && !inDrill;
   const last = [...chat].reverse().find((c) => c.kind === "coach");
   const preview = last?.kind === "coach" ? last.text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_#`>]/g, "").trim() : "";
   // The bar opens and closes the sheet; the size button switches between half and full.
@@ -323,12 +321,6 @@ function SheetBar() {
       </button>
       {/* The chat's own header (and its usage ring) is hidden on phones, so the ring lives here. */}
       {signedIn && <UsageMeter />}
-      {open && onBoard && (
-        <span className="sheet-nav">
-          <button onClick={() => step(-1)} aria-label="Back">◀</button>
-          <button onClick={() => step(1)} aria-label="Forward">▶</button>
-        </span>
-      )}
       {open && (
         <button
           className="sheet-size"
@@ -346,6 +338,7 @@ function SheetBar() {
 function TangentCard({ tangentId }: { tangentId: string }) {
   const tangent = useStore((s) => s.tangents[tangentId]);
   const active = useStore((s) => s.active === tangentId);
+  const orientation = useStore((s) => tangentOrientation(s, tangentId));
   if (!tangent) return null;
   const { line } = tangent;
   return (
@@ -353,7 +346,7 @@ function TangentCard({ tangentId }: { tangentId: string }) {
       <Board
         fen={line.fens[line.fens.length - 1]}
         lastMove={line.lastMoves[line.lastMoves.length - 1]}
-        orientation={useStore.getState().orientation}
+        orientation={orientation}
         preview
         coordinates={false}
         className="mini-board"

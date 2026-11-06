@@ -30,6 +30,8 @@ import {
 import { useStore } from "../store";
 import { moveLabel, START_FEN } from "../chess/line";
 import { Board } from "./Board";
+import { BoardSteps, StepButtons } from "./StepButtons";
+import { viewedPly } from "../chess/view";
 import { fromLichess } from "../rating";
 
 const MB = (bytes: number) => Math.round(bytes / 1e6);
@@ -43,7 +45,8 @@ export function PuzzlePanel() {
   const puzzle = s.queue[s.index];
   const line = s.line;
   const over = s.status === "solved" || s.status === "failed";
-  const ply = line ? (s.view ?? line.sans.length) : 0;
+  const ply = line ? viewedPly(line.sans.length, s.view) : 0;
+  const past = line !== null && ply < line.sans.length;
   const shapes = useMemo(() => s.shapes as DrawShape[], [s.shapes]);
   const opponent = s.color === "white" ? "Black" : "White";
   // The opponent's move that sets the puzzle up ("23...Nxe4"), once it's played.
@@ -83,8 +86,9 @@ export function PuzzlePanel() {
           orientation={s.color}
           onMove={puzzleMove}
           canMove={s.status === "solving" && s.view === null}
-          shapes={shapes}
+          shapes={past ? undefined : shapes}
         />
+        {line && <BoardSteps onStep={viewStep} disabled={line.sans.length === 0} />}
       </div>
 
       <aside className="game-side">
@@ -110,8 +114,16 @@ export function PuzzlePanel() {
                     {opponent} played {leadIn}.
                   </div>
                 )}
-                <strong>Your turn.</strong> Find the best move for {s.color === "white" ? "White" : "Black"}.
-                {s.message && <div className="puzzle-msg">{s.message}</div>}
+                {past ? (
+                  <>
+                    <strong>Looking back.</strong> Step forward (▶ or ⏭) to play on.
+                  </>
+                ) : (
+                  <>
+                    <strong>Your turn.</strong> Find the best move for {s.color === "white" ? "White" : "Black"}.
+                    {s.message && <div className="puzzle-msg">{s.message}</div>}
+                  </>
+                )}
               </>
             )}
             {s.status === "solved" && (
@@ -158,16 +170,7 @@ export function PuzzlePanel() {
           <div className="puzzle-credit muted">Puzzles from the Lichess open database (CC0).</div>
         </div>
 
-        {over && (
-          <div className="side-controls">
-            <div className="nav-buttons">
-              <button onClick={() => viewStep("start")} title="Start" aria-label="Start">⏮</button>
-              <button onClick={() => viewStep(-1)} title="Back (←)" aria-label="Back">◀</button>
-              <button onClick={() => viewStep(1)} title="Forward (→)" aria-label="Forward">▶</button>
-              <button onClick={() => viewStep("end")} title="End" aria-label="End">⏭</button>
-            </div>
-          </div>
-        )}
+        {line && <StepButtons onStep={viewStep} disabled={line.sans.length === 0} />}
 
         <div className="side-actions">
           {(s.status === "solving" || s.status === "intro") && <button onClick={showSolution}>View solution</button>}

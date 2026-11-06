@@ -14,9 +14,10 @@ pub fn definitions() -> Value {
         },
         {
             "name": "analyze",
-            "description": "Run Stockfish on a position. Returns the top lines with evaluations from White's point \
-                of view (pawns, or mate in N) and the principal variation in SAN. You must call this before \
-                stating any evaluation or claiming a move is best, good, bad, winning or losing.",
+            "description": "Run Stockfish on a position. Returns the top lines, each with its evaluation in words \
+                (\"White +1.20\", \"Black mates in 3\"), the principal variation in SAN and what it comes to in \
+                material, then the position's computed facts. You must call this (or use numbers the app already \
+                gave you) before stating any evaluation or claiming a move is best, good, bad, winning or losing.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -27,10 +28,44 @@ pub fn definitions() -> Value {
             }
         },
         {
+            "name": "evaluate_moves",
+            "description": "Judge up to 4 candidate moves in a position against the engine: the eval before and \
+                after each, its verdict on chess.com's scale (best, good, inaccuracy, mistake, blunder), the \
+                winning chances it gives away, and what happens next (the opponent's best reply played out to \
+                where the material settles, with a note per move), plus the engine's better move and what it \
+                does. Use it for \"why not X?\", \"is X good?\", \"X or Y?\" and before saying what a move wins, \
+                loses or allows.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "fen": { "type": "string", "description": "The position. Defaults to the one on the student's screen." },
+                    "moves": { "type": "array", "items": { "type": "string" }, "description": "Moves in SAN for the side to move, e.g. [\"Nxe5\", \"d4\"]." },
+                    "depth": { "type": "integer", "minimum": 10, "maximum": 20, "default": 14 }
+                },
+                "required": ["moves"]
+            }
+        },
+        {
+            "name": "position_facts",
+            "description": "Facts about a position computed exactly by code: material, loose (attacked and \
+                undefended) pieces, pins, captures that win material, checks, mate in one, what the other side \
+                threatens, kings and pawn shields, passed / isolated / doubled pawns, undeveloped pieces, open \
+                files. The <screen> block already has them for the position on screen; call this for another \
+                position before describing it.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "fen": { "type": "string", "description": "Defaults to the position on the student's screen." }
+                }
+            }
+        },
+        {
             "name": "show_line",
             "description": "Make a scenario: a line of moves on its own board, with your arrows and circles on \
                 it, that the student steps through. Every move is checked for legality; if any move is illegal \
-                you get an error naming it and nothing is shown, so fix the line and call again. Use this for \
+                you get an error naming it and nothing is shown, so fix the line and call again. The result \
+                has the engine's verdict on every move (eval before and after, mistake or not, the engine's \
+                move when it differs) and lists the mistakes in the line: make what you say match it. Use this for \
                 every concrete line of two or more moves instead of writing the moves in prose. Returns the \
                 scenario's key (s1, s2, ...): link to it in your reply as [words](#s1), and the student taps \
                 those words to open it on the board.",
@@ -67,6 +102,7 @@ pub fn definitions() -> Value {
                             "required": ["square"]
                         }
                     },
+                    "side": { "type": "string", "enum": ["white", "black"], "description": "Whose point of view the board shows (that side at the bottom): the student's side in the position you're talking about, e.g. black for a game or puzzle they had as Black. Defaults to the side at the bottom of the student's board now." },
                     "ply": { "type": "integer", "minimum": 0, "description": "Which step it opens on: how many moves are played. Default 0, the starting position." },
                     "open": { "type": "boolean", "description": "Open it on the student's board right away. Default false (they open it from the chat). Open the one your reply is mainly about." }
                 },
@@ -82,6 +118,7 @@ pub fn definitions() -> Value {
                     "title": { "type": "string", "description": "Short breadcrumb title, e.g. \"Carlsbad structure\"" },
                     "fen": { "type": "string", "description": "The position. Must be legal (both kings, side to move not giving check)." },
                     "note": { "type": "string", "description": "Optional one-line caption under the board." },
+                    "side": { "type": "string", "enum": ["white", "black"], "description": "Whose point of view the board shows (that side at the bottom): the student's side in the position you're talking about, e.g. black for a game or puzzle they had as Black. Defaults to the side at the bottom of the student's board now." },
                     "arrows": {
                         "type": "array",
                         "description": "Arrows to draw on this board. `at` is how many of the line's moves have been played when the arrow shows: 0 (the default) is the starting position, 3 is after the third move.",

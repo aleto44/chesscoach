@@ -43,7 +43,8 @@ export function askMove(opts: { fen: string; prompt: string; title: string; acce
     ply: 0,
   });
   const chatId = newId("c");
-  pushChat({ kind: "quiz", id: chatId, tangentId: tangent.id, prompt: opts.prompt, status: "waiting" });
+  // The student answers for the side to move, so that side is at the bottom.
+  pushChat({ kind: "quiz", id: chatId, tangentId: tangent.id, prompt: opts.prompt, status: "waiting", orientation: sideToMove(opts.fen) });
   openTangent(tangent.id);
   return new Promise<string>((resolve) => {
     pending.set(tangent.id, { chatId, fen: opts.fen, accept: opts.accept, tolerance: opts.tolerance, startedAt: Date.now(), resolve });
