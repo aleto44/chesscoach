@@ -3,6 +3,7 @@ import type { Key } from "chessground/types";
 import { emptyLine, moveLabel, playAt, sideToMove, type Line } from "./chess/line";
 import type { DrawShape } from "chessground/draw";
 import type { MoveAnnotation } from "./analysis/review";
+import { exploreGoto, exploreMove, type Explore } from "./chess/explore";
 
 /** A side board. Tangents form a tree: parentId is the tangent it branched from (null = the game). */
 export interface Tangent {
@@ -17,7 +18,15 @@ export interface Tangent {
 export type ChatItem =
   | { kind: "user"; id: string; text: string }
   | { kind: "coach"; id: string; text: string }
-  | { kind: "tangent"; id: string; tangentId: string }
+  | {
+      kind: "tangent";
+      id: string;
+      tangentId: string;
+      /** The coach's name for it ("s2"): its messages link to it as [words](#s2). */
+      key?: string;
+      /** The coach's arrows and circles, by ply of the tangent's line (0 = its start position). */
+      shapes?: Record<number, DrawShape[]>;
+    }
   | { kind: "tool"; id: string; text: string; status: "running" | "ok" | "error"; detail?: string }
   | { kind: "system"; id: string; text: string; error?: boolean }
   | {
@@ -88,6 +97,11 @@ interface State {
   reportOpen: boolean;
   /** Arrows and circles the coach drew (draw_arrows), shown while that position is on screen. */
   arrows: { fen: string; shapes: DrawShape[] } | null;
+  /**
+   * "What if" moves on a finished game (see chess/explore.ts): the game up to gamePly, then the
+   * student's moves. gamePly stays at the fork point; stepping back to it drops the fork.
+   */
+  gameFork: { line: Line; ply: number } | null;
 }
 
 /** Ids are stored in SQLite, so they must be unique across app runs. */
@@ -124,7 +138,13 @@ export const useStore = create<State>(() => ({
   review: null,
   reportOpen: false,
   arrows: null,
+  gameFork: null,
 }));
+
+// A different game (loaded, new or a move played) ends any what-if exploration of the old one.
+useStore.subscribe((s, prev) => {
+  if (s.game !== prev.game && s.gameFork) useStore.setState({ gameFork: null });
+});
 
 /** A rated game still being played: engine, coach, takebacks and side boards are off. */
 export function isLocked(meta: GameMeta = get().meta): boolean {
@@ -135,7 +155,8 @@ export function isLocked(meta: GameMeta = get().meta): boolean {
 export function canStudentMove(): boolean {
   const s = get();
   if (s.active) return true;
-  if (s.meta.result) return false;
+  // A finished game: moves are "what if" moves (see boardMove).
+  if (s.meta.result) return true;
   if (s.meta.studentColor === "both") return true;
   // Against an opponent, moves are played at the end of the game only (going back is a takeback).
   const end = s.game.sans.length;
@@ -176,7 +197,22 @@ const get = useStore.getState;
 export function screen(): { line: Line; ply: number; tangent: Tangent | null } {
   const s = get();
   const t = s.active ? s.tangents[s.active] : null;
-  return t ? { line: t.line, ply: t.ply, tangent: t } : { line: s.game, ply: s.gamePly, tangent: null };
+  if (t) return { line: t.line, ply: t.ply, tangent: t };
+  if (s.gameFork) return { line: s.gameFork.line, ply: s.gameFork.ply, tangent: null };
+  return { line: s.game, ply: s.gamePly, tangent: null };
+}
+
+/** The game as an Explore (its fork, if any). */
+function gameExplore(): Explore {
+  const { game, gamePly, gameFork } = get();
+  return gameFork
+    ? { base: game, line: gameFork.line, ply: gameFork.ply, forkAt: gamePly }
+    : { base: game, line: game, ply: gamePly, forkAt: null };
+}
+
+function setGameExplore(x: Explore) {
+  if (x.forkAt === null) set({ gamePly: x.ply, gameFork: null });
+  else set({ gamePly: x.forkAt, gameFork: { line: x.line, ply: x.ply } });
 }
 
 export function screenFen(): string {
@@ -192,6 +228,25 @@ export function tangentPath(id: string | null): Tangent[] {
     path.unshift(t);
   }
   return path;
+}
+
+type ScenarioItem = Extract<ChatItem, { kind: "tangent" }>;
+
+/** The chat card for a tangent the coach made (its key and drawings), if there is one. */
+export function scenarioOf(chat: ChatItem[], tangentId: string | null): ScenarioItem | undefined {
+  if (!tangentId) return undefined;
+  return chat.find((c): c is ScenarioItem => c.kind === "tangent" && c.tangentId === tangentId);
+}
+
+/** The scenario a key ("s2") names. */
+export function scenarioByKey(key: string): ScenarioItem | undefined {
+  return get().chat.find((c): c is ScenarioItem => c.kind === "tangent" && c.key === key);
+}
+
+/** The next unused scenario key for this game's chat. */
+export function nextScenarioKey(): string {
+  const used = get().chat.filter((c) => c.kind === "tangent" && c.key).length;
+  return `s${used + 1}`;
 }
 
 export function pushChat(item: ChatItem) {
@@ -216,7 +271,7 @@ export function goto(ply: number) {
   const { line, tangent } = screen();
   const p = Math.max(0, Math.min(line.sans.length, ply));
   if (tangent) set((s) => ({ tangents: { ...s.tangents, [tangent.id]: { ...tangent, ply: p } } }));
-  else set({ gamePly: p });
+  else setGameExplore(exploreGoto(gameExplore(), p));
 }
 
 export function step(delta: number) {
@@ -243,6 +298,12 @@ export function boardMove(from: Key, to: Key, promotion?: string) {
   if (!played) return;
 
   if (!tangent) {
+    // A finished game takes "what if" moves; they fork off without changing the game.
+    if (get().meta.result) {
+      const x = exploreMove(gameExplore(), from, to, promotion);
+      if (x) setGameExplore(x);
+      return;
+    }
     if (!canStudentMove()) return;
     set({ game: played.line, gamePly: ply + 1 });
     return;

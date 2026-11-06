@@ -1,6 +1,6 @@
 import type { DrawShape } from "chessground/draw";
 import { useEffect, useMemo, useState } from "react";
-import { hasBackend, openUrl } from "../backend";
+import { hasBackend, isRemote, openUrl } from "../backend";
 import { useAuth } from "../coach/auth";
 import { sendToCoach } from "../coach/bridge";
 import { getRepertoire } from "../openings/repertoire";
@@ -28,7 +28,7 @@ import {
   type Difficulty,
 } from "../puzzles/session";
 import { useStore } from "../store";
-import { START_FEN } from "../chess/line";
+import { moveLabel, START_FEN } from "../chess/line";
 import { Board } from "./Board";
 import { fromLichess } from "../rating";
 
@@ -45,6 +45,9 @@ export function PuzzlePanel() {
   const over = s.status === "solved" || s.status === "failed";
   const ply = line ? (s.view ?? line.sans.length) : 0;
   const shapes = useMemo(() => s.shapes as DrawShape[], [s.shapes]);
+  const opponent = s.color === "white" ? "Black" : "White";
+  // The opponent's move that sets the puzzle up ("23...Nxe4"), once it's played.
+  const leadIn = line && line.sans.length > 0 ? moveLabel(line.fens[0], line.sans[0]) : null;
 
   useEffect(() => {
     if (!pdb.loaded) refreshPuzzleDb();
@@ -99,9 +102,14 @@ export function PuzzlePanel() {
         <div className="side-body puzzle-body">
           <div className={`puzzle-status ${s.status}`}>
             {s.status === "loading" && "Finding puzzles…"}
-            {s.status === "intro" && "Watch the opponent's move."}
+            {s.status === "intro" && `Watch ${opponent}'s move…`}
             {s.status === "solving" && (
               <>
+                {leadIn && (
+                  <div className="muted">
+                    {opponent} played {leadIn}.
+                  </div>
+                )}
                 <strong>Your turn.</strong> Find the best move for {s.color === "white" ? "White" : "Black"}.
                 {s.message && <div className="puzzle-msg">{s.message}</div>}
               </>
@@ -272,7 +280,7 @@ function InstallPanel() {
         </p>
         <p className="muted">
           A one-time download of about {MB(310e6)} MB. The app keeps the best-rated puzzles in a file of about 400 MB on
-          this computer.
+          {isRemote ? " your computer (not this phone), so it's shared with the desktop app" : " this computer"}.
         </p>
         {running ? (
           <>
@@ -282,7 +290,9 @@ function InstallPanel() {
             <p className="muted">
               {p.phase === "index"
                 ? `Building the index for ${p.kept.toLocaleString()} puzzles…`
-                : `${MB(p.done)} of ${MB(p.total)} MB · ${p.kept.toLocaleString()} puzzles kept`}
+                : p.total
+                  ? `${MB(p.done)} of ${MB(p.total)} MB · ${p.kept.toLocaleString()} puzzles kept`
+                  : "Starting the download…"}
             </p>
             <div className="controls">
               <button onClick={cancelImport}>Cancel</button>

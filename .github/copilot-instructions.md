@@ -37,6 +37,29 @@ Rules:
   (`src/puzzles/session.ts`, `src/analysis/drillSession.ts`); starting one shows its board.
 - Board sounds (`src/sound.ts`) follow whichever board is on screen: game, puzzle or drill.
 
+## Boards: the student can always draw
+
+Every chessboard on screen takes the student's drawings: right-click drag on desktop, the two-finger
+method on phones (one finger held, the other draws). That covers the game board, analysis and review,
+drills, puzzles, the why-screen, the coach's scenario boards and any board added later.
+
+- Use `src/components/Board.tsx` for every board. `viewOnly` there only stops piece moves; drawing still
+  works. Only a thumbnail inside a button (`preview`, e.g. chat cards) has no drawing.
+- Never pass Chessground's own `viewOnly` or `drawable.enabled: false` to a full-size board.
+- The student's drawings belong to the position: they clear when the position changes, not on re-renders.
+
+## What-if moves
+
+Boards that show a fixed line (a finished game in review, the why-screen's lines) take the student's
+moves for both sides as a fork (`src/chess/explore.ts`): playing something other than the line's next
+move stacks new moves from there, and stepping back to the fork point drops them and brings the line back.
+
+## The coach and the board
+
+The coach explains with the board, not with move lists. `show_line` and `setup_position` make scenarios
+with the coach's arrows and circles per step, and return a key (`s1`, `s2`, ...). The coach links to them
+in its text as `[words](#s1)`; the chat renders those as buttons that open the scenario on the main board.
+
 ## Code style
 
 - Match the surrounding code: short doc comments that explain *why*, small zustand stores, plain

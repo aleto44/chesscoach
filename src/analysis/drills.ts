@@ -94,7 +94,7 @@ export function addMistakeDrills(
     const [, turn, , , , full] = fen.split(" ");
     drills.push({
       kind: "mistake",
-      title: `Move ${full}${turn === "w" ? "." : "..."}: you played ${g.line.sans[i]}`,
+      title: `In your game: ${full}${turn === "w" ? "." : "..."}${g.line.sans[i]}`,
       fen,
       color,
       answerUci: a.bestUci,

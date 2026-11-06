@@ -199,7 +199,14 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
   let verdict: string;
   if (oppMates) verdict = `${sideName(opp)} has a forced mate.`;
   else if (value(lost) - value(got) >= 1) verdict = `You lose ${listPieces(lost)}${got.length ? ` for ${listPieces(got)}` : ""}.`;
-  else verdict = `No material goes right away, but ${sideName(opp)}'s position gets a lot better.`;
+  else {
+    // No material: say how much worse it gets, in the student's winning chances.
+    const drop = winFor(m.evalBefore, mover) - winFor(p.eval ?? m.evalAfter, mover);
+    const much = drop >= 20 ? "a lot " : drop >= 10 ? "clearly " : "";
+    verdict =
+      `No material goes right away, but ${sideName(opp)}'s position gets ${much}better: ` +
+      `your winning chances drop from ${winFor(m.evalBefore, mover)}% to ${winFor(p.eval ?? m.evalAfter, mover)}%.`;
+  }
   const played: ExplainedLine = {
     startFen: m.fenBefore,
     steps: p.steps,

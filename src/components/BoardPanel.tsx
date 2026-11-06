@@ -12,6 +12,7 @@ import {
   canStudentMove,
   isLocked,
   opponentLabel,
+  scenarioOf,
   type GameMeta,
 } from "../store";
 import { Board } from "./Board";
@@ -31,7 +32,7 @@ import { saveSetting, useSettings } from "../settings";
  * controls, then the player at the bottom.
  */
 export function BoardPanel() {
-  const { game, gamePly, tangents, active, orientation, meta, opponentThinking, annotations, arrows, reportOpen } = useStore();
+  const { game, gamePly, tangents, active, orientation, meta, opponentThinking, annotations, arrows, reportOpen, gameFork } = useStore();
   const moment = useMoment();
   const verdict = useVerdict();
   const report = useGameReport();
@@ -41,21 +42,26 @@ export function BoardPanel() {
   const showEval = useSettings((s) => s.showEval) && !locked;
   const canTakeBack = takebackPly(game, meta) !== null;
   const tangent = active ? tangents[active] : null;
-  const line = tangent ? tangent.line : game;
-  const ply = tangent ? tangent.ply : gamePly;
+  // What-if moves on a finished game (store.gameFork): the game up to gamePly, then the student's.
+  const fork = tangent ? null : gameFork;
+  const line = tangent ? tangent.line : fork ? fork.line : game;
+  const ply = tangent ? tangent.ply : fork ? fork.ply : gamePly;
   const path = tangentPath(active);
   const note = ply > 0 ? line.notes[ply - 1] : "";
   const vsOpponent = meta.studentColor !== "both";
   const inProgress = vsOpponent && !meta.result;
   const top = orientation === "white" ? "black" : "white";
+  // The coach's drawings for this step of its scenario (show_line / setup_position).
+  const scenario = useStore((s) => scenarioOf(s.chat, active));
   const shapes = useMemo(() => {
+    const coach = [...(scenario?.shapes?.[ply] ?? []), ...(arrows?.fen === line.fens[ply] ? arrows.shapes : [])];
     const drawn =
       moment?.shapes ??
       (nudge?.showBest && !tangent && line.fens[ply] === nudge.fenBefore ? nudgeShapes : undefined) ??
-      (arrows?.fen === line.fens[ply] ? arrows.shapes : undefined);
+      (coach.length ? coach : undefined);
     // The review's badge on the square the last move went to.
     return verdict ? [...(drawn ?? []), verdict.badge] : drawn;
-  }, [moment, nudge, nudgeShapes, tangent, line, ply, arrows, verdict]);
+  }, [moment, nudge, nudgeShapes, tangent, line, ply, arrows, verdict, scenario]);
 
   const confirmResign = async () => {
     if (await askConfirm({ title: "Resign this game?", body: `${opponentLabel(meta)} wins.`, confirmLabel: "Resign", danger: true }))
@@ -70,8 +76,10 @@ export function BoardPanel() {
     if (ok) switchToPractice();
   };
 
+  // `live`: a game being played, which phones show as just the board, the clocks and the game's
+  // buttons (see styles.css).
   return (
-    <main className="board-panel play">
+    <main className={`board-panel play ${inProgress && !tangent ? "live" : ""} ${locked ? "locked" : ""}`}>
       <nav className="crumbs">
         <button className={`crumb ${active ? "" : "current"}`} onClick={() => openTangent(null)}>
           Game
@@ -130,17 +138,32 @@ export function BoardPanel() {
           </span>
         </div>
 
-        <PlayerCard side={top} />
+        <PlayerCard side={top} place="top" />
 
         <div className="side-body">
           {reportOpen && report && !tangent ? (
             <GameReportPanel report={report} />
           ) : (
             <>
-              <MoveList sans={line.sans} fens={line.fens} ply={ply} marks={tangent ? undefined : annotations.map(listLabel)} />
+              <MoveList
+                sans={line.sans}
+                fens={line.fens}
+                ply={ply}
+                marks={tangent ? undefined : annotations.slice(0, fork ? gamePly : undefined).map(listLabel)}
+                forkAt={fork ? gamePly : null}
+              />
+              {fork && (
+                <div className="note fork-note">
+                  <span>
+                    <strong>What if…</strong> Your own moves from move {game.fens[gamePly].split(" ")[5]}. Step back past them to return to
+                    the game.
+                  </span>
+                  <button onClick={() => goto(gamePly)}>Back to the game</button>
+                </div>
+              )}
               {showEval && <EvalLine />}
               {verdict && <VerdictLine v={verdict} />}
-              {moment ? (
+              {fork ? null : moment ? (
                 <div className="note moment">
                   {moment.text}
                   <WhyButton i={gamePly} />
@@ -185,7 +208,7 @@ export function BoardPanel() {
           </div>
         )}
 
-        <PlayerCard side={orientation} />
+        <PlayerCard side={orientation} place="bottom" />
       </aside>
     </main>
   );
@@ -210,7 +233,20 @@ function gameStatus(meta: GameMeta, thinking: boolean, endFen: string): string {
 }
 
 /** Moves in rows, one per move number, scrolled to keep the current move in view. */
-function MoveList({ sans, fens, ply, marks }: { sans: string[]; fens: string[]; ply: number; marks?: (MoveLabel | null)[] }) {
+function MoveList({
+  sans,
+  fens,
+  ply,
+  marks,
+  forkAt = null,
+}: {
+  sans: string[];
+  fens: string[];
+  ply: number;
+  marks?: (MoveLabel | null)[];
+  /** Moves from this index on are the student's what-if moves. */
+  forkAt?: number | null;
+}) {
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = list.current;
@@ -239,7 +275,11 @@ function MoveList({ sans, fens, ply, marks }: { sans: string[]; fens: string[]; 
             if (i === undefined) return <span key={c} />;
             if (i === null) return <span key={c} className="mv muted">…</span>;
             return (
-              <button key={c} className={`mv ${i + 1 === ply ? "current" : ""}`} onClick={() => goto(i + 1)}>
+              <button
+                key={c}
+                className={`mv ${i + 1 === ply ? "current" : ""} ${forkAt !== null && i >= forkAt ? "fork" : ""}`}
+                onClick={() => goto(i + 1)}
+              >
                 {sans[i]}
                 {marks?.[i] && <LabelIcon label={marks[i]} size={14} />}
               </button>

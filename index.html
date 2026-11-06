@@ -9,10 +9,16 @@
     <link rel="icon" type="image/png" href="/icons/icon-256.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Chess Coach</title>
+    <!-- Painted before any script or stylesheet loads, so reopening the app on a phone shows the
+         app's colours and a mark instead of a white page while it starts. -->
+    <style>
+      html, body { margin: 0; background: #1b1a18; }
+      #boot { position: fixed; inset: 0; display: grid; place-items: center; color: #6fbf7f; font: 64px/1 system-ui, sans-serif; }
+    </style>
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root"><div id="boot" aria-label="Loading">♞</div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

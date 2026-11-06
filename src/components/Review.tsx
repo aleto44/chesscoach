@@ -91,13 +91,14 @@ export const listLabel = (a: MoveAnnotation | null | undefined): MoveLabel | nul
  * played and what was better. Null elsewhere.
  */
 export function useMoment() {
-  const { game, gamePly, annotations, meta, active } = useStore();
-  return useMemo(() => moment(), [game, gamePly, annotations, meta, active]);
+  const { game, gamePly, annotations, meta, active, gameFork } = useStore();
+  return useMemo(() => moment(), [game, gamePly, annotations, meta, active, gameFork]);
 }
 
 function moment() {
-  const { game, gamePly, annotations, meta, active } = useStore.getState();
-  if (active || gamePly >= game.sans.length) return null;
+  const { game, gamePly, annotations, meta, active, gameFork } = useStore.getState();
+  // Off the game's own moves (a tangent or what-if moves), the review has nothing to say.
+  if (active || gameFork || gamePly >= game.sans.length) return null;
   const a = annotations[gamePly];
   if (!a || !MARKS[a.class] || !isStudentMove(game, meta, gamePly)) return null;
   const fen = game.fens[gamePly];
@@ -120,11 +121,11 @@ function moment() {
  * the square it went to, and a line for the side column. Null outside the analyzed game.
  */
 export function useVerdict() {
-  const { game, gamePly, annotations, active, meta } = useStore();
+  const { game, gamePly, annotations, active, meta, gameFork } = useStore();
   return useMemo(() => {
     const i = gamePly - 1;
     const a = annotations[i];
-    if (active || i < 0 || !a) return null;
+    if (active || gameFork || i < 0 || !a) return null;
     const label = labelOf(a);
     const fen = game.fens[i];
     const [, turn, , , , full] = fen.split(" ");
@@ -144,7 +145,7 @@ export function useVerdict() {
       /** A bad move of the student's: worth saying why. */
       explain: !!MARKS[a.class] && isStudentMove(game, meta, i),
     };
-  }, [game, gamePly, annotations, active, meta]);
+  }, [game, gamePly, annotations, active, meta, gameFork]);
 }
 
 export function VerdictLine({ v }: { v: NonNullable<ReturnType<typeof useVerdict>> }) {

@@ -406,7 +406,8 @@ button:disabled {
   background: rgb(0 0 0 / 0.45);
   display: grid;
   place-items: center;
-  z-index: 10;
+  /* Above the phone's chat sheet (z-index 20), which would otherwise cover a dialog's buttons. */
+  z-index: 30;
 }
 
 .modal {
@@ -1368,6 +1369,28 @@ button.icon {
   color: var(--error);
 }
 
+/* Under a wrong drill answer: why it's bad, why the better move is better. */
+.drill-why {
+  width: var(--board-w);
+  line-height: 1.45;
+}
+
+.drill-why p {
+  margin: 0 0 6px;
+}
+
+.drill-why .bad strong {
+  color: var(--error);
+}
+
+.drill-why .good strong {
+  color: var(--accent);
+}
+
+.drill-why .why-button {
+  margin: 0 0 4px;
+}
+
 .drill-done {
   width: var(--board-w);
   margin-top: 40px;
@@ -1800,6 +1823,109 @@ button.danger {
     left: -20px;
   }
 
+  /* A drill: already just the board and its buttons; centred on the screen like a game. */
+  .board-panel.drills {
+    min-height: calc(100dvh - 48px - env(safe-area-inset-top));
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* A game being played, and a puzzle: board-centred. The side column's box goes away so its
+     pieces can be placed around the board, and what isn't needed to play is hidden. */
+  .board-panel.play.live,
+  .board-panel.play.puzzles {
+    min-height: calc(100dvh - 48px - env(safe-area-inset-top));
+    align-content: center;
+  }
+
+  .board-panel.play.live .game-side,
+  .board-panel.play.puzzles .game-side {
+    display: contents;
+  }
+
+  /* Live game: the opponent's card, the board, your card, then resign / take back. */
+  .board-panel.play.live > .crumbs,
+  .board-panel.play.live .game-head,
+  .board-panel.play.live .side-body,
+  .board-panel.play.live .side-controls {
+    display: none;
+  }
+
+  .board-panel.play.live .player-card.top {
+    order: 1;
+  }
+
+  .board-panel.play.live .board-frame {
+    order: 2;
+  }
+
+  .board-panel.play.live .player-card.bottom {
+    order: 3;
+  }
+
+  .board-panel.play.live .side-actions {
+    order: 4;
+  }
+
+  .board-panel.play.live .player-card {
+    min-height: 40px;
+    padding: 4px 6px 4px 10px;
+  }
+
+  /* The eval toggle sits just above the board, which is now beside the opponent's card. */
+  .board-panel.play.live:not(.locked) .player-card.top {
+    margin-left: 28px;
+  }
+
+  .board-panel.play.live .side-actions button {
+    min-height: 42px;
+  }
+
+  /* Puzzle: the board, what to do, the buttons; the rating and filters below. */
+  .board-panel.play.puzzles .crumbs {
+    order: 0;
+  }
+
+  .board-panel.play.puzzles .board-frame {
+    order: 1;
+  }
+
+  .board-panel.play.puzzles .side-body {
+    order: 2;
+  }
+
+  .board-panel.play.puzzles .side-actions {
+    order: 3;
+  }
+
+  .board-panel.play.puzzles .side-controls {
+    order: 4;
+  }
+
+  .board-panel.play.puzzles .game-head {
+    order: 5;
+  }
+
+  .board-panel.play.puzzles .puzzle-filters {
+    order: 6;
+  }
+
+  .board-panel.play.puzzles .side-actions:empty {
+    display: none;
+  }
+
+  .board-panel.play.puzzles .side-actions button {
+    min-height: 42px;
+  }
+
+  .board-panel.play.puzzles .puzzle-status {
+    padding: 8px 12px;
+  }
+
+  .board-panel.play.puzzles .puzzle-credit {
+    display: none;
+  }
+
   /* The move buttons stay at the bottom of the screen while the board and its column are in
      view, so stepping through a game doesn't mean scrolling down to them and back up. */
   .side-controls {
@@ -2125,5 +2251,232 @@ button.danger {
 
   .why-body {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The why-screen's board: the eval bar on by default, its toggle in the corner above it. */
+.why-board.board-frame {
+  width: auto;
+  padding: 0;
+  margin-top: 26px;
+}
+
+.why-board.board-frame.with-eval {
+  margin-left: 22px;
+}
+
+.why-board .eval-bar {
+  top: var(--material-h);
+  bottom: var(--material-h);
+}
+
+.why-board .eval-toggle {
+  top: -26px;
+  left: 0;
+}
+
+.why-board.with-eval .eval-toggle {
+  left: -22px;
+}
+
+.why-side .eval-line {
+  width: auto;
+  white-space: normal;
+}
+
+/* What-if moves: the student's own, forked off the line being read. */
+.why-moves button.fork,
+.mv.fork {
+  font-style: italic;
+  color: var(--tangent);
+}
+
+.note.fork-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.note.fork-note button {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+/* The coach's scenarios: links in its messages that open a board it set up. */
+.scenario-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 0 6px;
+  margin: 0 1px;
+  font: inherit;
+  color: var(--tangent);
+  background: var(--tangent-soft);
+  border: 1px solid color-mix(in srgb, var(--tangent) 40%, transparent);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.scenario-link:hover,
+.scenario-link.active {
+  border-color: var(--tangent);
+}
+
+.scenario-link.active {
+  font-weight: 600;
+}
+
+.scenario-icon {
+  font-size: 0.9em;
+}
+
+/* Desktop: the phone sheet's bar isn't used. */
+.sheet-bar {
+  display: none;
+}
+
+/* Phones: the chat is a sheet over the bottom of the screen (Chat.tsx, SheetBar), so the board
+   stays in view while the coach talks about it. */
+@media (max-width: 760px) {
+  .chat.sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    height: auto;
+    border-top: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -6px 24px rgb(0 0 0 / 0.25);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .chat.sheet-half {
+    height: max(240px, calc(100dvh - var(--board-bottom, 50dvh)));
+  }
+
+  .chat.sheet-full {
+    top: env(safe-area-inset-top);
+    height: auto;
+    border-radius: 0;
+  }
+
+  /* Room to scroll the page out from under the sheet. */
+  .app:has(.chat.sheet-closed) {
+    padding-bottom: 120px;
+  }
+
+  .app:has(.chat.sheet-half) {
+    padding-bottom: max(240px, calc(100dvh - var(--board-bottom, 50dvh)));
+  }
+
+  .chat.sheet > header,
+  .chat.sheet-closed .messages {
+    display: none;
+  }
+
+  .chat.sheet-full > header {
+    display: flex;
+  }
+
+  .sheet-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sheet-handle {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 12px 8px;
+    border: none;
+    background: none;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .sheet-grip {
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 2px;
+    background: var(--border);
+  }
+
+  .sheet-preview {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 13px;
+  }
+
+  .sheet-nav {
+    display: flex;
+    gap: 4px;
+  }
+
+  /* The usage ring on the sheet's bar; its breakdown opens across the screen, above the bar
+     (below it when the sheet is full, since the bar is then at the top). */
+  .sheet-bar {
+    position: relative;
+  }
+
+  .sheet-bar .usage {
+    position: static;
+  }
+
+  .sheet-bar .usage-ring-button {
+    padding: 8px;
+  }
+
+  .sheet-bar .usage-popover {
+    top: auto;
+    bottom: calc(100% + 8px);
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
+
+  .chat.sheet-full .sheet-bar .usage-popover {
+    top: calc(100% + 8px);
+    bottom: auto;
+  }
+
+  /* The full sheet shows the chat's header too: one ring is enough. */
+  .chat.sheet > header .usage {
+    display: none;
+  }
+
+  .sheet-nav button,
+  .sheet-size {
+    min-width: 40px;
+    padding: 6px 10px;
+  }
+
+  .chat.sheet .messages {
+    padding: 10px 12px;
+  }
+
+  .chat.sheet .composer {
+    padding: 8px 10px;
+  }
+
+  .chat.sheet .composer textarea {
+    height: 44px;
+  }
+
+  .chat.sheet .mini-board {
+    width: 72px;
+    height: 72px;
   }
 }

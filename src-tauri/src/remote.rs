@@ -379,6 +379,7 @@ async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result
         "db_remove_repertoire" => out(stats::db_remove_repertoire(st(), arg(a, "id")?)),
         "puzzle_status" => out(puzzles::puzzle_status(st())),
         "puzzle_find" => out(puzzles::puzzle_find(st(), arg(a, "filter")?)),
+        "puzzle_get" => out(puzzles::puzzle_get(st(), arg(a, "id")?)),
         "puzzle_record" => out(puzzles::puzzle_record(
             st(),
             arg(a, "id")?,
@@ -389,6 +390,7 @@ async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result
         )),
         "puzzle_import_start" => out(puzzles::puzzle_import_start(app.clone(), app.state())),
         "puzzle_import_cancel" => out(Ok(puzzles::puzzle_import_cancel(app.state()))),
+        "puzzle_import_progress" => out(Ok(puzzles::puzzle_import_progress(app.state()))),
         "game_changed" => out(Ok(crate::notify_game_changed(app, client, arg(a, "gameId")?))),
         _ => Err(format!("unknown command: {cmd}")),
     }

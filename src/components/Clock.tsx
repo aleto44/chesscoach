@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { clockLeft, clockRunning, formatClock } from "../game/clock";
 import { opponentLabel, useStore, type Color } from "../store";
 
-/** A player's name, whose turn it is and their clock, at the top or bottom of the side column. */
-export function PlayerCard({ side }: { side: Color }) {
+/**
+ * A player's name, whose turn it is and their clock, at the top or bottom of the side column. `place`
+ * says which, for phones, where a live game moves the cards above and below the board.
+ */
+export function PlayerCard({ side, place }: { side: Color; place: "top" | "bottom" }) {
   const meta = useStore((s) => s.meta);
   const thinking = useStore((s) => s.opponentThinking);
   const toMove = useStore((s) => (s.game.fens[s.game.sans.length].split(" ")[1] === "w" ? "white" : "black"));
@@ -24,7 +27,7 @@ export function PlayerCard({ side }: { side: Color }) {
   const left = clockLeft(side);
   const low = left !== null && left < 20_000;
   return (
-    <div className={`player-card ${turn ? "turn" : ""}`}>
+    <div className={`player-card ${place} ${turn ? "turn" : ""}`}>
       <span className={`player-piece ${side}`} aria-hidden />
       <span className="player-name">{name}</span>
       {turn && !you && thinking && <span className="player-thinking" aria-label="Thinking" />}

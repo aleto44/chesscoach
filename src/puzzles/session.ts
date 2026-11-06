@@ -160,7 +160,7 @@ function begin(index: number) {
     if (get()?.queue[get()!.index] !== puzzle) return;
     autoplay();
     set({ status: "solving", startedAt: Date.now() });
-  }, 600);
+  }, 800);
 }
 
 /** Plays the opponent's next move of the solution. */

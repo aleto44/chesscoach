@@ -5,14 +5,15 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
 
 use crate::db::Db;
+use crate::relay;
 
 const URL: &str = "https://database.lichess.org/lichess_db_puzzle.csv.zst";
 pub const FILE: &str = "puzzles.db";
@@ -76,6 +77,8 @@ fn err(e: impl std::fmt::Display) -> String {
 pub struct Import {
     running: AtomicBool,
     cancel: Arc<AtomicBool>,
+    /// The latest progress, for a phone that opens the puzzle screen mid-download.
+    last: Mutex<Option<Progress>>,
 }
 
 #[derive(Serialize, Clone)]
@@ -177,8 +180,10 @@ pub fn puzzle_import_start(app: AppHandle, import: State<Import>) -> Result<(), 
     import.cancel.store(false, Ordering::SeqCst);
     let cancel = import.cancel.clone();
     std::thread::spawn(move || {
+        // Through the relay, so a phone that started the download sees its progress too.
         let emit = |p: Progress| {
-            let _ = app.emit("puzzle-import", p);
+            *app.state::<Import>().last.lock().unwrap() = Some(p.clone());
+            relay::emit_all(&app, "puzzle-import", p);
         };
         let result = download(&app, &cancel, &emit);
         let state = app.state::<Import>();
@@ -224,6 +229,12 @@ fn download(app: &AppHandle, cancel: &AtomicBool, emit: &dyn Fn(Progress)) -> Re
     std::fs::rename(&part, dir.join(FILE)).map_err(err)?;
     attach(&conn, &dir).map_err(err)?;
     Ok(kept)
+}
+
+/// The download's latest progress (or its last outcome), if one has run since the app started.
+#[tauri::command]
+pub fn puzzle_import_progress(import: State<Import>) -> Option<Value> {
+    import.last.lock().unwrap().as_ref().and_then(|p| serde_json::to_value(p).ok())
 }
 
 #[tauri::command]
@@ -346,6 +357,34 @@ pub fn puzzle_find(db: State<Db>, filter: Filter) -> Result<Vec<Puzzle>, String>
         .collect::<Result<Vec<_>, _>>()
         .map_err(err)?;
     Ok(puzzles)
+}
+
+/// One puzzle by its Lichess id (a missed-puzzle drill replays the opponent's move that set it up).
+#[tauri::command]
+pub fn puzzle_get(db: State<Db>, id: String) -> Result<Option<Puzzle>, String> {
+    let conn = db.conn();
+    if !attached(&conn) {
+        return Ok(None);
+    }
+    let split = |s: String| s.split(' ').filter(|t| !t.is_empty()).map(String::from).collect::<Vec<_>>();
+    conn.query_row(
+        "SELECT lichess_id, fen, moves, rating, plays, themes, openings, game FROM pz.puzzles WHERE lichess_id = ?1",
+        [&id],
+        |r| {
+            Ok(Puzzle {
+                id: r.get(0)?,
+                fen: r.get(1)?,
+                moves: split(r.get(2)?),
+                rating: r.get(3)?,
+                plays: r.get(4)?,
+                themes: split(r.get(5)?),
+                openings: split(r.get(6)?),
+                game: r.get(7)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(err)
 }
 
 /// The student's puzzle rating (Lichess scale; 1500 before any attempt) and rated attempts so far.

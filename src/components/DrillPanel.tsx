@@ -1,11 +1,24 @@
 import type { DrawShape } from "chessground/draw";
-import { useMemo } from "react";
-import { drillMove, drillQuestion, nextDrill, retireCurrent, startDrills, stopDrills, useDrill } from "../analysis/drillSession";
+import { useEffect, useMemo, useState } from "react";
+import {
+  drillMove,
+  drillQuestion,
+  drillTitle,
+  nextDrill,
+  retireCurrent,
+  startDrills,
+  stopDrills,
+  useDrill,
+  type DrillState,
+} from "../analysis/drillSession";
+import type { Explanation } from "../analysis/explain";
 import { sendToCoach } from "../coach/bridge";
 import { useAuth } from "../coach/auth";
 import { hasBackend } from "../db";
 import { useStore } from "../store";
 import { Board } from "./Board";
+import { Modal } from "./GameDialogs";
+import { WhyLines } from "./Why";
 
 const KIND_LABEL = { mistake: "From your games", opening: "Repertoire", coach: "From the coach", puzzle: "Missed puzzle" } as const;
 
@@ -18,9 +31,14 @@ export function DrillPanel() {
   const line = s.line;
   const ply = line ? line.sans.length : 0;
   const shapes = useMemo(() => s.shapes as DrawShape[], [s.shapes]);
+  const [whyOpen, setWhyOpen] = useState(false);
+  useEffect(() => setWhyOpen(false), [s.index]);
+  const side = drill ? (drill.color === "white" ? "White" : "Black") : "";
+  const opponent = drill ? (drill.color === "white" ? "Black" : "White") : "";
+  const lead = s.lead && s.status !== "intro" ? <span className="muted">{opponent} played {s.lead.label}. </span> : null;
 
   return (
-    <main className="board-panel">
+    <main className="board-panel drills">
       <div className="game-bar">
         <span className="game-status">
           <strong>Drills</strong>
@@ -36,7 +54,7 @@ export function DrillPanel() {
       </div>
 
       <div className="crumbs">
-        <span className="crumb current">{drill ? drill.title : "No drills due"}</span>
+        <span className="crumb current">{drill ? drillTitle(drill) : s.status === "loading" ? "Drills" : "No drills due"}</span>
       </div>
 
       {drill && line ? (
@@ -48,16 +66,23 @@ export function DrillPanel() {
               orientation={drill.color}
               onMove={drillMove}
               canMove={s.status === "solving"}
+              premoveColor={s.status === "intro" || s.status === "solving" ? drill.color : undefined}
               shapes={shapes}
             />
           </div>
           <div className={`drill-status ${s.status}`}>
-            {s.status === "solving" &&
-              (drill.kind === "opening"
-                ? `Play your ${drill.color} repertoire from memory.`
-                : drill.kind === "puzzle"
-                  ? `${drill.color === "white" ? "White" : "Black"} to move. Find the winning line${drill.note ? ` (${drill.note})` : ""}.`
-                : `${drill.color === "white" ? "White" : "Black"} to move. Find a good move${drill.note ? ` (last time: ${drill.note})` : ""}.`)}
+            {s.status === "intro" && s.lead && `${opponent} plays ${s.lead.label}…`}
+            {s.status === "loading" && "Setting up the next drill…"}
+            {s.status === "solving" && (
+              <>
+                {lead}
+                {drill.kind === "opening"
+                  ? `Play your ${drill.color} repertoire from memory.`
+                  : drill.kind === "puzzle"
+                    ? `${side} to move. Find the winning line${drill.note ? ` (${drill.note})` : ""}.`
+                    : `${side} to move. Find a good move${drill.note ? ` (last time: ${drill.note})` : ""}.`}
+              </>
+            )}
             {s.status === "checking" && "Checking with the engine…"}
             {(s.status === "right" || s.status === "wrong") && (
               <>
@@ -66,6 +91,22 @@ export function DrillPanel() {
               </>
             )}
           </div>
+          {s.status === "wrong" && (drill.kind === "mistake" || drill.kind === "coach" || drill.kind === "puzzle") && (
+            <WhySummary s={s} onOpen={() => setWhyOpen(true)} />
+          )}
+          {whyOpen && s.why && (
+            <Modal title={`Why ${playedLabel(s)} isn't good`} onClose={() => setWhyOpen(false)} className="why-dialog">
+              <div className="why-stats">
+                <span>
+                  Eval for you <strong>{s.why.evalBefore}</strong> → <strong>{s.why.evalAfter}</strong>
+                </span>
+                <span>
+                  Winning chances <strong>{s.why.winBefore}%</strong> → <strong>{s.why.winAfter}%</strong>
+                </span>
+              </div>
+              <WhyLines ex={s.why} playedSan={playedSan(s)} orientation={drill.color} />
+            </Modal>
+          )}
           <div className="controls">
             {(s.status === "right" || s.status === "wrong") && (
               <>
@@ -85,6 +126,10 @@ export function DrillPanel() {
             </button>
           </div>
         </>
+      ) : s.status === "loading" ? (
+        <div className="drill-done">
+          <p className="muted">Setting up your drills…</p>
+        </div>
       ) : (
         <div className="drill-done">
           <p>
@@ -101,6 +146,44 @@ export function DrillPanel() {
         </div>
       )}
     </main>
+  );
+}
+
+const playedSan = (s: DrillState) => s.line?.sans[s.base] ?? "";
+/** "14.g5". */
+const playedLabel = (s: DrillState) => s.why?.played.steps[0]?.label ?? playedSan(s);
+
+/**
+ * Why the answer was wrong, in words: what the opponent does against it and what that comes to,
+ * then what the better move does. The full lines open on their own board.
+ */
+function WhySummary({ s, onOpen }: { s: DrillState; onOpen: () => void }) {
+  const ex: Explanation | null = s.why;
+  if (!ex) return <div className="drill-why muted">{s.whyFailed ? "The engine couldn't work out why." : "Working out why…"}</div>;
+  const reply = ex.played.steps[1];
+  const better = ex.better;
+  return (
+    <div className="drill-why">
+      <p className="bad">
+        <strong>Why {ex.played.steps[0]?.san ?? playedSan(s)} is bad:</strong> {reply ? `${reply.note} ` : ""}
+        {ex.played.verdict}
+      </p>
+      {better && (
+        <p className="good">
+          <strong>Why {better.steps[0]?.san} is better:</strong> {better.steps[0]?.note}
+          {better.steps.length > 1 && (
+            <span className="muted">
+              {" "}
+              ({better.steps.map((st) => st.label).join(" ")})
+            </span>
+          )}{" "}
+          {better.verdict}
+        </p>
+      )}
+      <button className="why-button" onClick={onOpen}>
+        Step through both lines on a board ›
+      </button>
+    </div>
   );
 }
 

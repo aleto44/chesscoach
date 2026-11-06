@@ -66,6 +66,10 @@ export function initPuzzles() {
     if (e.payload.phase === "done") refreshPuzzleDb();
   });
   refreshPuzzleDb().catch((e) => console.error("puzzle status failed", e));
+  // A download may already be running (started from the other device, or before a reload).
+  invoke<ImportProgress | null>("puzzle_import_progress")
+    .then((p) => p && !usePuzzleDb.getState().importing && usePuzzleDb.setState({ importing: p }))
+    .catch(() => {});
 }
 
 export async function startImport() {
@@ -90,6 +94,9 @@ export interface Filter {
 
 export const findPuzzles = (filter: Filter) =>
   invoke<Puzzle[]>("puzzle_find", { filter: { themes: [], exclude: [], opening: null, ...filter } });
+
+/** One puzzle by its Lichess id; null when the set isn't downloaded or doesn't have it. */
+export const getPuzzle = (id: string) => invoke<Puzzle | null>("puzzle_get", { id });
 
 /** Saves the attempt; the rating only moves on a puzzle's first try. */
 export async function recordAttempt(p: Puzzle, correct: boolean, ms: number) {

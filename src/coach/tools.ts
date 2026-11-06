@@ -1,7 +1,8 @@
 // Handlers for the tools declared in src-tauri/src/tools.rs.
 import { invoke } from "../backend";
 import { Chess } from "chess.js";
-import { buildLine, formatMoves, sideToMove } from "../chess/line";
+import { buildLine, formatMoves, sideToMove, type Line } from "../chess/line";
+import type { DrawShape } from "chessground/draw";
 import { formatScore, getEngine, pvToSan } from "../engine/stockfish";
 import { clockLeft, formatClock } from "../game/clock";
 import { gamesText, profileText } from "./profile";
@@ -13,7 +14,19 @@ import { findPuzzles, openingLabel, openingTag, refreshPuzzleDb, themeKey, theme
 import { startCoachSet } from "../puzzles/session";
 import { fromLichess, toLichess } from "../rating";
 import type { Key } from "chessground/types";
-import { addTangent, openTangent, gameDescription, isLocked, newId, pushChat, screen, screenFen, tangentPath, useStore } from "../store";
+import {
+  addTangent,
+  openTangent,
+  gameDescription,
+  isLocked,
+  newId,
+  nextScenarioKey,
+  pushChat,
+  screen,
+  screenFen,
+  tangentPath,
+  useStore,
+} from "../store";
 
 export interface ToolResult {
   text: string;
@@ -83,22 +96,58 @@ const handlers: Record<string, (args: Args) => Promise<ToolResult>> = {
     const built = buildLine(start, moves, notes);
     if ("error" in built) return { text: built.error, isError: true };
 
+    const drawn = parseShapes(args, moves.length);
+    if ("error" in drawn) return { text: drawn.error, isError: true };
+
     const title = String(args.title ?? "Line");
-    const tangent = addTangent({
-      parentId: useStore.getState().active,
-      title,
-      author: "coach",
-      line: built.line,
-      ply: 0,
-    });
-    pushChat({ kind: "tangent", id: newId("c"), tangentId: tangent.id });
+    const ply = clamp(Number(args.ply ?? 0), 0, moves.length);
+    const open = args.open === true;
+    const { key } = addScenario(title, built.line, ply, drawn.shapes, open);
     const end = built.line.fens[built.line.fens.length - 1];
-    return { text: `Shown to the student as "${title}": ${formatMoves(built.line)}\nFinal position: ${end}` };
+    return {
+      text:
+        `Scenario ${key} "${title}"${open ? ", open on the student's board" : ""}: ${formatMoves(built.line)}\n` +
+        `Final position: ${end}\n${linkHint(key)}`,
+    };
   },
 };
 
 const SQUARE = /^[a-h][1-8]$/;
 const BRUSHES: Record<string, string> = { green: "green", red: "red", blue: "blue", yellow: "yellow" };
+
+/** A coach board (tangent) with its chat card, key and drawings. */
+function addScenario(title: string, line: Line, ply: number, shapes: Record<number, DrawShape[]>, open: boolean) {
+  const key = nextScenarioKey();
+  const tangent = addTangent({ parentId: useStore.getState().active, title, author: "coach", line, ply });
+  pushChat({ kind: "tangent", id: newId("c"), tangentId: tangent.id, key, shapes });
+  if (open) openTangent(tangent.id);
+  return { key, tangent };
+}
+
+const linkHint = (key: string) =>
+  `In your reply, put a link on the words that talk about it, [words](#${key}): the student taps it to open it on the board.`;
+
+/**
+ * A scenario's `arrows` and `circles`. Each may give `at`: how many of the line's moves have been
+ * played when it shows (0, the default, is the starting position).
+ */
+function parseShapes(args: Args, plies: number): { shapes: Record<number, DrawShape[]> } | { error: string } {
+  const shapes: Record<number, DrawShape[]> = {};
+  const bad: string[] = [];
+  const at = (v: unknown) => clamp(Number(v ?? 0), 0, plies);
+  const add = (ply: number, shape: DrawShape) => (shapes[ply] ??= []).push(shape);
+  for (const a of Array.isArray(args.arrows) ? (args.arrows as Args[]) : []) {
+    const { from, to, color } = a as Record<string, string>;
+    if (!SQUARE.test(from) || !SQUARE.test(to) || from === to) bad.push(`${from}-${to}`);
+    else add(at(a.at), { orig: from as Key, dest: to as Key, brush: BRUSHES[color] ?? "green" });
+  }
+  for (const c of Array.isArray(args.circles) ? (args.circles as Args[]) : []) {
+    const { square, color } = c as Record<string, string>;
+    if (!SQUARE.test(square)) bad.push(square);
+    else add(at(c.at), { orig: square as Key, brush: BRUSHES[color] ?? "green" });
+  }
+  return bad.length ? { error: `Not squares: ${bad.join(", ")}. Use e.g. "e4". Nothing was shown.` } : { shapes };
+}
 
 Object.assign(handlers, {
   async ask_move(args: Args) {
@@ -157,19 +206,16 @@ Object.assign(handlers, {
     }
     const built = buildLine(fen, []);
     if ("error" in built) return { text: built.error, isError: true };
+    const drawn = parseShapes(args, 0);
+    if ("error" in drawn) return { text: drawn.error, isError: true };
     const title = String(args.title ?? "Position");
     const note = typeof args.note === "string" ? args.note : "";
-    const tangent = addTangent({
-      parentId: useStore.getState().active,
-      title,
-      author: "coach",
-      line: { ...built.line, notes: [] },
-      ply: 0,
-    });
-    pushChat({ kind: "tangent", id: newId("c"), tangentId: tangent.id });
+    const open = args.open !== false;
+    const { key } = addScenario(title, { ...built.line, notes: [] }, 0, drawn.shapes, open);
     if (note) pushChat({ kind: "system", id: newId("c"), text: note });
-    openTangent(tangent.id);
-    return { text: `Opened "${title}" on the student's board (${sideToMove(fen)} to move).` };
+    return {
+      text: `Scenario ${key} "${title}"${open ? ", open on the student's board" : ""} (${sideToMove(fen)} to move).\n${linkHint(key)}`,
+    };
   },
 
   async draw_arrows(args: Args) {

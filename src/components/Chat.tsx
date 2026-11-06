@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import Markdown from "react-markdown";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import Markdown, { type Components } from "react-markdown";
 import { formatMoves } from "../chess/line";
 import { logout, useAuth } from "../coach/auth";
 import { restartCoach, sendToCoach } from "../coach/bridge";
@@ -8,7 +8,11 @@ import { bestSan, nudgeQuestion, useNudge } from "../coach/nudge";
 import { takeBack } from "../game/session";
 import { hasBackend } from "../db";
 import { useSettings } from "../settings";
-import { goto, isLocked, openTangent, useStore, type ChatItem } from "../store";
+import { goto, isLocked, openTangent, step, useStore, type ChatItem } from "../store";
+import { go, useNav } from "../nav";
+import { usePuzzle } from "../puzzles/session";
+import { useDrill } from "../analysis/drillSession";
+import { useBoardBottom, usePhone, useSheet, type Sheet } from "../phone";
 import { Board } from "./Board";
 import { askConfirm } from "./Confirm";
 import { SignIn } from "./SignIn";
@@ -22,20 +26,28 @@ export function Chat() {
   const signedIn = auth.status === "signed-in" || !hasBackend();
   const [draft, setDraft] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
+  const phone = usePhone();
+  const sheet = useSheet((s) => s.sheet);
+  useBoardBottom(phone);
 
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end" });
-  }, [chat]);
+    // Scrolls the messages list only; scrollIntoView would also scroll the phone's page.
+    const list = bottom.current?.parentElement;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [chat, sheet]);
 
   const send = () => {
     const text = draft.trim();
     if (!text || busy || !signedIn || locked) return;
     setDraft("");
     sendToCoach(text);
+    // On a phone the answer shows under the board, which stays in view.
+    if (phone && sheet === "closed") openSheet("half");
   };
 
   return (
-    <aside className="chat">
+    <aside className={`chat ${phone ? `sheet sheet-${sheet}` : ""}`}>
+      {phone && <SheetBar />}
       <header>
         <span className={`status ${busy ? "busy" : ""}`} />
         <strong>Coach</strong>
@@ -89,6 +101,7 @@ export function Chat() {
             locked ? "The coach is off until this rated game ends" : "Ask the coach…  (Enter to send, Shift+Enter for a new line)"
           }
           onChange={(e) => setDraft(e.target.value)}
+          onFocus={() => phone && sheet === "closed" && openSheet("half")}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -149,7 +162,7 @@ function ChatRow({ item }: { item: ChatItem }) {
     case "coach":
       return (
         <div className="msg coach">
-          <Markdown>{item.text}</Markdown>
+          <Markdown components={MARKDOWN}>{item.text}</Markdown>
         </div>
       );
     case "tangent":
@@ -239,18 +252,109 @@ function QuizCard({ item }: { item: Extract<ChatItem, { kind: "quiz" }> }) {
   );
 }
 
+/** The coach links to its scenarios as [words](#s2); those become buttons that open them on the board. */
+const MARKDOWN: Components = {
+  a: ({ href, children }) => {
+    const key = href?.match(/^#(s\d+)$/)?.[1];
+    if (key) return <ScenarioLink scenarioKey={key}>{children}</ScenarioLink>;
+    return (
+      <a href={href} target="_blank" rel="noreferrer">
+        {children}
+      </a>
+    );
+  },
+};
+
+function ScenarioLink({ scenarioKey, children }: { scenarioKey: string; children: ReactNode }) {
+  const tangentId = useStore((s) => {
+    const card = s.chat.find((c) => c.kind === "tangent" && c.key === scenarioKey);
+    return card?.kind === "tangent" ? card.tangentId : null;
+  });
+  const active = useStore((s) => !!tangentId && s.active === tangentId);
+  if (!tangentId) return <>{children}</>;
+  return (
+    <button className={`scenario-link ${active ? "active" : ""}`} onClick={() => openScenario(tangentId)} title="Show this on the board">
+      <span className="scenario-icon" aria-hidden>
+        ♞
+      </span>
+      {children}
+    </button>
+  );
+}
+
+/** Opens a coach scenario on the main board, leaving a puzzle or drill if one is showing. */
+function openScenario(tangentId: string) {
+  if (useNav.getState().view !== "board" || usePuzzle.getState() || useDrill.getState()) go("board");
+  openTangent(tangentId);
+  // On a phone, the board must be in view: the sheet drops to under it.
+  if (useSheet.getState().sheet === "full") openSheet("half");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+const openSheet = (sheet: Sheet) => useSheet.setState({ sheet });
+
+/**
+ * Phones: the chat is a sheet over the bottom of the screen. Closed it's a bar with the latest
+ * message; half-open it fills the space under the board, so the coach's boards stay in view
+ * while you read; full it covers the screen for long answers. The arrows step the board.
+ */
+function SheetBar() {
+  const sheet = useSheet((s) => s.sheet);
+  const { chat, busy } = useStore();
+  const signedIn = useAuth((a) => a.status === "signed-in");
+  // Every hook runs on every render: a `&&` chain of hooks crashes the app when the view changes.
+  const onMain = useNav((n) => n.view === "board");
+  const inPuzzle = usePuzzle((p) => p !== null);
+  const inDrill = useDrill((d) => d !== null);
+  const onBoard = onMain && !inPuzzle && !inDrill;
+  const last = [...chat].reverse().find((c) => c.kind === "coach");
+  const preview = last?.kind === "coach" ? last.text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_#`>]/g, "").trim() : "";
+  // The bar opens and closes the sheet; the size button switches between half and full.
+  const open = sheet !== "closed";
+  return (
+    <div className="sheet-bar">
+      <button className="sheet-handle" onClick={() => openSheet(open ? "closed" : "half")} aria-label={open ? "Close the chat" : "Open the chat"}>
+        <span className="sheet-grip" aria-hidden />
+        <span className={`status ${busy ? "busy" : ""}`} />
+        <strong>Coach</strong>
+        {!open && <span className="sheet-preview muted">{busy ? "Thinking…" : preview || "Ask about the position"}</span>}
+        <span className="spacer" />
+        <span aria-hidden>{open ? "▾" : "▴"}</span>
+      </button>
+      {/* The chat's own header (and its usage ring) is hidden on phones, so the ring lives here. */}
+      {signedIn && <UsageMeter />}
+      {open && onBoard && (
+        <span className="sheet-nav">
+          <button onClick={() => step(-1)} aria-label="Back">◀</button>
+          <button onClick={() => step(1)} aria-label="Forward">▶</button>
+        </span>
+      )}
+      {open && (
+        <button
+          className="sheet-size"
+          onClick={() => openSheet(sheet === "full" ? "half" : "full")}
+          aria-label={sheet === "full" ? "Show the board" : "Full screen"}
+          title={sheet === "full" ? "Show the board" : "Full screen"}
+        >
+          {sheet === "full" ? "⤡" : "⤢"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function TangentCard({ tangentId }: { tangentId: string }) {
   const tangent = useStore((s) => s.tangents[tangentId]);
   const active = useStore((s) => s.active === tangentId);
   if (!tangent) return null;
   const { line } = tangent;
   return (
-    <button className={`tangent-card ${active ? "active" : ""}`} onClick={() => openTangent(tangentId)}>
+    <button className={`tangent-card ${active ? "active" : ""}`} onClick={() => openScenario(tangentId)}>
       <Board
         fen={line.fens[line.fens.length - 1]}
         lastMove={line.lastMoves[line.lastMoves.length - 1]}
         orientation={useStore.getState().orientation}
-        viewOnly
+        preview
         coordinates={false}
         className="mini-board"
       />

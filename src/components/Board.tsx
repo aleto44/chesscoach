@@ -13,7 +13,10 @@ interface Props {
   lastMove?: [Key, Key];
   /** `promotion` is set ("q", "r", "b", "n") when a pawn reaches the last rank. */
   onMove?: (from: Key, to: Key, promotion?: string) => void;
+  /** No moves on this board. The student can still draw on it: every board on screen takes drawings. */
   viewOnly?: boolean;
+  /** A thumbnail inside a button (chat cards): no moves and no drawing, clicks go to the button. */
+  preview?: boolean;
   /** False locks the pieces without making the board view-only (e.g. opponent's turn). */
   canMove?: boolean;
   /** While the student can't move, this side may queue a premove (played when its turn comes). */
@@ -35,6 +38,7 @@ export function Board({
   lastMove,
   onMove,
   viewOnly,
+  preview,
   canMove = true,
   premoveColor,
   coordinates = true,
@@ -45,6 +49,8 @@ export function Board({
   // A pawn just reached the last rank: the move waits for the student's choice of piece.
   const [promo, setPromo] = useState<{ from: Key; to: Key; color: "white" | "black" } | null>(null);
   const api = useRef<Api | null>(null);
+  // The position Chessground has, so re-syncing the same position keeps the student's drawings.
+  const shown = useRef<string | null>(null);
   const props = useRef({ fen, orientation, lastMove, onMove, viewOnly, canMove, premoveColor, shapes });
   props.current = { fen, orientation, lastMove, onMove, viewOnly, canMove, premoveColor, shapes };
 
@@ -58,7 +64,8 @@ export function Board({
     const live = !p.viewOnly && p.canMove;
     const premove = !p.viewOnly && !p.canMove && p.premoveColor !== turn ? p.premoveColor : undefined;
     const config: Config = {
-      fen: p.fen,
+      // Passing the fen clears the drawings, so only pass it when the position changed.
+      ...(shown.current === p.fen ? {} : { fen: p.fen }),
       orientation: p.orientation,
       lastMove: p.lastMove,
       turnColor: turn,
@@ -66,6 +73,7 @@ export function Board({
       movable: { color: live ? turn : premove, dests: live ? legalDests(p.fen) : new Map() },
     };
     cg.set(config);
+    shown.current = p.fen;
     cg.setAutoShapes(p.shapes ?? []);
     if (live) cg.playPremove();
     else if (!premove) cg.cancelPremove();
@@ -74,7 +82,8 @@ export function Board({
   useEffect(() => {
     api.current = Chessground(el.current!, {
       coordinates,
-      viewOnly: !!viewOnly,
+      // Only thumbnails are view-only in Chessground's sense, which also turns drawing off.
+      viewOnly: !!preview,
       animation: { enabled: true, duration: 180 },
       highlight: { lastMove: true, check: true },
       premovable: { enabled: true, showDests: true, castle: true },
@@ -85,6 +94,8 @@ export function Board({
         showDests: true,
         events: {
           after: (from, to) => {
+            // Chessground already moved the piece: the next sync must set the position again.
+            shown.current = null;
             const piece = new Chess(props.current.fen).get(from as never);
             if (piece?.type === "p" && (to[1] === "8" || to[1] === "1")) {
               setPromo({ from, to, color: piece.color === "w" ? "white" : "black" });
@@ -96,6 +107,8 @@ export function Board({
         },
       },
     });
+    // A new Chessground starts from the initial position, whatever an earlier one showed.
+    shown.current = null;
     sync();
     return () => api.current?.destroy();
   }, []);
@@ -109,8 +122,8 @@ export function Board({
     queueMicrotask(sync);
   };
 
-  // View-only boards (chat cards) can't promote; keep them a single element for their layouts.
-  if (viewOnly) return <div ref={el} className={className ?? "cg-board-wrap"} />;
+  // Thumbnails can't promote; keep them a single element for their layouts.
+  if (preview) return <div ref={el} className={className ?? "cg-board-wrap"} />;
   return (
     <div className="board-holder">
       <div ref={el} className={className ?? "cg-board-wrap"} />

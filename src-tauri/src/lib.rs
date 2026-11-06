@@ -142,9 +142,11 @@ pub fn run() {
             stats::db_remove_repertoire,
             puzzles::puzzle_status,
             puzzles::puzzle_find,
+            puzzles::puzzle_get,
             puzzles::puzzle_record,
             puzzles::puzzle_import_start,
             puzzles::puzzle_import_cancel,
+            puzzles::puzzle_import_progress,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

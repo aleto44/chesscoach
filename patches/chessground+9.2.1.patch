@@ -54,7 +54,7 @@ index b0baae6..6f5592b 100644
          if (cur.mouseSq)
              addShape(state.drawable, cur);
 diff --git a/node_modules/chessground/dist/events.js b/node_modules/chessground/dist/events.js
-index 1ea7318..a16e01d 100644
+index 1ea7318..55cface 100644
 --- a/node_modules/chessground/dist/events.js
 +++ b/node_modules/chessground/dist/events.js
 @@ -20,6 +20,11 @@ export function bindBoard(s, onResize) {
@@ -69,7 +69,7 @@ index 1ea7318..a16e01d 100644
  }
  // returns the unbind function
  export function bindDocument(s, onResize) {
-@@ -35,6 +40,21 @@ export function bindDocument(s, onResize) {
+@@ -35,6 +40,36 @@ export function bindDocument(s, onResize) {
              unbinds.push(unbindable(document, ev, onmove));
          for (const ev of ['touchend', 'mouseup'])
              unbinds.push(unbindable(document, ev, onend));
@@ -88,13 +88,33 @@ index 1ea7318..a16e01d 100644
 +        };
 +        for (const ev of ['touchend', 'touchcancel'])
 +            unbinds.push(unbindable(document, ev, onTouchEnd, { capture: true, passive: false }));
++        // A cancelled touch ends no move: drop the drag or drawing it started, so it can't swallow
++        // the next touch.
++        unbinds.push(unbindable(document, 'touchcancel', () => {
++            if (s.draggable.current)
++                drag.cancel(s);
++            if (s.drawable.current)
++                draw.cancel(s);
++        }, { passive: true }));
++        // Holding a piece still mustn't open the phone's long-press menu or text selection.
++        const whileDragging = e => {
++            if (s.draggable.current || s.drawable.current)
++                e.preventDefault();
++        };
++        for (const ev of ['contextmenu', 'selectstart'])
++            unbinds.push(unbindable(document, ev, whileDragging, { capture: true }));
          const onScroll = () => s.dom.bounds.clear();
          unbinds.push(unbindable(document, 'scroll', onScroll, { capture: true, passive: true }));
          unbinds.push(unbindable(window, 'resize', onScroll, { passive: true }));
-@@ -46,6 +66,25 @@ function unbindable(el, eventName, callback, options) {
+@@ -46,11 +81,33 @@ function unbindable(el, eventName, callback, options) {
      return () => el.removeEventListener(eventName, callback, options);
  }
  const startDragOrDraw = (s) => e => {
+-    if (s.draggable.current)
+-        drag.cancel(s);
+-    else if (s.drawable.current)
+-        draw.cancel(s);
+-    else if (e.shiftKey || isRightButton(e)) {
 +    // Touch screens, as on lichess: with one finger held anywhere, the next finger draws.
 +    if (e.touches && e.touches.length > 1) {
 +        if (s.drawable.enabled && !s.drawable.current) {
@@ -114,9 +134,17 @@ index 1ea7318..a16e01d 100644
 +    }
 +    if (e.touches)
 +        s.drawable.held = { touchId: e.changedTouches[0].identifier, shapes: s.drawable.shapes };
-     if (s.draggable.current)
-         drag.cancel(s);
-     else if (s.drawable.current)
++    // A lone finger can't be continuing anything: a drag or drawing still open is left over from a
++    // touch the phone cancelled (a long press it took for itself), so drop it and start afresh.
++    const fresh = e.touches && e.touches.length === 1;
++    if (s.draggable.current && (drag.cancel(s), !fresh))
++        return;
++    if (s.drawable.current && (draw.cancel(s), !fresh))
++        return;
++    if (e.shiftKey || isRightButton(e)) {
+         if (s.drawable.enabled)
+             draw.start(s, e);
+     }
 diff --git a/node_modules/chessground/dist/svg.js b/node_modules/chessground/dist/svg.js
 index b38c6a0..5d8b5fd 100644
 --- a/node_modules/chessground/dist/svg.js

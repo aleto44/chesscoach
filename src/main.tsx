@@ -58,8 +58,32 @@ function start() {
 
 initTheme();
 registerServiceWorker();
-// On a phone, nothing works until it's paired with the computer.
-checkPairing().then((paired) => (paired || usePairing.getState().status !== "unpaired" ? start() : root.render(<Pair />)));
+// On a phone, nothing works until it's paired with the computer. A phone that was paired before
+// starts the app straight away (waiting for the computer to answer first kept a phone that had
+// just come back to the app on a blank page) and only shows pairing if the computer says no.
+const PAIRED = "cc-paired";
+const pairedBefore = (() => {
+  try {
+    return localStorage.getItem(PAIRED) === "1";
+  } catch {
+    return false;
+  }
+})();
+let started = false;
+const startOnce = () => {
+  if (!started) (started = true), start();
+};
+usePairing.subscribe(({ status }) => {
+  try {
+    if (status === "paired") localStorage.setItem(PAIRED, "1");
+    if (status === "unpaired") localStorage.removeItem(PAIRED);
+  } catch {
+    // Private mode: pairing is just checked every time.
+  }
+  if (status === "unpaired") root.render(<Pair />);
+});
+if (pairedBefore) startOnce();
+checkPairing().then((paired) => (paired || usePairing.getState().status !== "unpaired" ? startOnce() : root.render(<Pair />)));
 
 // Handle for poking at the running app from devtools.
 if (import.meta.env.DEV) {

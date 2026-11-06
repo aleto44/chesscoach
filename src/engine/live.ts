@@ -76,16 +76,26 @@ class LiveAnalysis {
 
 const live = new LiveAnalysis();
 
+/** A board of its own (the why-screen) that wants the eval, whatever the main board's setting. */
+let focus: string | null = null;
+let update = () => {};
+
+/** Analyze this position instead of the main board's; null hands the engine back. */
+export function setEvalFocus(fen: string | null) {
+  focus = fen;
+  update();
+}
+
 /** Follows the on-screen position while the eval bar is shown (never during a rated game). */
 export function initLiveEval() {
   let last: string | null = null;
-  const update = () => {
-    if (!useSettings.getState().showEval || isLocked()) {
+  update = () => {
+    if (isLocked() || (!focus && !useSettings.getState().showEval)) {
       live.stop();
       last = null;
       return;
     }
-    const fen = screenFen();
+    const fen = focus ?? screenFen();
     if (fen === last) return;
     last = fen;
     useEval.setState({ fen, line: null });

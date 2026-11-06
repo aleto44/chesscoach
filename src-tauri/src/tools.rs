@@ -28,30 +28,87 @@ pub fn definitions() -> Value {
         },
         {
             "name": "show_line",
-            "description": "Show the student a line of moves on its own board (a tangent card they can step through). \
-                Every move is checked for legality; if any move is illegal you get an error naming it and nothing \
-                is shown, so fix the line and call again. Use this for every concrete line of two or more moves \
-                instead of writing the moves in prose.",
+            "description": "Make a scenario: a line of moves on its own board, with your arrows and circles on \
+                it, that the student steps through. Every move is checked for legality; if any move is illegal \
+                you get an error naming it and nothing is shown, so fix the line and call again. Use this for \
+                every concrete line of two or more moves instead of writing the moves in prose. Returns the \
+                scenario's key (s1, s2, ...): link to it in your reply as [words](#s1), and the student taps \
+                those words to open it on the board.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "title": { "type": "string", "description": "Short title for the breadcrumb, e.g. \"Why not ...Nf6?\"" },
                     "start_fen": { "type": "string", "description": "Position the line starts from. Defaults to the position on the student's screen." },
                     "moves": { "type": "array", "items": { "type": "string" }, "description": "Moves in SAN, e.g. [\"e5\", \"Nf3\", \"Nc6\"]. No move numbers." },
-                    "notes": { "type": "array", "items": { "type": "string" }, "description": "Optional comment shown after each move, same order as moves. Use \"\" for no comment." }
+                    "notes": { "type": "array", "items": { "type": "string" }, "description": "Optional comment shown after each move, same order as moves. Use \"\" for no comment." },
+                    "arrows": {
+                        "type": "array",
+                        "description": "Arrows to draw on this board. `at` is how many of the line's moves have been played when the arrow shows: 0 (the default) is the starting position, 3 is after the third move.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "from": { "type": "string" }, "to": { "type": "string" },
+                                "color": { "type": "string", "enum": ["green", "red", "blue", "yellow"] },
+                                "at": { "type": "integer", "minimum": 0 }
+                            },
+                            "required": ["from", "to"]
+                        }
+                    },
+                    "circles": {
+                        "type": "array",
+                        "description": "Squares to circle, with `at` as for arrows.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "square": { "type": "string" },
+                                "color": { "type": "string", "enum": ["green", "red", "blue", "yellow"] },
+                                "at": { "type": "integer", "minimum": 0 }
+                            },
+                            "required": ["square"]
+                        }
+                    },
+                    "ply": { "type": "integer", "minimum": 0, "description": "Which step it opens on: how many moves are played. Default 0, the starting position." },
+                    "open": { "type": "boolean", "description": "Open it on the student's board right away. Default false (they open it from the chat). Open the one your reply is mainly about." }
                 },
                 "required": ["title", "moves"]
             }
         },
         {
             "name": "setup_position",
-            "description": "Put a position on the student's board as a side board (tangent), for example to                 show a typical structure or set up a question. It opens right away; the student can move pieces                 on it to try ideas. Use show_line instead when you have concrete moves to show.",
+            "description": "Make a scenario from a position: its own board, with your arrows and circles, for                 example to show a typical structure, a plan or a weakness. It opens right away unless open is                 false; the student can move pieces on it to try ideas. Use show_line instead when you have                 concrete moves to show. Returns its key; link to it in your reply as [words](#s1).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "title": { "type": "string", "description": "Short breadcrumb title, e.g. \"Carlsbad structure\"" },
                     "fen": { "type": "string", "description": "The position. Must be legal (both kings, side to move not giving check)." },
-                    "note": { "type": "string", "description": "Optional one-line caption under the board." }
+                    "note": { "type": "string", "description": "Optional one-line caption under the board." },
+                    "arrows": {
+                        "type": "array",
+                        "description": "Arrows to draw on this board. `at` is how many of the line's moves have been played when the arrow shows: 0 (the default) is the starting position, 3 is after the third move.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "from": { "type": "string" }, "to": { "type": "string" },
+                                "color": { "type": "string", "enum": ["green", "red", "blue", "yellow"] },
+                                "at": { "type": "integer", "minimum": 0 }
+                            },
+                            "required": ["from", "to"]
+                        }
+                    },
+                    "circles": {
+                        "type": "array",
+                        "description": "Squares to circle, with `at` as for arrows.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "square": { "type": "string" },
+                                "color": { "type": "string", "enum": ["green", "red", "blue", "yellow"] },
+                                "at": { "type": "integer", "minimum": 0 }
+                            },
+                            "required": ["square"]
+                        }
+                    },
+                    "open": { "type": "boolean", "description": "Default true." }
                 },
                 "required": ["title", "fen"]
             }
