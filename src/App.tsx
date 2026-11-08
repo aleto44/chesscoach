@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type CSSProperties } from "react";
 import { BoardPanel } from "./components/BoardPanel";
 import { Chat } from "./components/Chat";
 import { ConfirmHost } from "./components/Confirm";
@@ -13,6 +13,7 @@ import { GuessPanel } from "./components/Guess";
 import { endgameStep, useEndgame } from "./endgames/session";
 import { guessStep, useGuess } from "./guess/session";
 import { back, useNav } from "./nav";
+import { useSettings } from "./settings";
 import { usePuzzle, viewStep } from "./puzzles/session";
 import { drillStep, useDrill } from "./analysis/drillSession";
 import type { Step } from "./chess/view";
@@ -25,12 +26,16 @@ export default function App() {
   const opening = useOpening((o) => o !== null);
   const guessing = useGuess((g) => g !== null);
   const onBoard = useNav((n) => n.view === "board");
+  // Desktop coach column: its saved width, and 0 while it's tucked into the side tab (styles.css).
+  const chatWidth = useSettings((s) => s.chatWidth);
+  const chatCollapsed = useSettings((s) => s.chatCollapsed);
+  const layout = { "--chat-open": `${chatWidth}px`, "--chat-w": chatCollapsed ? "0px" : `${chatWidth}px` } as CSSProperties;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest("textarea, input, select")) return;
       // An open dialog handles its own Escape.
-      if (document.querySelector(".modal-backdrop, .promo-backdrop")) return;
+      if (document.querySelector(".modal-backdrop, .promo-backdrop, .puzzle-settings-pop")) return;
       const session = usePuzzle.getState()
         ? viewStep
         : useDrill.getState()
@@ -75,7 +80,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app">
+    <div className="app" style={layout}>
       <TopBar />
       {puzzling ? (
         <PuzzlePanel />

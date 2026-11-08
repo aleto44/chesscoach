@@ -6,7 +6,7 @@ import { cachedRead, keepRead } from "../snapshot";
 import { newGame } from "../game/session";
 import { timeControlLabel } from "../game/clock";
 import { go, useNav } from "../nav";
-import { refreshPuzzleDb, themeLabel, usePuzzleDb } from "../puzzles/puzzles";
+import { refreshPuzzleDb, themeLabel, usePuzzleDb, type ThemeMastery } from "../puzzles/puzzles";
 import { startPuzzles } from "../puzzles/session";
 import { commonness, findSet, pickLine, seenCounts, shortName, TRAINING_SETS, type Commonness, type TrainingLine } from "../openings/training";
 import { startOpening, useOpening } from "../openings/session";
@@ -21,6 +21,7 @@ import { RepertoireDialog } from "./RepertoireDialog";
 import { ProfileMenu, RatingHistory, Weaknesses } from "./Profile";
 import { EndgameMenu } from "./Endgames";
 import { GuessMenu } from "./Guess";
+import { MasteryRule, StarBadge, XpBar } from "./Mastery";
 
 /** Drills and puzzles would leave a rated game's clock (or position) sitting mid-game. */
 export function useSessionsBlocked() {
@@ -496,6 +497,8 @@ interface PuzzleHistoryData {
     themes: string;
   }[];
   stats: PuzzleStats | null;
+  /** Per theme, most tried first (puzzles.rs `mastery`); older servers leave it out. */
+  mastery?: ThemeMastery[];
 }
 
 function usePuzzleHistory(limit: number) {
@@ -555,6 +558,40 @@ function PuzzlesMenu() {
             ))}
           </div>
         </>
+      )}
+      {data?.mastery && data.mastery.length > 0 && <MasteryList themes={data.mastery} blocked={blocked} />}
+    </>
+  );
+}
+
+const MASTERY_SHOWN = 10;
+
+/** Every theme tried, with a bar that fills as it's solved; a click trains that theme. */
+function MasteryList({ themes, blocked }: { themes: ThemeMastery[]; blocked: boolean }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? themes : themes.slice(0, MASTERY_SHOWN);
+  const stars = themes.reduce((n, t) => n + t.stars, 0);
+  return (
+    <>
+      <h3 className="sub-title">
+        Theme mastery
+        {stars > 0 && <span className="muted small"> · {stars} ★ earned</span>}
+      </h3>
+      <MasteryRule />
+      <div className="mastery-list">
+        {shown.map((t) => (
+          <button key={t.theme} className="mastery-row" onClick={() => startPuzzles({ theme: t.theme })} disabled={blocked} title={`Train ${themeLabel(t.theme)}`}>
+            <span className="mastery-name">{themeLabel(t.theme)}</span>
+            <StarBadge stars={t.stars} />
+            <XpBar level={t} />
+            <span className="muted small mastery-total">{t.solved} solved</span>
+          </button>
+        ))}
+      </div>
+      {themes.length > MASTERY_SHOWN && (
+        <button className="link" onClick={() => setAll(!all)}>
+          {all ? "Show fewer" : `Show all ${themes.length} themes`}
+        </button>
       )}
     </>
   );

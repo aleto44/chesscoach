@@ -94,9 +94,106 @@ button:disabled {
 
 .app {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
+  /* --chat-w comes from App.tsx (the saved width, 0 when hidden); the board keeps at least 360px. */
+  grid-template-columns: minmax(0, 1fr) min(var(--chat-w, 420px), calc(100vw - 360px));
   grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
+}
+
+@media (min-width: 761px) {
+  .app {
+    overflow: hidden;
+    transition: grid-template-columns 0.25s ease;
+  }
+
+  /* While dragging the edge the column follows the pointer, with no easing and no text selection. */
+  .app.resizing {
+    transition: none;
+    cursor: col-resize;
+    user-select: none;
+  }
+
+  .chat {
+    position: relative;
+  }
+
+  /* Hidden: the column shrinks to nothing and the panel, keeping its width, slides out past the
+     right edge. It goes invisible (unfocusable) once the slide is over. */
+  .chat.collapsed {
+    min-width: min(var(--chat-open), calc(100vw - 360px));
+    visibility: hidden;
+    transition: visibility 0s 0.25s;
+  }
+
+  .chat-resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -4px;
+    width: 8px;
+    cursor: col-resize;
+    z-index: 5;
+    touch-action: none;
+  }
+
+  .chat-resize::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 2px;
+    background: transparent;
+    transition: background 0.15s;
+  }
+
+  .chat-resize:hover::after,
+  .app.resizing .chat-resize::after {
+    background: var(--accent);
+  }
+
+  .chat-hide {
+    padding: 2px 8px;
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  .coach-tab {
+    position: fixed;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    writing-mode: vertical-rl;
+    padding: 14px 7px;
+    border: 1px solid var(--border);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    background: var(--panel);
+    font-weight: 600;
+    box-shadow: -2px 0 8px rgb(0 0 0 / 0.15);
+    animation: coach-tab-in 0.2s ease 0.2s backwards;
+  }
+
+  .coach-tab:hover {
+    padding-right: 10px;
+  }
+
+  .coach-tab-new {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--tangent);
+  }
+
+  @keyframes coach-tab-in {
+    from {
+      transform: translate(100%, -50%);
+    }
+  }
 }
 
 /* Board side */
@@ -2051,7 +2148,7 @@ button.danger {
     order: 5;
   }
 
-  .board-panel.play.puzzles .puzzle-filters {
+  .board-panel.play.puzzles .puzzle-choice {
     order: 6;
   }
 
@@ -2662,3 +2759,206 @@ cg-board square.chat-hover {
 .startup-times summary { cursor: pointer; }
 .startup-launch { margin-top: 8px; }
 .startup-launch .stat-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Phones: the coach minimized to a tab in the bottom-right corner (Chat.tsx PhoneCoachTab). */
+@media (max-width: 760px) {
+  .chat.sheet-tab {
+    display: none;
+  }
+
+  /* Room to scroll the page's end out from under the tab. */
+  .app:has(.chat.sheet-tab) {
+    padding-bottom: 56px;
+  }
+
+  .phone-coach-tab {
+    position: fixed;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--panel);
+    font-weight: 600;
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.3);
+    animation: phone-tab-in 0.2s ease-out;
+  }
+
+  @keyframes phone-tab-in {
+    from {
+      transform: translateY(150%);
+    }
+  }
+}
+
+/* The puzzle header's count and filters are for phones (they replace the crumbs row there). */
+.game-head .head-count,
+.game-head .head-choice {
+  display: none;
+}
+
+/* Phones: the puzzle page fits the screen exactly, between the top bar and the coach's bar or
+   tab (--topbar-h, --sheet-h from phone.ts), so it never scrolls under a finger mid-puzzle. The
+   board takes what's left after the header, the status and the buttons; only the status area
+   scrolls, and only if a long one ever needs it. */
+@media (max-width: 760px) {
+  html:has(.board-panel.puzzles) {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  /* align-content: start, or the grid hands the spare height to the top bar's row: the bar
+     grows, the page (sized from the bar's height) shrinks, and the board creeps on every pass. */
+  .app:has(.board-panel.puzzles) {
+    height: 100dvh;
+    min-height: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+    align-content: start;
+  }
+
+  .board-panel.play.puzzles {
+    --puzzle-h: calc(100dvh - var(--topbar-h, 52px) - var(--sheet-h, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: var(--puzzle-h);
+    min-height: 0;
+    padding: 6px 8px;
+    overflow: hidden;
+  }
+
+  .board-panel.play.puzzles > .crumbs,
+  .board-panel.play.puzzles .puzzle-choice {
+    display: none;
+  }
+
+  /* Full width under the board (the column centres its children otherwise). */
+  .board-panel.play.puzzles .game-head,
+  .board-panel.play.puzzles .side-body,
+  .board-panel.play.puzzles .side-actions {
+    align-self: stretch;
+    width: auto;
+  }
+
+  .board-panel.play.puzzles .game-head {
+    order: 0;
+    flex: none;
+    padding: 0 2px;
+    min-height: 0;
+  }
+
+  .board-panel.play.puzzles .game-head .head-count,
+  .board-panel.play.puzzles .game-head .head-choice {
+    display: inline;
+    margin-left: 6px;
+    font-size: 13px;
+  }
+
+  /* The board's frame is as wide as the screen, or narrower when the screen is short: it leaves
+     ~240px for the header, the status (at least a couple of lines) and the buttons. */
+  .board-panel.play.puzzles .board-frame {
+    order: 1;
+    flex: none;
+    align-self: center;
+    width: min(100%, calc(var(--puzzle-h) - 240px));
+  }
+
+  /* The board sits in the middle of the page whatever the status under it says: the free space is
+     split in fixed shares, a third above the board (this spacer) and two thirds below it for the
+     status, which starts at the top of its share and scrolls inside it if it's ever longer. So
+     the status changing ("Watch Black's move…" → "Your turn…", the XP cards) never moves the board. */
+  .board-panel.play.puzzles::before {
+    content: "";
+    order: 0;
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .board-panel.play.puzzles .game-head {
+    order: -1;
+  }
+
+  .board-panel.play.puzzles .side-body {
+    order: 2;
+    flex: 2 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .board-panel.play.puzzles .side-actions {
+    order: 3;
+    flex: none;
+  }
+}
+
+/* Phones: the other board screens that are just a board with a few lines around it also fit the
+   screen instead of scrolling the page: drills, the opening and endgame trainers, guess the move
+   (all .drills) and a game in progress (.live). The board shrinks on short screens so the rest
+   fits; it's centred in the space. If something still doesn't fit, the panel scrolls, not the
+   page. Game review and the menus keep scrolling: they have real content under the board. */
+@media (max-width: 760px) {
+  html:has(.board-panel.drills),
+  html:has(.board-panel.play.live) {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .app:has(.board-panel.drills),
+  .app:has(.board-panel.play.live) {
+    height: 100dvh;
+    min-height: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+    align-content: start;
+  }
+
+  .board-panel.drills,
+  .board-panel.play.live {
+    --screen-h: calc(100dvh - var(--topbar-h, 52px) - var(--sheet-h, 0px));
+    height: var(--screen-h);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Room left for the bars, status and buttons that line up with the board (and its move row). */
+  .board-panel.drills {
+    --board-w: min(calc(100vw - 16px), calc(var(--screen-h) - 200px));
+    justify-content: flex-start;
+  }
+
+  .board-panel.drills.tall-status {
+    --board-w: min(calc(100vw - 16px), calc(var(--screen-h) - 230px));
+  }
+
+  /* Only the board shrinks on a short screen: the bars and text around it keep the full width. */
+  .board-panel.drills > :not(.board-frame) {
+    width: calc(100vw - 16px);
+  }
+
+  /* Centred, but never cut off at the top when it's taller than the screen. */
+  .board-panel.drills > :first-child {
+    margin-top: auto;
+  }
+
+  .board-panel.drills > :last-child {
+    margin-bottom: auto;
+  }
+
+  .board-panel.play.live {
+    align-content: safe center;
+    padding-bottom: 4px;
+  }
+
+  .board-panel.play.live .board-frame {
+    justify-self: center;
+    width: 100%;
+    max-width: calc(var(--screen-h) - 210px);
+  }
+}

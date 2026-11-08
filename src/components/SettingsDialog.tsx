@@ -7,12 +7,13 @@ import { MODEL_CHOICES, saveSetting, useSettings } from "../settings";
 import { START_RATING } from "../rating";
 import { newId, pushChat, useStore } from "../store";
 import { Modal } from "./GameDialogs";
-import { customSounds, loadSounds, play, SOUND_NAMES, soundFailures, type SoundName } from "../sound";
+import { canVibrate } from "../puzzles/fx";
+import { customSounds, loadSounds, play, playableSounds, SOUND_NAMES, soundFailures, type SoundName } from "../sound";
 
 const CHOICES = [...MODEL_CHOICES, { value: "custom", label: "Custom…", hint: "Any model name or ID claude accepts" }];
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const { coachModel, activeModel, sounds, showEval, theme, nudges, playerRating } = useSettings();
+  const { coachModel, activeModel, sounds, haptics, showEval, theme, nudges, playerRating } = useSettings();
   const [ratingText, setRatingText] = useState(playerRating === null ? "" : String(playerRating));
   const typedRating = ratingText.trim() === "" ? null : Math.round(Number(ratingText));
   const ratingValid = typedRating === null || (Number.isFinite(typedRating) && typedRating >= 100 && typedRating <= 3500);
@@ -95,10 +96,16 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       <div className="field">
         <label className="toggle">
           <input type="checkbox" checked={sounds} onChange={(e) => saveSetting("sounds", e.target.checked)} />
-          <span>Move sounds</span>
+          <span>Sounds</span>
         </label>
         {sounds && <SoundOptions />}
       </div>
+      {canVibrate() && (
+        <label className="toggle">
+          <input type="checkbox" checked={haptics} onChange={(e) => saveSetting("haptics", e.target.checked)} />
+          <span>Vibrate on puzzle moves</span>
+        </label>
+      )}
       <label className="toggle">
         <input type="checkbox" checked={showEval} onChange={(e) => saveSetting("showEval", e.target.checked)} />
         <span>Show engine evaluation</span>
@@ -298,9 +305,11 @@ function Problem({ text }: { text: string }) {
 function SoundOptions() {
   const [folder, setFolder] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<SoundName[]>(customSounds());
+  // Built-in puzzle sounds can be previewed too.
+  const [playable, setPlayable] = useState<SoundName[]>(playableSounds());
   const [failed, setFailed] = useState<string[]>(soundFailures());
   const [chosen, setPick] = useState<SoundName>("move-self");
-  const pick = loaded.includes(chosen) ? chosen : (loaded[0] as SoundName);
+  const pick = playable.includes(chosen) ? chosen : (playable[0] as SoundName);
 
   useEffect(() => {
     if (hasBackend()) invoke<string>("sounds_folder").then(setFolder, () => setFolder(null));
@@ -309,15 +318,16 @@ function SoundOptions() {
   const reload = async () => {
     await loadSounds();
     setLoaded(customSounds());
+    setPlayable(playableSounds());
     setFailed(soundFailures());
   };
 
   return (
     <div className="sound-options">
-      {loaded.length > 0 && (
+      {playable.length > 0 && (
         <div className="sound-preview">
           <select value={pick} onChange={(e) => setPick(e.target.value as SoundName)} title="Sound to preview">
-            {loaded.map((n) => (
+            {playable.map((n) => (
               <option key={n} value={n}>
                 {n}
               </option>

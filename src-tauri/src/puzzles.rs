@@ -414,6 +414,7 @@ pub fn puzzle_record(
     let seen: bool = conn
         .query_row("SELECT EXISTS (SELECT 1 FROM puzzle_attempts WHERE puzzle_id = ?1)", [&id], |r| r.get(0))
         .map_err(err)?;
+    let mastery_before = if seen { Vec::new() } else { mastery(&conn, Some(&themes))? };
     let after = if seen {
         before
     } else {
@@ -427,7 +428,119 @@ pub fn puzzle_record(
         params![id, correct, ms, rating, !seen, after, themes.join(" ")],
     )
     .map_err(err)?;
-    Ok(json!({ "before": before, "after": after, "rated": !seen }))
+    // How this try moved each theme's XP, for the bars on the solve screen.
+    let mut gains = Vec::new();
+    if !seen {
+        for now in mastery(&conn, Some(&themes))? {
+            let was = mastery_before.iter().find(|m| m.theme == now.theme);
+            gains.push(json!({
+                "theme": now.theme,
+                "before": was.map_or_else(|| Level::of(0), |m| m.level),
+                "after": now.level,
+            }));
+        }
+    }
+    Ok(json!({ "before": before, "after": after, "rated": !seen, "mastery": gains }))
+}
+
+/// Tags that don't earn theme XP: how long or how winning a puzzle is, whose game it came from,
+/// and "mate" (every mate puzzle also has mateIn1, mateIn2, ...). The game phases (opening,
+/// middlegame, endgame) do earn XP: they're skills of their own, and every puzzle has one.
+const NOT_IDEAS: &[&str] = &[
+    "short", "long", "veryLong", "oneMove", "crushing", "advantage", "equality",
+    "master", "masterVsMaster", "superGM", "mate",
+];
+
+/// XP a try earns or costs, weighted by how hard the puzzle was for the student then (Elo's
+/// expected score): a solve at their level is +10, 200 points harder about +15, 200 easier +5; a
+/// miss costs up to 10, most for an easy puzzle. Experience mostly grows; easy misses still sting.
+fn xp_for(correct: bool, puzzle: i64, student: i64) -> i64 {
+    let expected = 1.0 / (1.0 + 10f64.powf((puzzle - student) as f64 / 400.0));
+    if correct {
+        ((20.0 * (1.0 - expected)).round() as i64).max(1)
+    } else {
+        -((10.0 * expected).round() as i64)
+    }
+}
+
+/// XP for the first star; each star after it costs this much more (so stars come at a
+/// logarithmic pace in XP). Five stars make a tier (Bronze, Silver, ... in the UI).
+const FIRST_STAR_XP: f64 = 100.0;
+const STAR_GROWTH: f64 = 1.15;
+
+/// A theme's XP and the stars it's worth, with the XP where the current star began and the next one lands.
+#[derive(Serialize, Clone, Copy)]
+pub struct Level {
+    xp: i64,
+    stars: i64,
+    start: i64,
+    end: i64,
+}
+
+impl Level {
+    fn of(xp: i64) -> Level {
+        let (mut stars, mut start) = (0, 0);
+        loop {
+            let end = start + (FIRST_STAR_XP * STAR_GROWTH.powi(stars as i32)).round() as i64;
+            if xp < end {
+                return Level { xp, stars, start, end };
+            }
+            stars += 1;
+            start = end;
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct Mastery {
+    theme: String,
+    /// Rated tries and solves, all time.
+    n: i64,
+    solved: i64,
+    #[serde(flatten)]
+    level: Level,
+}
+
+/// XP per theme (the puzzle's own themes, or every theme tried), most XP first. Replayed from the
+/// rated tries, with the student's puzzle rating as it was at each one.
+pub fn mastery(conn: &Connection, only: Option<&[String]>) -> Result<Vec<Mastery>, String> {
+    let mut stmt = conn
+        .prepare("SELECT themes, correct, puzzle_rating, rating_after FROM puzzle_attempts WHERE rated = 1 ORDER BY id")
+        .map_err(err)?;
+    let tries = stmt
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, bool>(1)?, r.get::<_, i64>(2)?, r.get::<_, i64>(3)?)))
+        .map_err(err)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(err)?;
+    let mut by_theme: Vec<(String, i64, i64, i64)> = Vec::new(); // theme, tries, solves, xp
+    let mut student = 1500;
+    for (themes, correct, puzzle, rating_after) in tries {
+        let xp = xp_for(correct, puzzle, student);
+        student = rating_after;
+        for theme in themes.split(' ').filter(|t| !t.is_empty()) {
+            if NOT_IDEAS.contains(&theme) || only.is_some_and(|o| !o.iter().any(|t| t == theme)) {
+                continue;
+            }
+            let i = match by_theme.iter().position(|(t, ..)| t == theme) {
+                Some(i) => i,
+                None => {
+                    by_theme.push((theme.to_string(), 0, 0, 0));
+                    by_theme.len() - 1
+                }
+            };
+            let row = &mut by_theme[i];
+            row.1 += 1;
+            row.2 += correct as i64;
+            // A miss drains the bar but never below the current star: stars are kept.
+            row.3 = (row.3 + xp).max(Level::of(row.3).start);
+        }
+    }
+    let mut out: Vec<Mastery> = by_theme
+        .into_iter()
+        .map(|(theme, n, solved, xp)| Mastery { theme, n, solved, level: Level::of(xp) })
+        .collect();
+    out.sort_by(|a, b| b.level.xp.cmp(&a.level.xp).then_with(|| a.theme.cmp(&b.theme)));
+    Ok(out)
 }
 
 /// For the coach's profile: rating, recent form and accuracy by theme (worst first).
@@ -466,6 +579,42 @@ pub fn profile(conn: &Connection) -> Result<Value, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn mastery_xp() {
+        use super::{xp_for, Level};
+        // Harder puzzles pay more; easy misses cost more.
+        assert_eq!(xp_for(true, 1500, 1500), 10);
+        assert!(xp_for(true, 1700, 1500) > 10 && xp_for(true, 1300, 1500) < 10);
+        assert_eq!(xp_for(false, 1500, 1500), -5);
+        assert!(xp_for(false, 1300, 1500) < xp_for(false, 1700, 1500));
+        // Stars: 100, then 115 more, then 132 more...
+        assert_eq!((Level::of(99).stars, Level::of(100).stars, Level::of(214).stars, Level::of(215).stars), (0, 1, 1, 2));
+
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE puzzle_attempts (id INTEGER PRIMARY KEY, correct INT, rated INT, themes TEXT, puzzle_rating INT, rating_after INT)",
+        )
+        .unwrap();
+        let add = |correct: bool, rated: bool, themes: &str| {
+            conn.execute(
+                "INSERT INTO puzzle_attempts (correct, rated, themes, puzzle_rating, rating_after) VALUES (?1, ?2, ?3, 1500, 1500)",
+                rusqlite::params![correct, rated, themes],
+            )
+            .unwrap();
+        };
+        for _ in 0..10 {
+            add(true, true, "fork short"); // +10 each: 100 XP, the first star
+        }
+        add(false, true, "fork"); // would be -5, but the star's floor holds it at 100
+        add(true, false, "pin"); // a retry: no XP
+        add(true, true, "pin short");
+        let m = super::mastery(&conn, None).unwrap();
+        assert_eq!(m.len(), 2, "short isn't a theme");
+        assert_eq!((m[0].theme.as_str(), m[0].n, m[0].solved, m[0].level.xp, m[0].level.stars), ("fork", 11, 10, 100, 1));
+        assert_eq!((m[1].theme.as_str(), m[1].level.xp), ("pin", 10));
+        assert_eq!(super::mastery(&conn, Some(&["pin".to_string()])).unwrap().len(), 1);
+    }
+
     /// Builds the real puzzle file from a local download:
     /// PUZZLE_ZST=path/to/lichess_db_puzzle.csv.zst cargo test --release build_from_file -- --ignored --nocapture
     #[test]

@@ -224,7 +224,11 @@ pub fn puzzle_history(db: State<Db>, limit: i64) -> Result<Value, String> {
          FROM puzzle_attempts ORDER BY id DESC LIMIT ?1",
         [limit],
     )?;
-    Ok(json!({ "attempts": attempts, "stats": crate::puzzles::profile(&conn)? }))
+    Ok(json!({
+        "attempts": attempts,
+        "stats": crate::puzzles::profile(&conn)?,
+        "mastery": crate::puzzles::mastery(&conn, None)?,
+    }))
 }
 
 /// The drill menu: cards per kind and the latest attempts, newest first.

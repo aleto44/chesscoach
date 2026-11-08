@@ -237,6 +237,28 @@ ALTER TABLE games ADD COLUMN speed TEXT;             -- 'bullet' | 'blitz' | 'ra
 CREATE UNIQUE INDEX games_external ON games(source, external_id) WHERE source IS NOT NULL;
 DROP VIEW rated_games;
 CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
+"#, r#"
+-- Which of the student's accounts an imported game came from, so a whole account can be
+-- refreshed or removed (src-tauri/src/import.rs). NULL on games imported before this: an
+-- account's refresh claims the ones it sees again.
+ALTER TABLE games ADD COLUMN account TEXT;
+CREATE INDEX games_account ON games(source, account) WHERE source IS NOT NULL;
+-- Every account the student has imported from, even one whose games were all skipped.
+CREATE TABLE import_accounts (
+    site         TEXT NOT NULL,              -- 'chesscom' | 'lichess'
+    account      TEXT NOT NULL COLLATE NOCASE, -- the site's own spelling of the username
+    added_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    refreshed_at TEXT,
+    PRIMARY KEY (site, account)
+);
+-- The one username per site the app used to keep in settings.
+INSERT OR IGNORE INTO import_accounts (site, account)
+    SELECT CASE key WHEN 'chesscomUser' THEN 'chesscom' ELSE 'lichess' END, json_extract(value, '$')
+    FROM settings
+    WHERE key IN ('chesscomUser', 'lichessUser') AND json_type(value) = 'text' AND json_extract(value, '$') <> '';
+DELETE FROM settings WHERE key IN ('chesscomUser', 'lichessUser');
+DROP VIEW rated_games;
+CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
 "#];
 
 impl Db {

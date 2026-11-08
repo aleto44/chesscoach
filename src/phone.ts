@@ -16,9 +16,67 @@ export function usePhone(): boolean {
   return phone;
 }
 
-/** How much of the screen the coach's sheet covers on a phone. */
-export type Sheet = "closed" | "half" | "full";
-export const useSheet = create<{ sheet: Sheet }>(() => ({ sheet: "closed" }));
+/**
+ * How much of the screen the coach's sheet covers on a phone: "tab" is minimized to a small tab
+ * in the corner, "closed" is the bar with the message box.
+ */
+export type Sheet = "tab" | "closed" | "half" | "full";
+
+/** Minimized stays minimized across reloads. */
+const TAB_KEY = "cc-coach-tab";
+const startSheet = (): Sheet => {
+  try {
+    return localStorage.getItem(TAB_KEY) === "1" ? "tab" : "closed";
+  } catch {
+    return "closed";
+  }
+};
+export const useSheet = create<{ sheet: Sheet }>(() => ({ sheet: startSheet() }));
+useSheet.subscribe(({ sheet }) => {
+  try {
+    localStorage.setItem(TAB_KEY, sheet === "tab" ? "1" : "0");
+  } catch {
+    // Private mode: not remembered.
+  }
+});
+
+/**
+ * Keeps --topbar-h and --sheet-h (the top bar, and the coach's bar or tab at the bottom when it
+ * isn't open) up to date, so a screen can fit itself exactly between them (the puzzle page).
+ */
+export function useChromeHeights(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    const root = document.documentElement;
+    const measure = () => {
+      const top = document.querySelector(".topbar");
+      if (top) root.style.setProperty("--topbar-h", `${Math.round(top.getBoundingClientRect().height)}px`);
+      // An open sheet covers the page on purpose; keep the closed bar's height meanwhile.
+      const sheet = useSheet.getState().sheet;
+      if (sheet === "half" || sheet === "full") return;
+      const bottom = document.querySelector(sheet === "tab" ? ".phone-coach-tab" : ".chat.sheet");
+      // From its top edge to the bottom of the screen: the tab floats above a margin.
+      // offsetTop, not the bounding box: it ignores the tab's slide-in animation.
+      const covered = bottom instanceof HTMLElement ? Math.max(0, window.innerHeight - bottom.offsetTop) : 0;
+      root.style.setProperty("--sheet-h", `${Math.round(covered)}px`);
+    };
+    const ro = new ResizeObserver(measure);
+    const mo = new MutationObserver(() => {
+      ro.disconnect();
+      for (const el of document.querySelectorAll(".topbar, .chat.sheet, .phone-coach-tab")) ro.observe(el);
+      measure();
+    });
+    mo.observe(document.getElementById("root") ?? document.body, { childList: true, subtree: true });
+    for (const el of document.querySelectorAll(".topbar, .chat.sheet, .phone-coach-tab")) ro.observe(el);
+    const unsub = useSheet.subscribe(() => requestAnimationFrame(measure));
+    measure();
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+      unsub();
+    };
+  }, [enabled]);
+}
 
 /**
  * Keeps --board-bottom (where the board ends, in page coordinates) up to date, so the half-open

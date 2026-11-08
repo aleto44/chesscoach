@@ -41,12 +41,15 @@ export function LineChart({
   yLabel,
   format = (y) => String(Math.round(y)),
   xFormat,
+  minPad = 10,
 }: {
   series: ChartSeries[];
   xKind?: "time" | "index";
   yLabel: string;
   format?: (y: number) => string;
   xFormat?: (x: number) => string;
+  /** Least room above and below the data, in y units: 10 suits ratings, small counts want less. */
+  minPad?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
@@ -67,7 +70,7 @@ export function LineChart({
     const ys = all.map((p) => p.y);
     let [x0, x1] = [Math.min(...xs), Math.max(...xs)];
     if (x0 === x1) [x0, x1] = [x0 - 1, x1 + 1];
-    const pad = Math.max(10, (Math.max(...ys) - Math.min(...ys)) * 0.08);
+    const pad = Math.max(minPad, (Math.max(...ys) - Math.min(...ys)) * 0.08);
     const [y0, y1] = [Math.min(...ys) - pad, Math.max(...ys) + pad];
     const w = width - M.left - M.right;
     const h = HEIGHT - M.top - M.bottom;
@@ -79,7 +82,7 @@ export function LineChart({
       yTicks: ticks(y0, y1),
     };
     // all is rebuilt every render; series identity is what matters
-  }, [series, width]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [series, width, minPad]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!geo) return null;
   const { sx, sy, x0, x1, yTicks } = geo;

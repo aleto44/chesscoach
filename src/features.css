@@ -165,10 +165,53 @@ button.link {
   font-weight: 600;
 }
 
+.puzzle-settings {
+  position: relative;
+}
+
+/* Opens down and to the left of the ⚙, which sits at the column's right edge. */
+.puzzle-settings-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  white-space: normal;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.25);
+}
+
+.puzzle-settings-pop .toggle.auto-next {
+  padding: 0;
+}
+
+.puzzle-choice {
+  padding: 0 12px;
+  font-size: 12px;
+}
+
 .puzzle-filters {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.puzzle-filters .field-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.puzzle-filters .field-label:not(:first-child) {
+  margin-top: 4px;
 }
 
 .puzzle-filters select {
@@ -817,6 +860,70 @@ button.link {
   padding: 6px 8px;
 }
 
+/* The import hub: the student's accounts, then adding one. */
+.import-dialog h3 {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+.import-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.account-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.account-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.account-actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+.account-remove:hover:not(:disabled) {
+  color: var(--error);
+  border-color: var(--error);
+}
+.add-account {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.add-account > .segmented {
+  align-self: flex-start;
+}
+@media (max-width: 520px) {
+  .account-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .account-actions button {
+    flex: 1;
+  }
+}
+
 /* Phones away from the computer (offline.ts). */
 .offline-chip {
   font-size: 12px;
@@ -877,4 +984,786 @@ button.link {
 }
 .opening-why-evals .bad strong {
   color: var(--error);
+}
+
+/* Puzzle feedback: badges, bursts, rating ticker, auto-next, theme mastery */
+
+.board-frame.puzzle {
+  transition: background 0.35s;
+}
+
+.board-frame.puzzle.solved {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.board-frame.puzzle.failed {
+  background: color-mix(in srgb, var(--error) 45%, transparent);
+}
+
+.cue-board {
+  position: relative;
+}
+
+.cue-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  aspect-ratio: 1;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.square-cue {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  animation: square-tint 0.9s ease-out forwards;
+}
+
+.square-cue.good {
+  --cue: #4caf50;
+}
+
+.square-cue.bad {
+  --cue: #e05545;
+}
+
+@keyframes square-tint {
+  from {
+    background: color-mix(in srgb, var(--cue) 55%, transparent);
+  }
+  to {
+    background: color-mix(in srgb, var(--cue) 22%, transparent);
+  }
+}
+
+.square-badge {
+  position: absolute;
+  top: -14%;
+  right: -14%;
+  width: 46%;
+  height: 46%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--cue);
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(10px, 2.2vmin, 20px);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.45);
+  animation: badge-pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+@keyframes badge-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.cue-burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, #4caf50 92%, transparent);
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(32px, 9vmin, 84px);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.4);
+  animation: burst 1.1s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+
+@keyframes burst {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0;
+  }
+  25% {
+    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 1;
+  }
+  60% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.25);
+    opacity: 0;
+  }
+}
+
+.puzzle-rating {
+  position: relative;
+  transition: color 0.2s;
+}
+
+.puzzle-rating .rating-num {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+
+.puzzle-rating.ticking .rating-num {
+  transform: scale(1.12);
+}
+
+.puzzle-rating.ticking.up {
+  color: var(--accent);
+}
+
+.puzzle-rating.ticking.down {
+  color: var(--error);
+}
+
+.rating-delta {
+  position: relative;
+}
+
+.rating-delta.up {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rating-delta.down {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.rating-float {
+  position: absolute;
+  right: 0;
+  top: 0;
+  font-weight: 800;
+  font-size: 16px;
+  pointer-events: none;
+  animation: float-up 1.2s ease-out forwards;
+}
+
+@keyframes float-up {
+  from {
+    transform: translateY(0) scale(1.2);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-28px) scale(1);
+    opacity: 0;
+  }
+}
+
+.solved-line {
+  font-size: 16px;
+  display: inline-block;
+  animation: badge-pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.solved-gain {
+  margin-left: 8px;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.solved-gain.up {
+  color: var(--accent);
+}
+
+.solved-gain.down {
+  color: var(--error);
+}
+
+.next-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.next-btn .next-label {
+  position: relative;
+}
+
+.next-fill {
+  position: absolute;
+  inset: 0;
+  background: rgb(255 255 255 / 0.25);
+  transform-origin: left;
+  animation-name: next-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+@keyframes next-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.toggle.auto-next {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.mastery-gains,
+.mastery-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* On the puzzle screen the column is narrow: name, XP and stars on a line, the bar under it. */
+.mastery-gain {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+  font-size: 12px;
+}
+
+/* Compact stars inside the cards, so a name like "Discovered attack" still fits beside them. */
+.mastery-gain .star-badge {
+  gap: 4px;
+  flex: none;
+}
+
+.mastery-gain .tier-name {
+  font-size: 10px;
+}
+
+.mastery-gain .stars {
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.mastery-gain .mastery-name {
+  font-weight: 600;
+}
+
+.mastery-gain .xp-delta {
+  min-width: 42px;
+  text-align: right;
+}
+
+.mastery-gain-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.mastery-gain .mastery-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mastery-gain-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mastery-gain-bar .xp-bar {
+  flex: 1 1 auto;
+  min-width: 40px;
+}
+
+.mastery-list {
+  max-width: 640px;
+  gap: 4px;
+}
+
+.mastery-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) 150px minmax(100px, 1.5fr) 70px;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.mastery-rule {
+  margin: 0;
+}
+
+.mastery-total {
+  text-align: right;
+}
+
+/* Tiers: a colour each, from bronze to diamond. */
+.star-badge {
+  --tier: #c98a52;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.star-badge.tier-1 {
+  --tier: #b9c3cc;
+}
+
+.star-badge.tier-2 {
+  --tier: #e5c24a;
+}
+
+.star-badge.tier-3 {
+  --tier: #6fd0c4;
+}
+
+.star-badge.tier-4 {
+  --tier: #8fb8ff;
+}
+
+.tier-name {
+  color: var(--tier);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stars {
+  color: var(--tier);
+  letter-spacing: 1px;
+}
+
+.star {
+  display: inline-block;
+  opacity: 0.22;
+}
+
+.star.on {
+  opacity: 1;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--tier) 60%, transparent);
+}
+
+.star.fresh {
+  animation: star-pop 0.6s cubic-bezier(0.3, 1.8, 0.5, 1) both;
+}
+
+@keyframes star-pop {
+  0% {
+    transform: scale(0) rotate(-90deg);
+  }
+  60% {
+    transform: scale(1.9) rotate(10deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+.xp-bar {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+  overflow: hidden;
+}
+
+.xp-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f9d5d, #7fd18e);
+  transition: width 0.75s cubic-bezier(0.3, 1.1, 0.5, 1);
+}
+
+.xp-bar.instant > span {
+  transition: none;
+}
+
+.xp-delta {
+  font-weight: 700;
+  white-space: nowrap;
+  animation: badge-pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.xp-delta.up {
+  color: #7fd18e;
+}
+
+.xp-delta.down {
+  color: #e0806f;
+}
+
+.mastered-banner {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #e5c24a 18%, transparent);
+  color: #e5c24a;
+  font-weight: 700;
+  font-size: 14px;
+  animation: badge-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mastered-banner.tier {
+  font-size: 16px;
+  background: linear-gradient(90deg, color-mix(in srgb, #e5c24a 30%, transparent), color-mix(in srgb, #8fb8ff 25%, transparent));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .square-cue,
+  .square-badge,
+  .cue-burst,
+  .rating-float,
+  .solved-line,
+  .star.fresh,
+  .xp-delta,
+  .mastered-banner {
+    animation-duration: 1ms;
+  }
+  .xp-bar > span {
+    transition: none;
+  }
+}
+
+/* Phones: name and stars on a line, the XP bar under them. */
+@media (max-width: 700px) {
+  .mastery-row {
+    grid-template-columns: 1fr auto;
+    gap: 4px 10px;
+  }
+  .mastery-row .xp-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .mastery-row .mastery-total {
+    display: none;
+  }
+}
+
+/* Phones: puzzle settings as a sheet from the bottom of the screen, over everything. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  background: rgb(0 0 0 / 0.45);
+}
+
+.puzzle-settings-pop.sheet {
+  position: static;
+  width: 100%;
+  max-width: none;
+  max-height: 80vh;
+  max-height: 80dvh;
+  overflow-y: auto;
+  border-radius: 14px 14px 0 0;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  animation: sheet-up 0.2s ease-out;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* After a solve: the puzzle rating over the board, counting up, with the gain beside it. */
+.rating-burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 20px;
+  border-radius: 16px;
+  background: rgb(18 20 18 / 0.86);
+  box-shadow: 0 6px 28px rgb(0 0 0 / 0.5), 0 0 0 2px color-mix(in srgb, #5fae6c 70%, transparent);
+  color: #fff;
+  white-space: nowrap;
+  animation:
+    rating-in 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both,
+    rating-out 0.4s ease-in 2s forwards;
+}
+
+.rating-burst-num {
+  font-size: clamp(30px, 8vmin, 52px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: transform 0.15s;
+}
+
+.rating-burst.done .rating-burst-num {
+  animation: rating-land 0.35s cubic-bezier(0.3, 1.8, 0.5, 1);
+}
+
+.rating-burst-gain {
+  font-size: clamp(18px, 4.5vmin, 28px);
+  font-weight: 800;
+}
+
+.rating-burst-gain.up {
+  color: #7fd18e;
+}
+
+.rating-burst-gain.down {
+  color: #e0806f;
+}
+
+@keyframes rating-in {
+  from {
+    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes rating-out {
+  to {
+    transform: translate(-50%, -50%) scale(0.92);
+    opacity: 0;
+  }
+}
+
+@keyframes rating-land {
+  50% {
+    transform: scale(1.18);
+    color: #7fd18e;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rating-burst,
+  .rating-burst.done .rating-burst-num {
+    animation-duration: 1ms;
+  }
+}
+
+/* ---- Weakness dashboard bars (components/Bars.tsx) ---- */
+/* Error severity is one ordered warm ramp: light to dark on the light theme, dim to bright on the
+   dark one, so a blunder always stands out most. Draws are a neutral gray. */
+:root {
+  --sev-1: #f0b55e;
+  --sev-2: #dd6f2a;
+  --sev-3: #b3341f;
+  --draw: #a8a29a;
+}
+:root[data-theme="dark"] {
+  --sev-1: #7a5226;
+  --sev-2: #cc6a2c;
+  --sev-3: #ffa088;
+  --draw: #6f6a63;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --sev-1: #7a5226;
+    --sev-2: #cc6a2c;
+    --sev-3: #ffa088;
+    --draw: #6f6a63;
+  }
+}
+
+.viz-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+.viz-card {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.viz-card h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.stackbar-track {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+}
+.stackbar-seg {
+  position: relative;
+  min-width: 4px;
+}
+.stackbar-seg:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.stackbar-seg:last-child {
+  border-radius: 0 4px 4px 0;
+}
+.stackbar-seg:only-child {
+  border-radius: 4px;
+}
+.stackbar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.stackbar-legend strong {
+  color: var(--text);
+}
+
+/* Hover tips on any bar segment. */
+.bar-tip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  pointer-events: none;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.15);
+}
+.stackbar-seg:hover .bar-tip,
+.barrow-seg:hover .bar-tip {
+  display: block;
+}
+
+.barrows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.barrow {
+  display: grid;
+  grid-template-columns: minmax(110px, 34%) 1fr 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+}
+.barrow.clickable {
+  cursor: pointer;
+}
+.barrow.clickable:hover:not(:disabled) {
+  background: var(--panel);
+  border-color: var(--border);
+}
+.barrow-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.barrow-label > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.barrow-label .strong {
+  font-weight: 700;
+}
+.barrow-track {
+  position: relative;
+  height: 14px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+}
+.barrow-fill {
+  display: flex;
+  gap: 2px;
+  height: 100%;
+}
+.barrow-seg {
+  position: relative;
+  height: 100%;
+}
+.barrow-seg:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.barrow-seg:last-child {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+.barrow-ref {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  border-left: 2px dashed var(--text);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.barrow-value {
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.barrow-reflegend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+}
+.barrow-refmark {
+  display: inline-block;
+  height: 12px;
+  border-left: 2px dashed var(--text);
+  opacity: 0.55;
+}
+
+.meter {
+  height: 6px;
+  margin: 8px 0 2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+}
+.meter > div {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--warn);
+}
+
+.trend-verdict {
+  margin: 0 0 4px;
+}
+.trend-verdict.good strong {
+  color: var(--accent);
+}
+.trend-verdict.bad strong {
+  color: var(--error);
+}
+.chart-table .stat-table {
+  margin-top: 8px;
+}
+
+/* A puzzle still loading: the board's squares without pieces (PuzzlePanel CueFrame). */
+.board-frame.puzzle.waiting cg-board piece {
+  visibility: hidden;
 }

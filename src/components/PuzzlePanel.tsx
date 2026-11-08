@@ -1,6 +1,8 @@
 import type { DrawShape } from "chessground/draw";
-import { useEffect, useMemo, useState } from "react";
-import { hasBackend, isRemote, openUrl } from "../backend";
+import type { Key } from "chessground/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { hasBackend, isRemote } from "../backend";
 import { useAuth } from "../coach/auth";
 import { sendToCoach } from "../coach/bridge";
 import { getRepertoire } from "../openings/repertoire";
@@ -14,7 +16,12 @@ import {
   themeLabel,
   usePuzzleDb,
 } from "../puzzles/puzzles";
+import { usePuzzleFx } from "../puzzles/fx";
+import { play } from "../sound";
+import { saveSetting, useSettings } from "../settings";
 import {
+  AUTO_NEXT_MS,
+  holdPuzzle,
   nextPuzzle,
   puzzleMove,
   puzzleQuestion,
@@ -30,6 +37,7 @@ import {
 import { useStore } from "../store";
 import { moveLabel, START_FEN } from "../chess/line";
 import { Board } from "./Board";
+import { MasteryGains } from "./Mastery";
 import { BoardSteps, StepButtons } from "./StepButtons";
 import { viewedPly } from "../chess/view";
 import { fromLichess } from "../rating";
@@ -63,6 +71,7 @@ export function PuzzlePanel() {
   if (pdb.loaded && !pdb.installed) return <InstallPanel />;
 
   const change = s.change ? fromLichess(s.change.after) - fromLichess(s.change.before) : null;
+  const fen = line ? line.fens[ply] : START_FEN;
   return (
     <main className="board-panel play puzzles">
       <nav className="crumbs">
@@ -79,9 +88,16 @@ export function PuzzlePanel() {
         </button>
       </nav>
 
-      <div className="board-frame puzzle">
+      <CueFrame
+        status={s.status}
+        orientation={s.color}
+        fen={fen}
+        rating={s.change ? { before: fromLichess(s.change.before), after: fromLichess(s.change.after) } : null}
+        // Always there (disabled until a puzzle is up), so nothing shifts when it loads.
+        after={<BoardSteps onStep={viewStep} disabled={!line || line.sans.length === 0} />}
+      >
         <Board
-          fen={line ? line.fens[ply] : START_FEN}
+          fen={fen}
           lastMove={line && ply > 0 ? line.lastMoves[ply - 1] : undefined}
           orientation={s.color}
           onMove={puzzleMove}
@@ -90,20 +106,25 @@ export function PuzzlePanel() {
           premoveColor={(s.status === "intro" || s.status === "solving") && s.view === null && !s.message ? s.color : undefined}
           shapes={past ? undefined : shapes}
         />
-        {line && <BoardSteps onStep={viewStep} disabled={line.sans.length === 0} />}
-      </div>
+      </CueFrame>
 
       <aside className="game-side">
         <div className="game-head">
           <strong>Puzzles</strong>
+          {/* Phones drop the crumbs row: where you are in the set, and the filters, go here. */}
+          {puzzle && (
+            <span className="muted head-count">
+              {s.index + 1}
+              {s.set.fromCoach ? ` of ${s.queue.length}` : ""}
+            </span>
+          )}
+          {!s.set.fromCoach && <ChoiceSummary className="head-choice" />}
           <span className="spacer" />
-          <span className="puzzle-rating" title={`${pdb.attempts} rated puzzles`}>
-            Rating {fromLichess(pdb.rating)}
-            {change !== null && <span className={change >= 0 ? "up" : "down"}>{change >= 0 ? ` +${change}` : ` ${change}`}</span>}
-          </span>
+          <RatingTicker rating={fromLichess(pdb.rating)} change={change} attempts={pdb.attempts} puzzleId={puzzle?.id ?? ""} />
+          <PuzzleSettings filters={!s.set.fromCoach} />
         </div>
 
-        {!s.set.fromCoach && <Filters />}
+        {!s.set.fromCoach && <ChoiceSummary />}
 
         <div className="side-body puzzle-body">
           <div className={`puzzle-status ${s.status}`}>
@@ -130,7 +151,10 @@ export function PuzzlePanel() {
             )}
             {s.status === "solved" && (
               <>
-                <strong>✓ Solved.</strong>
+                <strong className="solved-line">✓ Solved!</strong>
+                {change !== null && change !== 0 && (
+                  <span className={`solved-gain ${change > 0 ? "up" : "down"}`}>{change > 0 ? `+${change}` : change}</span>
+                )}
               </>
             )}
             {s.status === "failed" && (
@@ -154,19 +178,24 @@ export function PuzzlePanel() {
               <div>
                 Puzzle rating <strong>{fromLichess(puzzle.rating)}</strong> · played {puzzle.plays.toLocaleString()} times
               </div>
-              <div className="puzzle-tags">
-                {puzzle.themes
-                  .filter((t) => !META_THEMES.has(t))
-                  .map((t) => (
-                    <span key={t} className="chip">
-                      {themeLabel(t)}
-                    </span>
-                  ))}
-              </div>
+              {s.mastery ? (
+                <MasteryGains gains={s.mastery} />
+              ) : (
+                <>
+                  <div className="puzzle-tags">
+                    {puzzle.themes
+                      .filter((t) => !META_THEMES.has(t))
+                      .map((t) => (
+                        <span key={t} className="chip">
+                          {themeLabel(t)}
+                        </span>
+                      ))}
+                  </div>
+                  {/* Rated, but none of its tags earns XP (only length tags, say): no theme to give it to. */}
+                  {s.change && <div className="muted small">None of this puzzle's tags earn theme XP.</div>}
+                </>
+              )}
               {puzzle.openings[0] && <div className="muted">{openingLabel(puzzle.openings[puzzle.openings.length - 1])}</div>}
-              <button className="link" onClick={() => openUrl(`https://lichess.org/training/${puzzle.id}`)}>
-                Open on lichess.org
-              </button>
             </div>
           )}
           <div className="puzzle-credit muted">Puzzles from the Lichess open database (CC0).</div>
@@ -175,17 +204,19 @@ export function PuzzlePanel() {
         {line && <StepButtons onStep={viewStep} disabled={line.sans.length === 0} />}
 
         <div className="side-actions">
-          {(s.status === "solving" || s.status === "intro") && <button onClick={showSolution}>View solution</button>}
+          {(s.status === "solving" || s.status === "intro" || s.status === "loading") && (
+            <button onClick={showSolution} disabled={s.status === "loading"}>
+              View solution
+            </button>
+          )}
           {over && (
             <>
               {signedIn && (
-                <button onClick={() => sendToCoach(puzzleQuestion())} disabled={busy} title="One message to the coach">
+                <button onClick={() => (holdPuzzle(), sendToCoach(puzzleQuestion()))} disabled={busy} title="One message to the coach">
                   Ask the coach
                 </button>
               )}
-              <button className="primary" onClick={nextPuzzle}>
-                Next
-              </button>
+              <NextButton autoNextAt={s.autoNextAt} />
             </>
           )}
           {s.status === "empty" && s.set.fromCoach && (
@@ -206,11 +237,279 @@ export function PuzzlePanel() {
   );
 }
 
+const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * The board frame with the puzzle's feedback on top: a ✓ or ✗ badge on the square just played (until
+ * the position moves on), the puzzle rating counting up over the board on a solve, a shake on a
+ * wrong move, and the frame itself turning green or red once the puzzle is over.
+ */
+function CueFrame({
+  status,
+  orientation,
+  fen,
+  rating,
+  after,
+  children,
+}: {
+  status: string;
+  orientation: "white" | "black";
+  fen: string;
+  /** The student's puzzle rating before and after this puzzle (chess.com scale), once it's saved. */
+  rating: { before: number; after: number } | null;
+  after?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const fx = usePuzzleFx();
+  const frame = useRef<HTMLDivElement>(null);
+  const board = useRef<HTMLDivElement>(null);
+  const shown = fx && fx.fen === fen ? fx : null;
+  // The rating comes back a moment after the solve; a puzzle that wasn't rated (a retry, or
+  // offline) gets the plain ✓ once it's clear none is coming.
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    setWaited(false);
+    if (fx?.kind !== "solved") return;
+    const id = window.setTimeout(() => setWaited(true), 700);
+    return () => window.clearTimeout(id);
+  }, [fx?.id]);
+
+  // Motion through the Web Animations API, so the board itself is never remounted.
+  useEffect(() => {
+    if (!fx || reducedMotion()) return;
+    if (fx.kind === "wrong")
+      board.current?.animate(
+        [
+          { transform: "translateX(0)" },
+          { transform: "translateX(-7px)" },
+          { transform: "translateX(6px)" },
+          { transform: "translateX(-4px)" },
+          { transform: "translateX(0)" },
+        ],
+        { duration: 320, easing: "ease-out" },
+      );
+    if (fx.kind === "solved")
+      frame.current?.animate(
+        [
+          { boxShadow: "0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent)" },
+          { boxShadow: "0 0 0 16px color-mix(in srgb, var(--accent) 0%, transparent)" },
+        ],
+        { duration: 750, easing: "ease-out" },
+      );
+  }, [fx?.id]);
+
+  const over = status === "solved" ? " solved" : status === "failed" ? " failed" : "";
+  // No puzzle on the board yet: an empty board, not the starting position flashing up first.
+  const waiting = status === "loading" || status === "error" || status === "empty" ? " waiting" : "";
+  return (
+    <div ref={frame} className={`board-frame puzzle${over}${waiting}`}>
+      <div ref={board} className="cue-board">
+        {children}
+        {shown && (
+          <div className="cue-layer" aria-hidden>
+            {shown.square && <SquareCue key={shown.id} kind={shown.kind} square={shown.square} orientation={orientation} />}
+            {shown.kind === "solved" &&
+              (rating ? (
+                <RatingBurst key={`r${shown.id}`} before={rating.before} after={rating.after} />
+              ) : (
+                waited && (
+                  <div key={`b${shown.id}`} className="cue-burst">
+                    ✓
+                  </div>
+                )
+              ))}
+          </div>
+        )}
+      </div>
+      {after}
+    </div>
+  );
+}
+
+/**
+ * Over the board after a solve: the puzzle rating with the gain beside it, counting up to the new
+ * rating fast, a rising tick per step. At most ~24 steps, so a big early gain still takes under a second.
+ */
+function RatingBurst({ before, after }: { before: number; after: number }) {
+  const [shown, setShown] = useState(before);
+  const d = after - before;
+  useEffect(() => {
+    if (d === 0) return;
+    if (reducedMotion()) return setShown(after);
+    const steps = Math.min(Math.abs(d), 24);
+    let i = 0;
+    let id = 0;
+    // A beat to see the gain first, then the climb.
+    const start = window.setTimeout(() => {
+      id = window.setInterval(() => {
+        i += 1;
+        setShown(Math.round(before + (d * i) / steps));
+        play("rating-tick", 1 + (0.25 * i) / steps);
+        if (i >= steps) window.clearInterval(id);
+      }, 38);
+    }, 350);
+    return () => (window.clearTimeout(start), window.clearInterval(id));
+  }, [before, after]);
+  return (
+    <div className={`rating-burst${shown === after && d !== 0 ? " done" : ""}`}>
+      <span className="rating-burst-num">{shown}</span>
+      <span className={`rating-burst-gain ${d >= 0 ? "up" : "down"}`}>{d >= 0 ? `+${d}` : d}</span>
+    </div>
+  );
+}
+
+function SquareCue({ kind, square, orientation }: { kind: string; square: Key; orientation: "white" | "black" }) {
+  const file = square.charCodeAt(0) - 97;
+  const rank = Number(square[1]) - 1;
+  const col = orientation === "white" ? file : 7 - file;
+  const row = orientation === "white" ? 7 - rank : rank;
+  const good = kind !== "wrong";
+  return (
+    <div className={`square-cue ${good ? "good" : "bad"}`} style={{ left: `${col * 12.5}%`, top: `${row * 12.5}%` }}>
+      <span className="square-badge">{good ? "✓" : "✗"}</span>
+    </div>
+  );
+}
+
+/** The puzzle rating, counting up (or down) to its new value, with the change floating off it. */
+function RatingTicker({ rating, change, attempts, puzzleId }: { rating: number; change: number | null; attempts: number; puzzleId: string }) {
+  const [shown, setShown] = useState(rating);
+  const from = useRef(rating);
+  useEffect(() => {
+    const start = from.current;
+    from.current = rating;
+    if (start === rating) return;
+    if (reducedMotion()) return setShown(rating);
+    const t0 = performance.now();
+    let raf = 0;
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - t0) / 700);
+      const eased = 1 - Math.pow(1 - k, 3);
+      setShown(Math.round(start + (rating - start) * eased));
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [rating]);
+  const dir = change === null ? "" : change >= 0 ? "up" : "down";
+  return (
+    <span className={`puzzle-rating${shown !== rating ? ` ticking ${dir}` : ""}`} title={`${attempts} rated puzzles`}>
+      Rating <span className="rating-num">{shown}</span>
+      {change !== null && (
+        <span className={`rating-delta ${dir}`}>
+          {change >= 0 ? ` +${change}` : ` ${change}`}
+          {change !== 0 && (
+            <span key={puzzleId} className={`rating-float ${dir}`}>
+              {change > 0 ? `+${change}` : change}
+            </span>
+          )}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Next, filling up while a solved puzzle waits to move on by itself; a click goes right away. */
+function NextButton({ autoNextAt }: { autoNextAt: number | null }) {
+  // Started late (a re-render mid-wait): the fill picks up where the wait is.
+  const elapsed = autoNextAt ? Math.min(AUTO_NEXT_MS, AUTO_NEXT_MS - (autoNextAt - Date.now())) : 0;
+  return (
+    <button className="primary next-btn" onClick={nextPuzzle}>
+      {autoNextAt && (
+        <span key={autoNextAt} className="next-fill" style={{ animationDuration: `${AUTO_NEXT_MS}ms`, animationDelay: `${-elapsed}ms` }} />
+      )}
+      <span className="next-label">Next</span>
+    </button>
+  );
+}
+
+function AutoNextToggle() {
+  const on = useSettings((st) => st.puzzleAutoNext);
+  return (
+    <label className="toggle auto-next">
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => {
+          saveSetting("puzzleAutoNext", e.target.checked);
+          if (!e.target.checked) holdPuzzle();
+        }}
+      />
+      <span>Next puzzle automatically after a solve</span>
+    </label>
+  );
+}
+
 const DIFFICULTIES: { value: Difficulty; label: string }[] = [
-  { value: "easier", label: "Easier" },
+  { value: "easier", label: "Easy" },
   { value: "normal", label: "Normal" },
-  { value: "harder", label: "Harder" },
+  { value: "harder", label: "Hard" },
 ];
+
+/** The ⚙ in the puzzle column: theme, position and difficulty (not for a coach's set), and auto-next. */
+function PuzzleSettings({ filters }: { filters: boolean }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  // Phones: a sheet over the page instead, since a popover under the board runs off the screen.
+  const sheet = matchMedia("(max-width: 760px)").matches;
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!root.current?.contains(t) && !pop.current?.contains(t)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <div className="puzzle-settings" ref={root}>
+      <button className="icon" onClick={() => setOpen((o) => !o)} title="Puzzle settings" aria-label="Puzzle settings" aria-expanded={open}>
+        ⚙
+      </button>
+      {open &&
+        (sheet ? (
+          createPortal(
+            <div className="sheet-backdrop">
+              <div ref={pop} className="puzzle-settings-pop sheet" role="dialog" aria-label="Puzzle settings">
+                <div className="sheet-head">
+                  <strong>Puzzle settings</strong>
+                  <button className="icon" onClick={() => setOpen(false)} aria-label="Close">
+                    ✕
+                  </button>
+                </div>
+                {filters && <Filters />}
+                <AutoNextToggle />
+              </div>
+            </div>,
+            document.body,
+          )
+        ) : (
+          <div ref={pop} className="puzzle-settings-pop" role="dialog" aria-label="Puzzle settings">
+            {filters && <Filters />}
+            <AutoNextToggle />
+          </div>
+        ))}
+    </div>
+  );
+}
+
+/** What the filters are set to, so the choice shows with the settings closed. Nothing when all are "any". */
+function ChoiceSummary({ className = "puzzle-choice" }: { className?: string }) {
+  const choice = usePuzzle((s) => s!.choice);
+  const parts = [
+    choice.theme && themeLabel(choice.theme),
+    choice.opening && openingLabel(choice.opening),
+    choice.difficulty !== "normal" && DIFFICULTIES.find((d) => d.value === choice.difficulty)?.label,
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  return <div className={`${className} muted`}>{parts.join(" · ")}</div>;
+}
 
 function Filters() {
   const choice = usePuzzle((s) => s!.choice);
@@ -227,6 +526,7 @@ function Filters() {
 
   return (
     <div className="puzzle-filters">
+      <span className="field-label">Theme</span>
       <select value={choice.theme ?? ""} onChange={(e) => setChoice({ theme: e.target.value || null })} aria-label="Theme">
         <option value="">Any theme</option>
         {themes.map((t) => (
@@ -235,6 +535,7 @@ function Filters() {
           </option>
         ))}
       </select>
+      <span className="field-label">Position</span>
       <select value={choice.opening ?? ""} onChange={(e) => setChoice({ opening: e.target.value || null })} aria-label="Opening">
         <option value="">Any position</option>
         {repertoire.length > 0 && (
@@ -254,6 +555,7 @@ function Filters() {
           ))}
         </optgroup>
       </select>
+      <span className="field-label">Difficulty</span>
       <div className="segmented">
         {DIFFICULTIES.map((d) => (
           <button key={d.value} className={choice.difficulty === d.value ? "on" : ""} onClick={() => setChoice({ difficulty: d.value })}>

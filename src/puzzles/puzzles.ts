@@ -112,7 +112,7 @@ export async function recordAttempt(p: Puzzle, correct: boolean, ms: number) {
   markPuzzleUsed(p.id);
   // Offline, the attempt waits on the phone; the rating moves when the computer gets it.
   const rating = usePuzzleDb.getState().rating;
-  const r = await orOffline<{ before: number; after: number; rated: boolean }>(
+  const r = await orOffline<{ before: number; after: number; rated: boolean; mastery?: ThemeGain[] }>(
     "puzzle_record",
     { id: p.id, rating: p.rating, themes: p.themes, correct, ms },
     () => ({ before: rating, after: rating, rated: false }),
@@ -120,6 +120,28 @@ export async function recordAttempt(p: Puzzle, correct: boolean, ms: number) {
   );
   if (r.rated) usePuzzleDb.setState((s) => ({ rating: r.after, attempts: s.attempts + 1 }));
   return r;
+}
+
+/** A theme's XP and stars; `start`/`end` are the XP where the current star began and the next one lands. */
+export interface ThemeLevel {
+  xp: number;
+  stars: number;
+  start: number;
+  end: number;
+}
+
+/** One theme on the Puzzles menu (puzzles.rs `mastery`): rated tries, solves, and its level. */
+export interface ThemeMastery extends ThemeLevel {
+  theme: string;
+  n: number;
+  solved: number;
+}
+
+/** How one rated try moved a theme. */
+export interface ThemeGain {
+  theme: string;
+  before: ThemeLevel;
+  after: ThemeLevel;
 }
 
 // ---- Names ----

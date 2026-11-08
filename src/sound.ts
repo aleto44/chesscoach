@@ -27,6 +27,12 @@ export const SOUND_NAMES = [
   "premove",
   "game-start",
   "game-end",
+  "puzzle-correct",
+  "puzzle-solved",
+  "puzzle-wrong",
+  "rating-tick",
+  "puzzle-star",
+  "puzzle-tier",
 ] as const;
 export type SoundName = (typeof SOUND_NAMES)[number];
 
@@ -34,7 +40,10 @@ const RATE = 48000;
 let ctx: AudioContext | null = null;
 const buffers = new Map<SoundName, AudioBuffer>();
 
-/** Sounds without their own file borrow another (followed until one loads); premove, game-start and game-end stay silent. */
+/**
+ * Sounds without their own file borrow another (followed until one loads); premove, game-start and
+ * game-end stay silent, and the puzzle ones fall back to their built-in sound (SYNTH).
+ */
 const FALLBACK: Partial<Record<SoundName, SoundName>> = {
   "move-self": "move",
   "move-opponent": "move",
@@ -72,6 +81,8 @@ export async function loadSounds() {
 
 /** The sounds that have their own file. */
 export const customSounds = () => SOUND_NAMES.filter((n) => buffers.has(n));
+/** Sounds that make a noise now: a file of their own, or a built-in one. */
+export const playableSounds = () => SOUND_NAMES.filter((n) => buffers.has(n) || SYNTH[n]);
 export const soundFailures = () => [...failures].map(([name, why]) => `${name} (${why})`);
 function bufferFor(name: SoundName): AudioBuffer | undefined {
   for (let n: SoundName | undefined = name; n; n = FALLBACK[n]) {
@@ -99,16 +110,61 @@ function unlockOnTouch() {
   for (const ev of ["pointerdown", "touchend", "keydown"]) window.addEventListener(ev, unlock, { capture: true, passive: true });
 }
 
-export function play(name: SoundName) {
+/** `pitch` raises the sound (1 = as recorded): the rating count-up climbs with each tick. */
+export function play(name: SoundName, pitch = 1) {
   if (!useSettings.getState().sounds) return;
   const buf = bufferFor(name);
-  if (!buf) return;
+  const synth = SYNTH[name];
+  if (!buf && !synth) return;
   ctx ??= new AudioContext();
   if (ctx.state === "suspended") ctx.resume();
+  if (!buf) return synth!(ctx, pitch);
   const src = ctx.createBufferSource();
   src.buffer = buf;
+  src.playbackRate.value = pitch;
   src.connect(ctx.destination);
   src.start();
+}
+
+/**
+ * Puzzle feedback has a built-in sound, since most students never add files: a few soft notes
+ * made on the spot. A file of the same name replaces it.
+ */
+const SYNTH: Partial<Record<SoundName, (ctx: AudioContext, pitch: number) => void>> = {
+  // One step of the rating counting up: a faint soft blip, felt more than heard.
+  "rating-tick": (c, pitch) => notes(c, [[784 * pitch, 0, 0.04]], "sine", 0.012),
+  // A quick rising pair: "that's right, keep going".
+  "puzzle-correct": (c) => notes(c, [[880, 0, 0.12], [1318.5, 0.07, 0.18]], "sine", 0.08),
+  // A bright major arpeggio that rings a little.
+  "puzzle-solved": (c) =>
+    notes(c, [[523.25, 0, 0.3], [659.25, 0.08, 0.3], [783.99, 0.16, 0.3], [1046.5, 0.24, 0.55]], "sine", 0.09),
+  // A new star in a theme: a quick high sparkle.
+  "puzzle-star": (c) =>
+    notes(c, [[1318.5, 0, 0.12], [1568, 0.06, 0.12], [2093, 0.12, 0.35]], "sine", 0.07),
+  // A theme up a tier: a rising run that ends on a held chord.
+  "puzzle-tier": (c) => {
+    notes(c, [[523.25, 0, 0.18], [659.25, 0.1, 0.18], [783.99, 0.2, 0.18], [1046.5, 0.3, 0.2]], "sine", 0.1);
+    notes(c, [[1046.5, 0.45, 1.1], [1318.5, 0.45, 1.1], [1568, 0.45, 1.1]], "sine", 0.05);
+  },
+  // Two low falling notes, muted rather than harsh.
+  "puzzle-wrong": (c) => notes(c, [[311.13, 0, 0.14], [233.08, 0.11, 0.24]], "sine", 0.1),
+};
+
+/** Plays [frequency, start, length] notes (seconds from now) with a fast attack and a soft decay. */
+function notes(c: AudioContext, list: [number, number, number][], type: OscillatorType, volume: number) {
+  const t0 = c.currentTime + 0.01;
+  for (const [freq, at, len] of list) {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t0 + at);
+    gain.gain.linearRampToValueAtTime(volume, t0 + at + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + len);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t0 + at);
+    osc.stop(t0 + at + len + 0.02);
+  }
 }
 
 /** `self`: the move was the student's (plain moves sound different for each side). */

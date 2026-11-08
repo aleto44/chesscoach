@@ -1,7 +1,8 @@
 // The Profile menu: what goes wrong in the student's real games (the weakness dashboard) and every
 // rating they have, over time. "Real games" are rated games here and games imported from
 // chess.com and Lichess; practice games had help on, so they don't count.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { loadAccounts, useAccounts } from "../games/import";
 import { startDrills } from "../analysis/drillSession";
 import { useBacklog } from "../analysis/review";
 import { go } from "../nav";
@@ -10,6 +11,7 @@ import { themeLabel, usePuzzleDb } from "../puzzles/puzzles";
 import { fromLichess, signed } from "../rating";
 import { useSettings } from "../settings";
 import { SITE_NAME, type ImportSite } from "../store";
+import { BarRows, Meter, StackBar, scoreColor } from "./Bars";
 import { LineChart, Legend, type ChartSeries } from "./Chart";
 import { BLOCKED, Tile, useRead, useSessionsBlocked } from "./Home";
 import { ImportDialog } from "./ImportDialog";
@@ -22,7 +24,8 @@ const OFFLINE = "Your games are on the computer; open the app there or from the 
 export function ProfileMenu() {
   const [dialog, setDialog] = useState<"import" | "saved" | null>(null);
   const backlog = useBacklog();
-  const accounts = useSettings((s) => [s.chesscomUser && "chess.com", s.lichessUser && "Lichess"].filter(Boolean).join(" and "));
+  const accounts = useAccounts((s) => s.list?.filter((a) => a.account).length ?? 0);
+  useEffect(() => void loadAccounts().catch(() => undefined), []);
   const rating = useSettings((s) => s.playerRating);
   const pdb = usePuzzleDb();
   const { data } = useRead<Weakness>("db_weakness", { source: "all", last: 50 }, OFFLINE);
@@ -64,7 +67,7 @@ export function ProfileMenu() {
             backlog
               ? `Reviewing imported games: ${backlog.done} of ${backlog.total}`
               : accounts
-                ? `Get your latest games from ${accounts}`
+                ? `${accounts} account${accounts > 1 ? "s" : ""}: get new games, add or remove`
                 : "Your games from chess.com and Lichess"
           }
           onClick={() => setDialog("import")}
@@ -284,24 +287,35 @@ export function Weaknesses() {
       )}
       {s && s.games > 0 && (
         <>
-          <div className="stat-row">
-            <div>
-              <span className="stat-big">{s.games}</span>
-              <span className="muted small">
-                games · {s.wins}W {s.draws}D {s.losses}L
-              </span>
+          <div className="viz-cards">
+            <div className="viz-card">
+              <h4>
+                Results <span className="muted small">· {s.games} games, {Math.round((100 * (s.wins + s.draws / 2)) / s.games)}% score</span>
+              </h4>
+              <StackBar
+                parts={[
+                  { key: "w", label: "Won", value: s.wins, color: "var(--accent)" },
+                  { key: "d", label: "Drawn", value: s.draws, color: "var(--draw)" },
+                  { key: "l", label: "Lost", value: s.losses, color: "var(--sev-3)" },
+                ]}
+              />
             </div>
-            <div>
-              <span className="stat-big">{per(s.blunders)}</span>
-              <span className="muted small">blunders a game</span>
-            </div>
-            <div>
-              <span className="stat-big">{per(s.mistakes)}</span>
-              <span className="muted small">mistakes a game</span>
-            </div>
-            <div>
-              <span className="stat-big">{s.avgCpLoss ?? "–"}</span>
-              <span className="muted small">avg centipawn loss</span>
+            <div className="viz-card">
+              <h4>
+                Errors a game{" "}
+                <span className="muted small">
+                  · {per(s.inaccuracies + s.mistakes + s.blunders)} in all
+                  {s.avgCpLoss !== null ? `, ${s.avgCpLoss} centipawns lost a move` : ""}
+                </span>
+              </h4>
+              <StackBar
+                format={(v) => v.toFixed(1)}
+                parts={[
+                  { key: "i", label: "Inaccuracies", value: s.inaccuracies / s.games, color: "var(--sev-1)" },
+                  { key: "m", label: "Mistakes", value: s.mistakes / s.games, color: "var(--sev-2)" },
+                  { key: "b", label: "Blunders", value: s.blunders / s.games, color: "var(--sev-3)" },
+                ]}
+              />
             </div>
           </div>
 
@@ -315,6 +329,7 @@ export function Weaknesses() {
                   <strong>{l.title}</strong>
                   <span className="muted small">{l.stat}</span>
                 </div>
+                <Meter value={l.weight / leaks[0].weight} label={`How much it costs, next to your biggest leak`} />
                 <p className="muted small">{l.detail}</p>
                 <div className="leak-actions">
                   {l.actions.map((a) => (
@@ -329,102 +344,76 @@ export function Weaknesses() {
 
           {data.trend.length >= 3 && <Trend trend={data.trend} />}
 
-          <h3 className="sub-title">By phase</h3>
-          <table className="stat-table">
-            <thead>
-              <tr>
-                <th>Phase</th>
-                <th>Moves</th>
-                <th>Mistakes per 100 moves</th>
-                <th>Blunders</th>
-                <th>Avg loss</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(["opening", "middlegame", "endgame"] as const).map((ph) => {
-                const p = data.phases.find((x) => x.phase === ph);
-                return (
-                  <tr key={ph}>
-                    <td>{PHASE_NAME[ph]}</td>
-                    <td>{p?.moves ?? 0}</td>
-                    <td>{p ? errorRate(p).toFixed(1) : "–"}</td>
-                    <td>{p?.blunders ?? 0}</td>
-                    <td>{p?.avgCpLoss ?? "–"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <Phases phases={data.phases} />
 
           {data.colors.length > 0 && (
             <>
-              <h3 className="sub-title">By color</h3>
-              <table className="stat-table">
-                <thead>
-                  <tr>
-                    <th>Side</th>
-                    <th>Games</th>
-                    <th>Score</th>
-                    <th>Avg loss</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.colors.map((c) => (
-                    <tr key={c.color}>
-                      <td>{c.color === "white" ? "White" : "Black"}</td>
-                      <td>{c.games}</td>
-                      <td>{Math.round((100 * c.points) / c.games)}%</td>
-                      <td>{c.avgCpLoss ?? "–"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <h3 className="sub-title">
+                By color <span className="muted small">· your score with each side</span>
+              </h3>
+              <BarRows
+                max={100}
+                reference={50}
+                referenceLabel="50%: as many points won as lost"
+                rows={data.colors.map((c) => {
+                  const pct = Math.round((100 * c.points) / c.games);
+                  return {
+                    key: c.color,
+                    label: c.color === "white" ? "♔ White" : "♚ Black",
+                    sub: `${c.games} games${c.avgCpLoss !== null ? ` · ${c.avgCpLoss} cp a move` : ""}`,
+                    parts: [{ value: pct, color: scoreColor(pct), label: "Score %" }],
+                    value: `${pct}%`,
+                  };
+                })}
+              />
             </>
           )}
 
           {data.openings.length > 0 && (
             <>
-              <h3 className="sub-title">Openings</h3>
-              <table className="stat-table">
-                <thead>
-                  <tr>
-                    <th>Opening</th>
-                    <th>Games</th>
-                    <th>Score</th>
-                    <th>Avg loss, moves 1–12</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.openings.map((o) => (
-                    <tr key={`${o.color}-${o.opening}`}>
-                      <td>
-                        {o.opening} <span className="muted small">as {o.color}</span>
-                      </td>
-                      <td>{o.games}</td>
-                      <td>{Math.round((100 * o.points) / o.games)}%</td>
-                      <td>{o.avgCpLoss ?? "–"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <h3 className="sub-title">
+                Openings <span className="muted small">· your score in each, most played first</span>
+              </h3>
+              <BarRows
+                max={100}
+                reference={50}
+                referenceLabel="50%: even"
+                rows={data.openings.map((o) => {
+                  const pct = Math.round((100 * o.points) / o.games);
+                  return {
+                    key: `${o.color}-${o.opening}`,
+                    label: o.opening,
+                    sub: `as ${o.color} · ${o.games} games`,
+                    parts: [{ value: pct, color: scoreColor(pct), label: "Score %" }],
+                    value: `${pct}%`,
+                  };
+                })}
+              />
             </>
           )}
 
           {(data.puzzles?.themes.length ?? 0) > 0 && (
             <>
-              <h3 className="sub-title">Weakest puzzle themes</h3>
-              <div className="theme-picks">
-                {data.puzzles!.themes.slice(0, 4).map((t) => (
-                  <button key={t.theme} onClick={() => startPuzzles({ theme: t.theme, opening: null })} disabled={blocked}>
-                    <strong>{themeLabel(t.theme)}</strong>
-                    <span className="muted small">
-                      {t.pct}% of {t.n}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <h3 className="sub-title">
+                Weakest puzzle themes <span className="muted small">· share solved; tap one to train it</span>
+              </h3>
+              <BarRows
+                max={100}
+                rows={data.puzzles!.themes.slice(0, 6).map((t) => ({
+                  key: t.theme,
+                  label: themeLabel(t.theme),
+                  sub: `${t.n} tried`,
+                  parts: [{ value: t.pct, color: scoreColor(t.pct), label: "Solved %" }],
+                  value: `${t.pct}%`,
+                  onClick: () => startPuzzles({ theme: t.theme, opening: null }),
+                  disabled: blocked,
+                  title: blocked ? BLOCKED : undefined,
+                }))}
+              />
             </>
           )}
+
+          <NumbersTable data={data} />
         </>
       )}
       {importing && <ImportDialog onClose={() => setImporting(false)} />}
@@ -432,27 +421,211 @@ export function Weaknesses() {
   );
 }
 
-/** Mistakes and blunders a game, averaged over the last five games, oldest first. */
+/** Mistakes and blunders a game, averaged over the last five games, oldest first, with a verdict. */
 function Trend({ trend }: { trend: Weakness["trend"] }) {
   const window = 5;
+  const errors = (g: Weakness["trend"][number]) => g.blunders + g.mistakes;
   const points = trend.map((_, i) => {
     const slice = trend.slice(Math.max(0, i - window + 1), i + 1);
-    return { x: i, y: slice.reduce((n, g) => n + g.blunders + g.mistakes, 0) / slice.length };
+    return { x: i, y: slice.reduce((n, g) => n + errors(g), 0) / slice.length };
   });
   const series: ChartSeries[] = [{ key: "errors", label: "Mistakes and blunders a game", slot: 1, points }];
+  // Older half against newer half: the one sentence the line is there to show.
+  const half = Math.floor(trend.length / 2);
+  const avg = (list: typeof trend) => list.reduce((n, g) => n + errors(g), 0) / Math.max(1, list.length);
+  const [before, after] = [avg(trend.slice(0, half)), avg(trend.slice(trend.length - half))];
+  const change = before ? (after - before) / before : 0;
+  const verdict =
+    Math.abs(change) < 0.15
+      ? { cls: "", text: "About the same lately" }
+      : change < 0
+        ? { cls: "good", text: "▼ Fewer mistakes lately" }
+        : { cls: "bad", text: "▲ More mistakes lately" };
   return (
     <>
       <h3 className="sub-title">
         Mistakes a game <span className="muted small">· average of the last {window} games, oldest to newest</span>
       </h3>
+      {trend.length >= 6 && (
+        <p className={`trend-verdict ${verdict.cls}`}>
+          <strong>{verdict.text}</strong>{" "}
+          <span className="muted small">
+            {before.toFixed(1)} a game in your older {half} games, {after.toFixed(1)} in your newer {half}
+          </span>
+        </p>
+      )}
       <LineChart
         series={series}
         xKind="index"
         yLabel="Mistakes and blunders a game"
         format={(y) => y.toFixed(1)}
         xFormat={(x) => trend[Math.round(x)]?.date ?? ""}
+        minPad={0.5}
       />
     </>
+  );
+}
+
+/** Mistakes and blunders per 100 moves in each phase, against the student's overall rate. */
+function Phases({ phases }: { phases: Phase[] }) {
+  const list = (["opening", "middlegame", "endgame"] as const).map((ph) => ({ ph, p: phases.find((x) => x.phase === ph) }));
+  const moves = list.reduce((n, { p }) => n + (p?.moves ?? 0), 0);
+  if (!moves) return null;
+  const overall = (100 * list.reduce((n, { p }) => n + (p ? p.mistakes + p.blunders : 0), 0)) / moves;
+  const rates = list.map(({ p }) => (p ? errorRate(p) : 0));
+  const worst = list[rates.indexOf(Math.max(...rates))];
+  const per100 = (n: number, p?: Phase) => (p?.moves ? (100 * n) / p.moves : 0);
+  const standsOut = !!worst.p && errorRate(worst.p) >= overall * 1.15;
+  return (
+    <>
+      <h3 className="sub-title">
+        By phase <span className="muted small">· mistakes and blunders per 100 of your moves</span>
+      </h3>
+      {standsOut && (
+        <p className="trend-verdict bad">
+          <strong>▲ Most errors in the {worst.ph}</strong>{" "}
+          <span className="muted small">
+            {errorRate(worst.p!).toFixed(1)} per 100 moves, against {overall.toFixed(1)} overall
+          </span>
+        </p>
+      )}
+      <BarRows
+        max={Math.max(...rates, overall) * 1.15}
+        reference={overall}
+        referenceLabel={`Your average: ${overall.toFixed(1)} per 100 moves`}
+        rows={list.map(({ ph, p }) => ({
+          key: ph,
+          label: PHASE_NAME[ph],
+          sub: p ? `${p.moves} moves${p.avgCpLoss !== null ? ` · ${p.avgCpLoss} cp a move` : ""}` : "no moves yet",
+          strong: standsOut && ph === worst.ph,
+          parts: [
+            { value: per100(p?.mistakes ?? 0, p), color: "var(--sev-2)", label: "Mistakes per 100 moves" },
+            { value: per100(p?.blunders ?? 0, p), color: "var(--sev-3)", label: "Blunders per 100 moves" },
+          ],
+          value: p ? errorRate(p).toFixed(1) : "–",
+        }))}
+      />
+      <div className="stackbar-legend">
+        <span>
+          <span className="chart-swatch" style={{ background: "var(--sev-2)" }} />
+          Mistakes
+        </span>
+        <span>
+          <span className="chart-swatch" style={{ background: "var(--sev-3)" }} />
+          Blunders
+        </span>
+      </div>
+    </>
+  );
+}
+
+/** Every number behind the charts, for anyone who wants them exact. */
+function NumbersTable({ data }: { data: Weakness }) {
+  return (
+    <details className="chart-table">
+      <summary>Show the numbers</summary>
+      <table className="stat-table">
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th>Moves</th>
+            <th>Errors per 100 moves</th>
+            <th>Inaccuracies</th>
+            <th>Mistakes</th>
+            <th>Blunders</th>
+            <th>Avg loss</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(["opening", "middlegame", "endgame"] as const).map((ph) => {
+            const p = data.phases.find((x) => x.phase === ph);
+            return (
+              <tr key={ph}>
+                <td>{PHASE_NAME[ph]}</td>
+                <td>{p?.moves ?? 0}</td>
+                <td>{p ? errorRate(p).toFixed(1) : "–"}</td>
+                <td>{p?.inaccuracies ?? 0}</td>
+                <td>{p?.mistakes ?? 0}</td>
+                <td>{p?.blunders ?? 0}</td>
+                <td>{p?.avgCpLoss ?? "–"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {data.colors.length > 0 && (
+        <table className="stat-table">
+          <thead>
+            <tr>
+              <th>Side</th>
+              <th>Games</th>
+              <th>Points</th>
+              <th>Score</th>
+              <th>Avg loss</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.colors.map((c) => (
+              <tr key={c.color}>
+                <td>{c.color === "white" ? "White" : "Black"}</td>
+                <td>{c.games}</td>
+                <td>{c.points}</td>
+                <td>{Math.round((100 * c.points) / c.games)}%</td>
+                <td>{c.avgCpLoss ?? "–"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {data.openings.length > 0 && (
+        <table className="stat-table">
+          <thead>
+            <tr>
+              <th>Opening</th>
+              <th>Games</th>
+              <th>Points</th>
+              <th>Score</th>
+              <th>Avg loss, moves 1–12</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.openings.map((o) => (
+              <tr key={`${o.color}-${o.opening}`}>
+                <td>
+                  {o.opening} <span className="muted small">as {o.color}</span>
+                </td>
+                <td>{o.games}</td>
+                <td>{o.points}</td>
+                <td>{Math.round((100 * o.points) / o.games)}%</td>
+                <td>{o.avgCpLoss ?? "–"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {data.tags.length > 0 && (
+        <table className="stat-table">
+          <thead>
+            <tr>
+              <th>Pattern</th>
+              <th>Times</th>
+              <th>Games</th>
+              <th>Blunders</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.tags.map((t) => (
+              <tr key={t.tag}>
+                <td>{TAGS[t.tag]?.title ?? t.tag}</td>
+                <td>{t.count}</td>
+                <td>{t.games}</td>
+                <td>{t.blunders}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </details>
   );
 }
 

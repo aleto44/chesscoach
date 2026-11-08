@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { formatMoves } from "../chess/line";
 import { hoverSquare, rehypeSquares, useHoverSquare, useTapAway } from "../chess/squareRefs";
@@ -9,10 +9,10 @@ import { bestSan, nudgeQuestion, useNudge } from "../coach/nudge";
 import { useTrainerChat } from "../coach/trainerChat";
 import { takeBack } from "../game/session";
 import { hasBackend } from "../db";
-import { useSettings } from "../settings";
+import { saveSetting, useSettings } from "../settings";
 import { goto, isLocked, openTangent, tangentOrientation, useStore, type ChatItem } from "../store";
 import { anySession, go, useNav } from "../nav";
-import { useBoardBottom, usePhone, useSheet, type Sheet } from "../phone";
+import { useBoardBottom, useChromeHeights, usePhone, useSheet, type Sheet } from "../phone";
 import { Board } from "./Board";
 import { askConfirm } from "./Confirm";
 import { SignIn } from "./SignIn";
@@ -24,14 +24,22 @@ export function Chat() {
   const trainer = useTrainerChat();
   const locked = isLocked(meta);
   const auth = useAuth();
-  const { coachModel, activeModel } = useSettings();
+  const phone = usePhone();
+  const { coachModel, activeModel, chatCollapsed } = useSettings();
+  const collapsed = chatCollapsed && !phone;
   const signedIn = auth.status === "signed-in" || !hasBackend();
   const [draft, setDraft] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
-  const phone = usePhone();
   const sheet = useSheet((s) => s.sheet);
   useBoardBottom(phone);
+  useChromeHeights(phone);
   useTapAway();
+
+  // Minimized on a phone: a question asked from a button (Ask the coach) opens it to show the answer.
+  const thinking = busy || trainer.thinkingSince !== null;
+  useEffect(() => {
+    if (phone && thinking && useSheet.getState().sheet === "tab") openSheet("half");
+  }, [thinking]);
 
   useEffect(() => {
     // Scrolls the messages list only; scrollIntoView would also scroll the phone's page.
@@ -49,8 +57,9 @@ export function Chat() {
   };
 
   return (
-    <aside className={`chat ${phone ? `sheet sheet-${sheet}` : ""}`}>
-      {phone && <SheetBar />}
+    <>
+    <aside className={`chat ${phone ? `sheet sheet-${sheet}` : ""} ${collapsed ? "collapsed" : ""}`} aria-hidden={collapsed || undefined}>
+      {phone ? <SheetBar /> : <ResizeHandle />}
       <header>
         <span className={`status ${busy || trainer.thinkingSince !== null ? "busy" : ""}`} />
         <strong>Coach</strong>
@@ -68,6 +77,11 @@ export function Chat() {
         <button onClick={restartCoach} title="Start a fresh coach conversation (rereads coach.md)">
           Restart coach
         </button>
+        {!phone && (
+          <button className="chat-hide" onClick={() => saveSetting("chatCollapsed", true)} title="Hide the coach (it stays as a tab on the right)" aria-label="Hide the coach">
+            »
+          </button>
+        )}
       </header>
 
       <div className="messages">
@@ -121,6 +135,78 @@ export function Chat() {
         </button>
       </div>
     </aside>
+    {collapsed && <CoachTab busy={busy || trainer.thinkingSince !== null} count={chat.length + trainer.items.length} />}
+    {phone && sheet === "tab" && <PhoneCoachTab busy={thinking} count={chat.length + trainer.items.length} />}
+    </>
+  );
+}
+
+/**
+ * Desktop: the hidden coach's tab on the right edge. A dot shows while it's thinking, and another
+ * when something new came in since it was hidden.
+ */
+/** Phones: the coach minimized to a tab in the bottom corner; a tap opens it under the board. */
+function PhoneCoachTab({ busy, count }: { busy: boolean; count: number }) {
+  const [seen] = useState(count);
+  return (
+    <button className="phone-coach-tab" onClick={() => openSheet("half")} aria-label="Show the coach">
+      <span className={`status ${busy ? "busy" : ""}`} />
+      Coach
+      {count > seen && !busy && <span className="coach-tab-new" aria-label="New messages" />}
+      <span aria-hidden>▴</span>
+    </button>
+  );
+}
+
+function CoachTab({ busy, count }: { busy: boolean; count: number }) {
+  const [seen] = useState(count);
+  return (
+    <button className="coach-tab" onClick={() => saveSetting("chatCollapsed", false)} title="Show the coach">
+      <span className={`status ${busy ? "busy" : ""}`} />
+      Coach
+      {count > seen && !busy && <span className="coach-tab-new" aria-label="New messages" />}
+    </button>
+  );
+}
+
+const MIN_CHAT_W = 280;
+const MAX_CHAT_W = 900;
+
+/** Desktop: drag the coach column's left edge to resize it; double-click puts it back to the default. */
+function ResizeHandle() {
+  const start = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const app = handle.closest(".app");
+    app?.classList.add("resizing");
+    // Leaves the board column at least 360px; the CSS clamps the same way when the window shrinks.
+    const widthAt = (x: number) =>
+      Math.round(Math.max(MIN_CHAT_W, Math.min(MAX_CHAT_W, window.innerWidth - 360, window.innerWidth - x)));
+    const move = (ev: PointerEvent) => useSettings.setState({ chatWidth: widthAt(ev.clientX) });
+    const end = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+      app?.classList.remove("resizing");
+      // Saved once, when the drag ends.
+      saveSetting("chatWidth", useSettings.getState().chatWidth);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  };
+  return (
+    <div
+      className="chat-resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the coach"
+      title="Drag to resize · double-click to reset"
+      onPointerDown={start}
+      onDoubleClick={() => saveSetting("chatWidth", 420)}
+    />
   );
 }
 
@@ -348,7 +434,7 @@ function SheetBar() {
   const last = [...chat, ...trainer.items].reverse().find((c) => c.kind === "coach");
   const preview = last?.kind === "coach" ? last.text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_#`>]/g, "").trim() : "";
   // The bar opens and closes the sheet; the size button switches between half and full.
-  const open = sheet !== "closed";
+  const open = sheet === "half" || sheet === "full";
   return (
     <div className="sheet-bar">
       <button className="sheet-handle" onClick={() => openSheet(open ? "closed" : "half")} aria-label={open ? "Close the chat" : "Open the chat"}>
@@ -361,6 +447,11 @@ function SheetBar() {
       </button>
       {/* The chat's own header (and its usage ring) is hidden on phones, so the ring lives here. */}
       {signedIn && <UsageMeter />}
+      {!open && (
+        <button className="sheet-size" onClick={() => openSheet("tab")} aria-label="Minimize the coach" title="Minimize the coach">
+          –
+        </button>
+      )}
       {open && (
         <button
           className="sheet-size"

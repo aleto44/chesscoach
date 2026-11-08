@@ -10,11 +10,14 @@ import { stopDrills } from "../analysis/drillSession";
 import { emptyLine, playAt, sideToMove, type Line } from "../chess/line";
 import { stepView, viewedPly, type Step } from "../chess/view";
 import type { Color } from "../store";
-import { findPuzzles, recordAttempt, themeLabel, usePuzzleDb, type Puzzle } from "./puzzles";
+import { findPuzzles, recordAttempt, themeLabel, usePuzzleDb, type Puzzle, type ThemeGain } from "./puzzles";
 import { fromLichess } from "../rating";
 import { stopEndgame } from "../endgames/session";
 import { stopGuess } from "../guess/session";
 import { stopOpening } from "../openings/session";
+import { useSettings } from "../settings";
+import { buzz, BUZZ_END, BUZZ_OPPONENT, celebrate, clearCue, cue } from "./fx";
+import { tierOf } from "../components/Mastery";
 
 const stopTrainers = () => (stopEndgame(), stopOpening(), stopGuess());
 
@@ -49,7 +52,14 @@ export interface PuzzleSession {
   /** Ply the student stepped back to (null = the latest position). Moves are played at the latest only. */
   view: number | null;
   results: { id: string; correct: boolean; themes: string[]; rating: number }[];
+  /** How the first try moved each of the puzzle's themes (XP and stars), when it was rated. */
+  mastery: ThemeGain[] | null;
+  /** When a solved puzzle goes on to the next by itself (ms timestamp); null = it waits. */
+  autoNextAt: number | null;
 }
+
+/** How long a solve stays on screen before the next puzzle, with auto-advance on (the rating count-up fits in it). */
+export const AUTO_NEXT_MS = 2400;
 
 export const usePuzzle = create<PuzzleSession | null>(() => null);
 
@@ -80,7 +90,9 @@ export function initPuzzleSession() {
 
 /** Picks a saved session back up, redoing whatever a timer was about to do when the page went away. */
 function resume(saved: PuzzleSession) {
-  usePuzzle.setState(saved, true);
+  // Saved by an older version (a different shape): dropped.
+  const mastery = saved.mastery?.every((g) => typeof g.after?.xp === "number") ? saved.mastery : null;
+  usePuzzle.setState({ ...saved, mastery, autoNextAt: null }, true);
   const puzzle = saved.queue[saved.index];
   if (saved.status === "loading" || saved.status === "intro" || !saved.line) {
     // Mid-refill or before the opponent's first move: start this puzzle over (or reload the set).
@@ -164,6 +176,7 @@ export function startCoachSet(title: string, puzzles: Puzzle[]) {
 }
 
 export function stopPuzzles() {
+  stopReplay();
   usePuzzle.setState(null, true);
 }
 
@@ -184,6 +197,8 @@ function blank(set: PuzzleSession["set"], choice: Choice): PuzzleSession {
     change: null,
     view: null,
     results: [],
+    mastery: null,
+    autoNextAt: null,
   };
 }
 
@@ -229,7 +244,9 @@ function begin(index: number) {
   }
   // The student plays the side that replies to the opponent's first move.
   const color: Color = sideToMove(puzzle.fen) === "white" ? "black" : "white";
-  set({ index, line: emptyLine(puzzle.fen), solution, color, status: "intro", missed: false, message: "", shapes: [], change: null, view: null });
+  clearCue();
+  stopReplay();
+  set({ index, line: emptyLine(puzzle.fen), solution, color, status: "intro", missed: false, message: "", shapes: [], change: null, view: null, mastery: null, autoNextAt: null });
   window.setTimeout(() => {
     if (get()?.queue[get()!.index] !== puzzle) return;
     autoplay();
@@ -253,6 +270,7 @@ function autoplay() {
   };
   // The opponent's move brings the board back to the present, as in a game.
   set({ line, view: null });
+  buzz(BUZZ_OPPONENT);
 }
 
 export async function nextPuzzle() {
@@ -278,9 +296,13 @@ export async function puzzleMove(from: Key, to: Key) {
   const last = ply === s.solution.length - 1;
   const mates = new Chess(played.line.fens[ply + 1]).isCheckmate();
 
+  const after = played.line.fens[ply + 1];
   if (played.san === expected || (last && mates)) {
     set({ line: played.line, shapes: [], message: "" });
-    if (last || mates) return finish(!s.missed);
+    const done = last || mates;
+    // The final move of a clean solve gets the big cue; a line finished after a miss just gets the tick.
+    cue(done && !s.missed ? "solved" : "correct", to, after);
+    if (done) return finish(!s.missed);
     window.setTimeout(() => {
       if (get()?.line !== played.line) return;
       autoplay();
@@ -290,6 +312,7 @@ export async function puzzleMove(from: Key, to: Key) {
 
   // Wrong: show it briefly, then take it back. The first miss fails the puzzle.
   set({ line: played.line, message: `${played.san} isn't it.` });
+  cue("wrong", to, after);
   if (!s.missed) {
     set({ missed: true });
     await save(false);
@@ -317,19 +340,63 @@ export async function showSolution() {
     line.notes.push("");
   }
   set({ line });
-  finish(false);
+  cue("failed", null, line.fens[line.fens.length - 1]);
+  await finish(false);
+  replaySolution();
+}
+
+/**
+ * "View solution": goes back to where the student was to move and plays the solution out one
+ * move at a time, rather than jumping to its end. Any step the student takes (the arrows) or a
+ * new puzzle stops it where it is.
+ */
+const REPLAY_MS = 900;
+let replay = 0;
+const stopReplay = () => window.clearTimeout(replay);
+
+function replaySolution() {
+  stopReplay();
+  const s = get();
+  if (!s?.line) return;
+  const line = s.line;
+  const end = line.sans.length;
+  // Ply 1: after the opponent's move that sets the puzzle up.
+  let ply = Math.min(1, end);
+  set({ view: ply === end ? null : ply });
+  const step = () => {
+    const now = get();
+    if (!now || now.line !== line) return;
+    ply += 1;
+    set({ view: ply >= end ? null : ply });
+    if (ply < end) replay = window.setTimeout(step, REPLAY_MS);
+  };
+  replay = window.setTimeout(step, REPLAY_MS);
 }
 
 async function finish(correct: boolean) {
   const s = get()!;
   const puzzle = current()!;
+  buzz(BUZZ_END);
   set({
     status: correct ? "solved" : "failed",
     message: correct ? "Solved." : `The solution: ${s.solution.slice(1).join(" ")}.`,
     view: null,
     results: [...s.results, { id: puzzle.id, correct, themes: puzzle.themes, rating: puzzle.rating }],
   });
+  if (correct && useSettings.getState().puzzleAutoNext) {
+    const at = Date.now() + AUTO_NEXT_MS;
+    set({ autoNextAt: at });
+    window.setTimeout(() => {
+      const now = get();
+      if (now && now.autoNextAt === at && current() === puzzle && now.status === "solved") nextPuzzle();
+    }, AUTO_NEXT_MS);
+  }
   if (correct) await save(true);
+}
+
+/** Keeps a solved puzzle on screen (the student is looking at it or asking about it). */
+export function holdPuzzle() {
+  if (get()?.autoNextAt) set({ autoNextAt: null });
 }
 
 /** Saves the attempt once per showing; a miss also becomes a drill. */
@@ -338,7 +405,15 @@ async function save(correct: boolean) {
   const puzzle = current()!;
   try {
     const r = await recordAttempt(puzzle, correct, Date.now() - s.startedAt);
-    if (current() === puzzle) set({ change: r.rated ? { before: r.before, after: r.after } : null });
+    if (current() === puzzle) {
+      set({ change: r.rated ? { before: r.before, after: r.after } : null, mastery: r.mastery?.length ? r.mastery : null });
+      // A new star (or tier): hold the puzzle so auto-next doesn't skip the moment.
+      const ups = r.mastery?.filter((g) => g.after.stars > g.before.stars) ?? [];
+      if (ups.length) {
+        holdPuzzle();
+        celebrate(ups.some((g) => tierOf(g.after.stars).index > tierOf(g.before.stars).index));
+      }
+    }
     if (!correct) {
       const themes = puzzle.themes.filter((t) => !["short", "long", "veryLong", "oneMove", "crushing", "advantage"].includes(t));
       const start = new Chess(puzzle.fen);
@@ -364,7 +439,8 @@ async function save(correct: boolean) {
 export function viewStep(delta: Step) {
   const s = get();
   if (!s?.line) return;
-  set({ view: stepView(s.line.sans.length, s.view, delta) });
+  stopReplay();
+  set({ view: stepView(s.line.sans.length, s.view, delta), autoNextAt: null });
 }
 
 export function setChoice(choice: Partial<Choice>) {

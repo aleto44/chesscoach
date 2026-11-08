@@ -17,11 +17,15 @@ export interface Settings {
    * it by Elo against the bot's rating; the computer updates it as each one ends (db.rs rate_game).
    */
   playerRating: number | null;
-  /** The student's usernames for importing their games (games/import.ts); "" = not set. */
-  chesscomUser: string;
-  lichessUser: string;
-  /** Desktop: look for new games on those accounts when the app opens (every few hours at most). */
+  /** Desktop: look for new games on the student's import accounts (games/import.ts) when the app opens (every few hours at most). */
   autoImport: boolean;
+  /** Puzzles: go on to the next one by itself shortly after a solve (a miss always waits). */
+  puzzleAutoNext: boolean;
+  /** Phones: a short buzz on puzzle moves and solves (where the browser can vibrate). */
+  haptics: boolean;
+  /** Desktop: the coach column's width in px (dragged by its left edge) and whether it's tucked away into a side tab. */
+  chatWidth: number;
+  chatCollapsed: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -31,9 +35,11 @@ const DEFAULTS: Settings = {
   theme: "dark",
   nudges: "blunders",
   playerRating: null,
-  chesscomUser: "",
-  lichessUser: "",
   autoImport: true,
+  puzzleAutoNext: true,
+  haptics: true,
+  chatWidth: 420,
+  chatCollapsed: false,
 };
 
 export const MODEL_CHOICES = [

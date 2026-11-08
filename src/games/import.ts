@@ -7,7 +7,8 @@ import { invoke, isTauri } from "../backend";
 import { analyzeBacklog } from "../analysis/review";
 import { hasBackend, moveRows } from "../db";
 import { fromLichess } from "../rating";
-import { saveSetting, useSettings } from "../settings";
+import { useSettings } from "../settings";
+import { leaveDeletedGames } from "../game/session";
 import type { Color, ImportSite } from "../store";
 import { parsePgn } from "./pgn";
 
@@ -32,8 +33,8 @@ export interface ImportResult {
   skipped: number;
 }
 
-/** Per site: an import running now, or how the last one went. */
-export const useImport = create<Partial<Record<ImportSite, { running: boolean; message: string; error: boolean }>>>(() => ({}));
+/** Per account (accountKey): an import running now, or how the last one went. */
+export const useImport = create<Partial<Record<string, { running: boolean; message: string; error: boolean }>>>(() => ({}));
 
 // ---- chess.com ----
 
@@ -111,30 +112,42 @@ function fromLichessGame(g: any): Candidate {
 // ---- Saving ----
 
 const sqliteTime = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace("T", " ");
+const fromSqlite = (t: string) => Date.parse(t.replace(" ", "T") + "Z");
 
 /** Games that never got going (aborted, or a move or two) teach nothing. */
 const MIN_PLIES = 6;
 
-/** Fetches the latest `max` games of `user` from `site` and saves the new ones. */
-export async function importGames(site: ImportSite, user: string, max: number): Promise<ImportResult> {
-  const set = (running: boolean, message: string, error = false) =>
-    useImport.setState({ [site]: { running, message, error } });
+/** A refresh looks back this far before the account's latest game, in case one ended late. */
+const REFRESH_OVERLAP_MS = 24 * 3600_000;
+
+/** How many games a refresh may bring in at most (the backend's cap). */
+const REFRESH_MAX = 300;
+
+/** Fetches `user`'s games from `site` (the latest `max`, or all since `since`) and saves the new ones. */
+async function runImport(site: ImportSite, user: string, max: number, since: number | null): Promise<ImportResult> {
   user = user.trim();
-  await saveSetting(site === "chesscom" ? "chesscomUser" : "lichessUser", user);
-  set(true, "Fetching your games…");
+  const key = accountKey(site, user);
+  const set = (running: boolean, message: string, error = false) =>
+    useImport.setState({ [key]: { running, message, error } });
+  set(true, "Fetching games…");
   try {
-    const raw = await invoke<any[]>("import_fetch", { site, user, max });
+    const raw = await invoke<any[]>("import_fetch", { site, user, max, since });
     const known = new Set(await invoke<string[]>("db_import_known", { site }));
     const result: ImportResult = { site, fetched: raw.length, added: 0, already: 0, skipped: 0 };
     const me = user.toLowerCase();
+    // The site's own spelling of the username, as its games have it.
+    let account = user;
+    const seen: string[] = [];
     for (const [i, g] of raw.entries()) {
       set(true, `Reading game ${i + 1} of ${raw.length}…`);
       const c = site === "chesscom" ? fromChesscom(g) : fromLichessGame(g);
+      const color: Color | null = c.white.name.toLowerCase() === me ? "white" : c.black.name.toLowerCase() === me ? "black" : null;
+      if (color) account = (color === "white" ? c.white : c.black).name;
       if (known.has(c.externalId)) {
+        seen.push(c.externalId);
         result.already++;
         continue;
       }
-      const color: Color | null = c.white.name.toLowerCase() === me ? "white" : c.black.name.toLowerCase() === me ? "black" : null;
       let parsed;
       try {
         parsed = parsePgn(c.pgn);
@@ -153,6 +166,7 @@ export async function importGames(site: ImportSite, user: string, max: number): 
       const id = await invoke<number | null>("db_import_game", {
         game: {
           source: site,
+          account: me_.name,
           externalId: c.externalId,
           url: c.url,
           playedAt: sqliteTime(c.playedAt),
@@ -171,9 +185,11 @@ export async function importGames(site: ImportSite, user: string, max: number): 
       if (id === null) result.already++;
       else result.added++;
     }
-    set(false, summary(result));
-    localStorage.setItem(lastKey(site), String(Date.now()));
+    await invoke("db_import_finish", { site, account, seen });
+    set(false, summary(result, since !== null));
+    localStorage.setItem(lastKey(site, account), String(Date.now()));
     if (result.added) analyzeBacklog();
+    await loadAccounts();
     return result;
   } catch (e) {
     set(false, String(e).replace(/^Error: /, ""), true);
@@ -181,32 +197,74 @@ export async function importGames(site: ImportSite, user: string, max: number): 
   }
 }
 
-function summary(r: ImportResult): string {
-  if (r.fetched === 0) return "No games found on that account.";
+/** Adds an account (or re-reads one): its latest `max` games. */
+export const importGames = (site: ImportSite, user: string, max: number) => runImport(site, user, max, null);
+
+/** New games on an account since its latest one here; the latest few if it has none yet. */
+export function refreshAccount(a: ImportAccount & { account: string }) {
+  const since = a.lastGameAt ? fromSqlite(a.lastGameAt) - REFRESH_OVERLAP_MS : null;
+  return runImport(a.site, a.account, since === null ? 25 : REFRESH_MAX, since);
+}
+
+function summary(r: ImportResult, refresh: boolean): string {
+  if (r.fetched === 0) return refresh ? "No new games since the last one here." : "No games found on that account.";
   const parts = [r.added ? `Added ${r.added} new game${r.added > 1 ? "s" : ""}` : "No new games"];
   if (r.already) parts.push(`${r.already} already here`);
   if (r.skipped) parts.push(`${r.skipped} skipped (too short or unfinished)`);
   return parts.join(", ") + ".";
 }
 
-const lastKey = (site: ImportSite) => `cc-last-import-${site}`;
-const AUTO_EVERY_MS = 6 * 3600_000;
+// ---- Accounts ----
+
+/** One account the student imported from; `account` null = games from before accounts were recorded. */
+export interface ImportAccount {
+  site: ImportSite;
+  account: string | null;
+  games: number;
+  /** SQLite datetimes, UTC. */
+  lastGameAt: string | null;
+  refreshedAt: string | null;
+}
+
+export const useAccounts = create<{ list: ImportAccount[] | null }>(() => ({ list: null }));
+
+export async function loadAccounts() {
+  if (!hasBackend()) return;
+  useAccounts.setState({ list: await invoke<ImportAccount[]>("db_import_accounts") });
+}
+
+/** Where useImport keeps an account's progress: usernames are the same in any case. */
+export const accountKey = (site: ImportSite, account: string | null) => `${site}:${account?.trim().toLowerCase() ?? ""}`;
 
 /**
- * Desktop: picks up new games on the student's accounts when the app opens, at most every few
- * hours. Only the latest few are fetched; anything older was imported by hand.
+ * Deletes an account's games, their reviews and the drills made from them, and forgets the
+ * account. Returns how many games went.
  */
-export function autoImport() {
+export async function removeAccount(site: ImportSite, account: string | null): Promise<number> {
+  const ids = await invoke<number[]>("db_import_remove", { site, account });
+  await leaveDeletedGames(ids);
+  useImport.setState({ [accountKey(site, account)]: undefined });
+  if (account) localStorage.removeItem(lastKey(site, account));
+  await loadAccounts();
+  return ids.length;
+}
+
+const lastKey = (site: ImportSite, account: string) => `cc-last-import-${accountKey(site, account)}`;
+const AUTO_EVERY_MS = 6 * 3600_000;
+
+/** Desktop: picks up new games on every account when the app opens, at most every few hours. */
+export async function autoImport() {
   if (!isTauri || !hasBackend()) return;
-  const s = useSettings.getState();
-  if (!s.autoImport) return;
-  for (const [site, user] of [
-    ["chesscom", s.chesscomUser],
-    ["lichess", s.lichessUser],
-  ] as [ImportSite, string][]) {
-    if (!user) continue;
-    const last = Number(localStorage.getItem(lastKey(site)) ?? 0);
+  if (!useSettings.getState().autoImport) return;
+  try {
+    await loadAccounts();
+  } catch (e) {
+    return console.warn("could not list the import accounts", e);
+  }
+  for (const a of useAccounts.getState().list ?? []) {
+    if (!a.account) continue;
+    const last = Number(localStorage.getItem(lastKey(a.site, a.account)) ?? 0);
     if (Date.now() - last < AUTO_EVERY_MS) continue;
-    importGames(site, user, 20).catch((e) => console.warn(`auto-import from ${site} failed`, e));
+    await refreshAccount({ ...a, account: a.account }).catch((e) => console.warn(`auto-import of ${a.account} failed`, e));
   }
 }

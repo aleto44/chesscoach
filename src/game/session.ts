@@ -232,7 +232,19 @@ export async function deleteGame(id: number) {
     await invoke("coach_reset");
   }
   await db.deleteGame(id);
-  if (!current) return;
+  if (current) await moveOffDeletedGame();
+}
+
+/** After games were deleted in bulk (an imported account removed): leaves the open one if it went. */
+export async function leaveDeletedGames(ids: number[]) {
+  const open = useStore.getState().gameId;
+  if (open === null || !ids.includes(open)) return;
+  discardPending();
+  await invoke("coach_reset");
+  await moveOffDeletedGame();
+}
+
+async function moveOffDeletedGame() {
   withoutSaving(() => useStore.setState({ gameId: null }));
   const [latest] = await db.listGames(1);
   if (latest) await loadGame(latest.id);
