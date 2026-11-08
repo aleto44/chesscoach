@@ -2,7 +2,12 @@ import { useState } from "react";
 import { useDrill } from "../analysis/drillSession";
 import { back, go, goHome, trail, useNav, VIEW_TITLE } from "../nav";
 import { usePuzzle } from "../puzzles/session";
+import { useEndgame } from "../endgames/session";
+import { useOpening } from "../openings/session";
+import { useGuess } from "../guess/session";
 import { NewGameDialog } from "./GameDialogs";
+import { isRemote, useConnection } from "../backend";
+import { useOutbox } from "../offline";
 import { SettingsDialog } from "./SettingsDialog";
 
 /** App-wide bar: back and home on the left, where you are, then a quick new game and settings. */
@@ -13,7 +18,10 @@ export function TopBar() {
   const puzzling = usePuzzle((p) => p !== null);
   const path = trail(view).slice(1);
   // A running session is one level below the menu it was started from.
-  const session = puzzling ? "Solving" : drilling ? "Drilling" : null;
+  const endgame = useEndgame((e) => e !== null);
+  const guessing = useGuess((g) => g !== null);
+  const opening = useOpening((o) => o !== null);
+  const session = puzzling ? "Solving" : drilling ? "Drilling" : endgame ? "Endgame" : opening ? "Opening" : guessing ? "Guessing" : null;
   const atHome = view === "home" && !session;
   const close = () => setDialog(null);
   return (
@@ -48,6 +56,7 @@ export function TopBar() {
           )}
         </nav>
         <span className="spacer" />
+        <OfflineChip />
         <button className="primary" onClick={() => setDialog("new")}>
           New game
         </button>
@@ -59,5 +68,25 @@ export function TopBar() {
       {dialog === "new" && <NewGameDialog onClose={close} />}
       {dialog === "settings" && <SettingsDialog onClose={close} />}
     </>
+  );
+}
+
+/** Phones: says when the computer is out of reach, and how many results wait to sync. */
+function OfflineChip() {
+  const reachable = useConnection((c) => c.reachable);
+  const pending = useOutbox((o) => o.pending);
+  if (!isRemote || (reachable && !pending)) return null;
+  const label = reachable ? `Syncing ${pending}…` : pending ? `Offline · ${pending} to sync` : "Offline";
+  return (
+    <span
+      className={`offline-chip ${reachable ? "syncing" : ""}`}
+      title={
+        reachable
+          ? "Sending what you did offline to your computer."
+          : "Can't reach your computer. Puzzles and drills still work; results sync when it's back. Games and the coach need the computer."
+      }
+    >
+      {label}
+    </span>
   );
 }

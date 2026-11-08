@@ -47,7 +47,7 @@ const getSession = () =>
   }));
 
 /** Starts loading the model so the first move isn't slow. */
-export const preloadMaia = () => void getSession().catch(() => undefined);
+export const preloadMaia = () => getSession().then(() => true, () => false);
 
 /** A move a player of this chess.com-scale rating might play, in UCI. Samples, so it varies. */
 export async function maiaMove(fen: string, rating: number): Promise<string | null> {

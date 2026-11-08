@@ -15,6 +15,9 @@ import { getPuzzle } from "../puzzles/puzzles";
 import { dueDrills, gradeDrill, retireDrill, type Drill } from "./drills";
 import { explainCached, type Explanation } from "./explain";
 import { lossFromEvals } from "./review";
+import { stopEndgame } from "../endgames/session";
+import { stopGuess } from "../guess/session";
+import { stopOpening } from "../openings/session";
 
 /**
  * Loss in review points (see lossPoints) a drill answer may give away: below an inaccuracy. A flat
@@ -60,6 +63,65 @@ export interface DrillState {
 
 export const useDrill = create<DrillState | null>(() => null);
 
+/**
+ * The session is kept in localStorage so a reload picks up the same drill where the student left
+ * it: a phone drops the page when the student switches apps for a while.
+ */
+const SAVE_KEY = "cc-drill";
+
+/** Restores the last session (if any) and keeps saving it. Call once at startup. */
+export function initDrillSession() {
+  let saved: DrillState | null = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(SAVE_KEY) ?? "null");
+  } catch {
+    saved = null;
+  }
+  useDrill.subscribe((s) => {
+    try {
+      if (s) localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+      else localStorage.removeItem(SAVE_KEY);
+    } catch {
+      // Private mode or full storage: the session just won't survive a reload.
+    }
+  });
+  if (saved && Array.isArray(saved.queue)) resume(saved);
+}
+
+/** Picks a saved session back up, redoing whatever was in flight when the page went away. */
+function resume(saved: DrillState) {
+  useDrill.setState(saved, true);
+  const drill = saved.queue[saved.index];
+  const line = saved.line;
+  if (saved.status === "loading" || saved.status === "intro" || !line) {
+    // Before the drill's position was shown (or while the queue loaded): open it again.
+    if (drill) begin(saved.index);
+    else if (saved.status === "loading") startDrills();
+    return;
+  }
+  if (saved.status === "solving") return autoplay();
+  if (saved.status === "checking") {
+    // The engine was grading the answer and the grade never got saved: take the move back to replay it.
+    const back = line.sans.length - 1;
+    useDrill.setState({
+      status: "solving",
+      shapes: [],
+      line: { ...line, sans: line.sans.slice(0, back), fens: line.fens.slice(0, back + 1), lastMoves: line.lastMoves.slice(0, back), notes: line.notes.slice(0, back) },
+    });
+    return;
+  }
+  if (saved.status === "wrong" && !saved.why && !saved.whyFailed && drill && drill.kind !== "opening") {
+    // The reasons for a wrong answer were still being worked out: work them out again.
+    const ply = line.sans.length - 1;
+    const best = saved.shapes.find((sh) => sh.brush === "green");
+    if (ply >= 0 && best) {
+      const fen = line.fens[ply];
+      const bestMove = new Chess(fen).moves({ verbose: true }).find((m) => m.from === best.orig && m.to === best.dest);
+      if (bestMove) explainWrong(fen, uciOf(fen, line.sans[ply]), bestMove.from + bestMove.to + (bestMove.promotion ?? ""));
+    }
+  }
+}
+
 const current = () => {
   const s = useDrill.getState();
   return s && s.queue[s.index];
@@ -86,9 +148,13 @@ const blank = (queue: Drill[]): DrillState => ({
   whyFailed: false,
 });
 
-export async function startDrills(all = false) {
+/** `tag`: drill the mistakes with that review tag (the weakness dashboard), due or not. */
+export async function startDrills(all = false, tag: string | null = null) {
+  stopEndgame();
+  stopOpening();
+  stopGuess();
   useDrill.setState(blank([]), true);
-  const queue = await dueDrills(30, all);
+  const queue = await dueDrills(30, all, tag);
   if (!useDrill.getState()) return;
   useDrill.setState({ ...blank(queue), status: queue.length ? "loading" : "done" }, true);
   if (queue.length) begin(0);

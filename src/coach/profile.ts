@@ -26,6 +26,13 @@ export async function profileText(): Promise<string> {
     `Rated games (unaided): ${c.rated_finished ?? 0} finished, ${c.rated_analyzed ?? 0} analyzed. ` +
       `Practice games: ${c.practice_games ?? 0} (help was available; not evidence of strength).`,
   ];
+  const gr = p.gameRating;
+  if (gr) {
+    out.push(
+      `Game rating (chess.com scale, Elo from rated games vs the bots' ratings): ${gr.rating}, ` +
+        (gr.games ? `moved by ${gr.games} rated games.` : "set by the student or the default; no rated games have moved it yet."),
+    );
+  }
   if (!c.rated_finished) {
     out.push("No rated games yet, so there's no reliable picture of the student's level. Suggest playing a few.");
   }
@@ -64,7 +71,8 @@ export async function profileText(): Promise<string> {
           .map(
             (g: Row) =>
               `  #${g.id} ${g.date} ${g.color} vs ${opp(g.opponent)}, ${g.result} ${g.termination}, ${tc(g.time_control)}` +
-              `${g.opening_name ? `, ${g.opening_name}` : ""}, avg loss ${g.avg_cp_loss ?? "?"}cp, ${g.blunders} blunders`,
+              `${g.opening_name ? `, ${g.opening_name}` : ""}` +
+              `${g.rating_after !== null && g.rating_after !== undefined ? `, rating ${g.rating_before}→${g.rating_after}` : ""}, avg loss ${g.avg_cp_loss ?? "?"}cp, ${g.blunders} blunders`,
           )
           .join("\n"),
     );

@@ -218,6 +218,25 @@ ALTER TABLE moves ADD COLUMN label TEXT;
 -- while behind are blunders again): re-analyze every game on the next launch. Drills are unique
 -- per position, so existing ones aren't duplicated.
 UPDATE games SET analyzed_at = NULL;
+"#, r#"
+-- The student's game rating (chess.com scale) before and after each rated game that counted.
+-- NULL = the game didn't count (practice, unfinished, or finished before ratings existed).
+ALTER TABLE games ADD COLUMN rating_before INTEGER;
+ALTER TABLE games ADD COLUMN rating_after INTEGER;
+"#, r#"
+-- Games imported from the student's chess.com and Lichess accounts (src-tauri/src/import.rs).
+-- They're stored as rated games (real play, no help) but never move the in-app rating: their
+-- opponent key is 'chesscom:<name>' / 'lichess:<name>', which rate_game ignores.
+ALTER TABLE games ADD COLUMN source TEXT;            -- 'chesscom' | 'lichess'; NULL = played in this app
+ALTER TABLE games ADD COLUMN external_id TEXT;       -- the site's game id
+ALTER TABLE games ADD COLUMN url TEXT;
+ALTER TABLE games ADD COLUMN opponent_name TEXT;
+ALTER TABLE games ADD COLUMN opponent_rating INTEGER; -- chess.com scale (Lichess converted on import)
+ALTER TABLE games ADD COLUMN student_rating INTEGER;  -- the student's own rating in that game, chess.com scale
+ALTER TABLE games ADD COLUMN speed TEXT;             -- 'bullet' | 'blitz' | 'rapid' | 'classical'
+CREATE UNIQUE INDEX games_external ON games(source, external_id) WHERE source IS NOT NULL;
+DROP VIEW rated_games;
+CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
 "#];
 
 impl Db {
@@ -309,17 +328,17 @@ pub struct GamePatch {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveRow {
-    ply: i64,
-    san: String,
-    uci: String,
-    fen_before: String,
-    fen_after: String,
-    by_student: bool,
+    pub(crate) ply: i64,
+    pub(crate) san: String,
+    pub(crate) uci: String,
+    pub(crate) fen_before: String,
+    pub(crate) fen_after: String,
+    pub(crate) by_student: bool,
     #[serde(default)]
-    clock_ms: Option<i64>,
+    pub(crate) clock_ms: Option<i64>,
     /// Read-only here; written by `stats::db_save_analysis`.
     #[serde(default, skip_deserializing)]
-    analysis: Option<MoveAnalysis>,
+    pub(crate) analysis: Option<MoveAnalysis>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -359,7 +378,7 @@ pub struct ChatRow {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameSummary {
-    id: i64,
+    pub(crate) id: i64,
     started_at: String,
     updated_at: String,
     ended_at: Option<String>,
@@ -377,6 +396,15 @@ pub struct GameSummary {
     opening_focus: Option<Vec<String>>,
     plies: i64,
     opening: String,
+    rating_before: Option<i64>,
+    rating_after: Option<i64>,
+    /// Imported games: where from, and who the student played.
+    source: Option<String>,
+    url: Option<String>,
+    opponent_name: Option<String>,
+    opponent_rating: Option<i64>,
+    student_rating: Option<i64>,
+    speed: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -393,7 +421,9 @@ const SUMMARY_SQL: &str = "
            g.analyzed_at IS NOT NULL, g.opening_name, g.opening_focus,
            (SELECT count(*) FROM moves m WHERE m.game_id = g.id),
            (SELECT coalesce(group_concat(san, ' '), '')
-              FROM (SELECT san FROM moves m WHERE m.game_id = g.id ORDER BY ply LIMIT 10))
+              FROM (SELECT san FROM moves m WHERE m.game_id = g.id ORDER BY ply LIMIT 10)),
+           g.rating_before, g.rating_after,
+           g.source, g.url, g.opponent_name, g.opponent_rating, g.student_rating, g.speed
     FROM games g";
 
 fn summary(r: &Row) -> rusqlite::Result<GameSummary> {
@@ -416,10 +446,18 @@ fn summary(r: &Row) -> rusqlite::Result<GameSummary> {
         opening_focus: r.get::<_, Option<String>>(15)?.and_then(|f| serde_json::from_str(&f).ok()),
         plies: r.get(16)?,
         opening: r.get(17)?,
+        rating_before: r.get(18)?,
+        rating_after: r.get(19)?,
+        source: r.get(20)?,
+        url: r.get(21)?,
+        opponent_name: r.get(22)?,
+        opponent_rating: r.get(23)?,
+        student_rating: r.get(24)?,
+        speed: r.get(25)?,
     })
 }
 
-fn err(e: impl std::fmt::Display) -> String {
+pub(crate) fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
 
@@ -447,22 +485,118 @@ pub fn db_create_game(db: State<Db>, game: NewGame) -> Result<i64, String> {
 
 #[tauri::command]
 pub fn db_update_game(db: State<Db>, id: i64, patch: GamePatch) -> Result<(), String> {
-    db.0.lock()
-        .unwrap()
-        .execute(
-            "UPDATE games SET
-                coach_session_id = coalesce(?2, coach_session_id),
-                result           = coalesce(?3, result),
-                termination      = coalesce(?4, termination),
-                mode             = coalesce(?5, mode),
-                takebacks        = coalesce(?6, takebacks),
-                ended_at         = CASE WHEN ?3 IS NOT NULL THEN datetime('now') ELSE ended_at END,
-                updated_at       = datetime('now')
-             WHERE id = ?1",
-            params![id, patch.coach_session_id, patch.result, patch.termination, patch.mode, patch.takebacks],
+    update_game(&mut db.0.lock().unwrap(), id, patch)
+}
+
+fn update_game(conn: &mut Connection, id: i64, patch: GamePatch) -> Result<(), String> {
+    let tx = conn.transaction().map_err(err)?;
+    let was_over: bool = tx
+        .query_row("SELECT result IS NOT NULL FROM games WHERE id = ?1", [id], |r| r.get(0))
+        .optional()
+        .map_err(err)?
+        .ok_or_else(|| format!("game {id} no longer exists"))?;
+    tx.execute(
+        "UPDATE games SET
+            coach_session_id = coalesce(?2, coach_session_id),
+            result           = coalesce(?3, result),
+            termination      = coalesce(?4, termination),
+            mode             = coalesce(?5, mode),
+            takebacks        = coalesce(?6, takebacks),
+            ended_at         = CASE WHEN ?3 IS NOT NULL THEN datetime('now') ELSE ended_at END,
+            updated_at       = datetime('now')
+         WHERE id = ?1",
+        params![id, patch.coach_session_id, patch.result, patch.termination, patch.mode, patch.takebacks],
+    )
+    .map_err(err)?;
+    // Rated once, when the result first arrives: a second device saving the same result
+    // (both saw the game end) finds it already over.
+    if !was_over && patch.result.is_some() {
+        rate_game(&tx, id)?;
+    }
+    tx.commit().map_err(err)
+}
+
+/// Where a player's rating starts until they set their own (Settings), chess.com scale.
+pub const START_RATING: i64 = 1200;
+
+/// The student's game rating (the `playerRating` setting, chess.com scale) and how many rated
+/// games have changed it.
+pub fn player_rating(conn: &Connection) -> Result<(i64, i64), String> {
+    let rating = conn
+        .query_row("SELECT value FROM settings WHERE key = 'playerRating'", [], |r| r.get::<_, String>(0))
+        .optional()
+        .map_err(err)?
+        .and_then(|v| v.parse::<f64>().ok())
+        .map_or(START_RATING, |v| v.round() as i64);
+    let games = conn
+        .query_row("SELECT count(*) FROM games WHERE rating_after IS NOT NULL", [], |r| r.get(0))
+        .map_err(err)?;
+    Ok((rating, games))
+}
+
+/// Elo against the opponent's rating (the bot's chess.com-scale strength), stored on the game and
+/// in the setting. Mirrors `eloChange` in src/rating.ts, which previews it before a game.
+fn rate_game(conn: &Connection, id: i64) -> Result<(), String> {
+    let (mode, color, opponent, result): (String, String, Option<String>, Option<String>) = conn
+        .query_row("SELECT mode, student_color, opponent, result FROM games WHERE id = ?1", [id], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+        })
+        .map_err(err)?;
+    // Only "stockfish-cc:" keys are on the chess.com scale (older "stockfish:" games never get here).
+    let opp = opponent.as_deref().and_then(|o| o.strip_prefix("stockfish-cc:")).and_then(|r| r.parse::<i64>().ok());
+    let (Some(opp), Some(result)) = (opp, result) else { return Ok(()) };
+    if mode != "rated" || color == "both" {
+        return Ok(());
+    }
+    let score = match (result.as_str(), color.as_str()) {
+        ("1/2-1/2", _) => 0.5,
+        ("1-0", "white") | ("0-1", "black") => 1.0,
+        _ => 0.0,
+    };
+    let (before, games) = player_rating(conn)?;
+    let after = before + elo_change(before, opp, score, games);
+    conn.execute("UPDATE games SET rating_before = ?2, rating_after = ?3 WHERE id = ?1", params![id, before, after])
+        .map_err(err)?;
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES ('playerRating', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [after.to_string()],
+    )
+    .map_err(err)?;
+    Ok(())
+}
+
+/// Bigger steps for the first games, so a rating that was set wrong settles quickly.
+fn elo_change(player: i64, opponent: i64, score: f64, games_so_far: i64) -> i64 {
+    let expected = 1.0 / (1.0 + 10f64.powf((opponent - player) as f64 / 400.0));
+    let k = if games_so_far < 10 { 32.0 } else { 16.0 };
+    (k * (score - expected)).round() as i64
+}
+
+/// For the games menu and the new-game dialog: the rating, how many games it rests on, and the
+/// rating after each of the last 100 rated games (oldest first), each with the one before it.
+#[tauri::command]
+pub fn db_player_rating(db: State<Db>) -> Result<serde_json::Value, String> {
+    let conn = db.0.lock().unwrap();
+    let (rating, games) = player_rating(&conn)?;
+    let history = conn
+        .prepare(
+            "SELECT rating_before, rating_after FROM
+                (SELECT rating_before, rating_after, ended_at, id FROM games WHERE rating_after IS NOT NULL
+                 ORDER BY ended_at DESC, id DESC LIMIT 100)
+             ORDER BY ended_at, id",
         )
-        .map_err(err)
-        .and_then(|n| if n == 0 { Err(format!("game {id} no longer exists")) } else { Ok(()) })
+        .map_err(err)?
+        .query_map([], |r| Ok([r.get::<_, i64>(0)?, r.get::<_, i64>(1)?]))
+        .map_err(err)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(err)?;
+    let set = conn
+        .query_row("SELECT 1 FROM settings WHERE key = 'playerRating'", [], |_| Ok(()))
+        .optional()
+        .map_err(err)?
+        .is_some();
+    Ok(serde_json::json!({ "rating": rating, "games": games, "set": set, "history": history }))
 }
 
 /// Makes the stored move list match `moves` (takebacks truncate it). A move's analysis survives
@@ -674,4 +808,57 @@ pub fn db_prune_empty_games(db: State<Db>, keep: Option<i64>) -> Result<usize, S
             [keep],
         )
         .map_err(err)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn finish(conn: &mut Connection, id: i64, result: &str) {
+        let patch = GamePatch { coach_session_id: None, result: Some(result.into()), termination: Some("checkmate".into()), mode: None, takebacks: None };
+        update_game(conn, id, patch).unwrap();
+    }
+
+    fn game(conn: &Connection, mode: &str, color: &str, opponent: &str) -> i64 {
+        conn.execute(
+            "INSERT INTO games (start_fen, student_color, opponent, mode) VALUES ('x', ?1, ?2, ?3)",
+            params![color, opponent, mode],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    }
+
+    #[test]
+    fn rated_games_move_the_rating_once() {
+        let path = std::env::temp_dir().join(format!("cc-rating-test-{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let db = Db::open(&path).unwrap();
+        let mut conn = db.conn();
+        assert_eq!(player_rating(&conn).unwrap(), (START_RATING, 0));
+
+        // A win against an equal bot: +16 while the rating is new.
+        let g = game(&conn, "rated", "white", "stockfish-cc:1200");
+        finish(&mut conn, g, "1-0");
+        assert_eq!(player_rating(&conn).unwrap(), (1216, 1));
+        // The same result saved again (a second device) changes nothing.
+        finish(&mut conn, g, "1-0");
+        assert_eq!(player_rating(&conn).unwrap(), (1216, 1));
+
+        // Practice games don't count.
+        let p = game(&conn, "practice", "black", "stockfish-cc:1800");
+        finish(&mut conn, p, "0-1");
+        assert_eq!(player_rating(&conn).unwrap(), (1216, 1));
+
+        // A set rating is the starting point; a loss as Black to a much weaker bot costs a lot.
+        conn.execute("UPDATE settings SET value = '1500' WHERE key = 'playerRating'", []).unwrap();
+        let l = game(&conn, "rated", "black", "stockfish-cc:1100");
+        finish(&mut conn, l, "1-0");
+        let (before, after): (i64, i64) =
+            conn.query_row("SELECT rating_before, rating_after FROM games WHERE id = ?1", [l], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+        assert_eq!((before, after), (1500, 1500 - 29));
+        assert_eq!(elo_change(1500, 1500, 0.5, 20), 0);
+        drop(conn);
+        drop(db);
+        let _ = std::fs::remove_file(&path);
+    }
 }

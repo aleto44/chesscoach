@@ -164,7 +164,8 @@ export function VerdictLine({ v }: { v: NonNullable<ReturnType<typeof useVerdict
 // ---- The report ----
 
 /** The rating the game was played at: the bot's, when there was one. */
-const reportAnchor = (meta: GameMeta) => (meta.studentColor === "both" ? null : meta.opponentElo);
+const reportAnchor = (meta: GameMeta) =>
+  meta.studentColor === "both" ? null : meta.imported ? meta.imported.opponentRating : meta.opponentElo;
 
 export function useGameReport(): GameReport | null {
   const game = useStore((s) => s.game);

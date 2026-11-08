@@ -19,17 +19,28 @@ import { initSync } from "./game/sync";
 import { initReview } from "./analysis/review";
 import { initQuiz } from "./coach/quiz";
 import { initNudges } from "./coach/nudge";
-import { refreshDrillCounts } from "./analysis/drills";
 import { initPuzzles } from "./puzzles/puzzles";
-import { bootstrap, initGameOverWatch } from "./game/session";
-import { initTheme, loadSettings } from "./settings";
+import { initGameOverWatch } from "./game/session";
+import { initTheme } from "./settings";
 import { initSounds } from "./sound";
 import { initNav } from "./nav";
+import { initPuzzleSession } from "./puzzles/session";
+import { initDrillSession } from "./analysis/drillSession";
 import { initLiveEval } from "./engine/live";
+import { boot } from "./boot";
+import { launchedFrom, mark } from "./perf";
+import { initSnapshot, restoreSnapshot } from "./snapshot";
+import { initOffline } from "./offline";
+import { resumeOpponent } from "./game/opponent";
 
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 
+mark("script running");
+
 function start() {
+  // Phones: the last screen first (from the phone itself), the computer's copy after.
+  const shown = restoreSnapshot();
+  launchedFrom(shown !== null ? "snapshot" : "cold");
   initBridge();
   initAuth();
   initUsage();
@@ -41,19 +52,24 @@ function start() {
   initReview();
   initQuiz();
   initNudges();
-  refreshDrillCounts();
   initPuzzles();
+  initPuzzleSession();
+  initDrillSession();
   initSounds();
   initNav();
   initLiveEval();
-  loadSettings().catch((e) => console.error("could not load settings", e));
-  bootstrap().catch((e) => console.error("could not open the last game", e));
+  initSnapshot();
+  initOffline();
+  boot(shown)
+    .then(resumeOpponent)
+    .catch((e) => console.error("could not open the app", e));
 
   root.render(
     <React.StrictMode>
       <App />
     </React.StrictMode>,
   );
+  requestAnimationFrame(() => mark("first screen"));
 }
 
 initTheme();

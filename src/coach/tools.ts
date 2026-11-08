@@ -407,7 +407,12 @@ Object.assign(handlers, {
       );
       if (ex.better && !shownBetter) {
         shownBetter = true;
-        out.push(`Engine's move instead: ${ex.better.steps.map((s) => `${s.label} ${s.note}`).join(" ")} Result: ${ex.better.verdict}`);
+        if (ex.alternatives.length > 1)
+          out.push(
+            `No single best move: several sound moves instead, each with the reply: ` +
+              ex.alternatives.map((a) => `${a.steps.map((s) => `${s.label} ${s.note}`).join(" ")} (${a.verdict})`).join("; "),
+          );
+        else out.push(`Engine's move instead: ${ex.better.steps.map((s) => `${s.label} ${s.note}`).join(" ")} Result: ${ex.better.verdict}`);
       }
     }
     return { text: out.join("\n") };

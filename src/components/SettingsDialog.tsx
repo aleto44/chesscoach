@@ -1,25 +1,32 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
-import { invoke, isTauri, openUrl } from "../backend";
+import { invoke, isRemote, isTauri, openUrl } from "../backend";
+import { useLaunches } from "../perf";
 import { hasBackend } from "../db";
 import { MODEL_CHOICES, saveSetting, useSettings } from "../settings";
+import { START_RATING } from "../rating";
 import { newId, pushChat, useStore } from "../store";
 import { Modal } from "./GameDialogs";
-import { customSounds, loadSounds, play, SOUND_NAMES, soundFailures } from "../sound";
+import { customSounds, loadSounds, play, SOUND_NAMES, soundFailures, type SoundName } from "../sound";
 
 const CHOICES = [...MODEL_CHOICES, { value: "custom", label: "Custom…", hint: "Any model name or ID claude accepts" }];
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const { coachModel, activeModel, sounds, showEval, theme, nudges } = useSettings();
+  const { coachModel, activeModel, sounds, showEval, theme, nudges, playerRating } = useSettings();
+  const [ratingText, setRatingText] = useState(playerRating === null ? "" : String(playerRating));
+  const typedRating = ratingText.trim() === "" ? null : Math.round(Number(ratingText));
+  const ratingValid = typedRating === null || (Number.isFinite(typedRating) && typedRating >= 100 && typedRating <= 3500);
+  const ratingChanged = ratingValid && typedRating !== playerRating;
   const preset = MODEL_CHOICES.some((c) => c.value === coachModel);
   const [choice, setChoice] = useState(preset ? coachModel : "custom");
   const [custom, setCustom] = useState(preset ? "" : coachModel);
 
   const model = choice === "custom" ? custom.trim() : choice;
-  const changed = model !== coachModel;
+  const changed = model !== coachModel || ratingChanged;
 
   const save = async () => {
-    if (changed) {
+    if (ratingChanged) await saveSetting("playerRating", typedRating);
+    if (model !== coachModel) {
       await saveSetting("coachModel", model);
       // Restart the coach so the next message starts it on the new model (same conversation).
       if (hasBackend() && !useStore.getState().busy) await invoke("coach_reset");
@@ -57,6 +64,27 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         </span>
       </div>
       <label className="field">
+        <span>Your rating</span>
+        <input
+          className="text-input rating-input"
+          type="number"
+          inputMode="numeric"
+          min={100}
+          max={3500}
+          step={1}
+          value={ratingText}
+          placeholder={String(START_RATING)}
+          onChange={(e) => setRatingText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && ratingValid && save()}
+        />
+        <span className={ratingValid ? "muted small" : "error small"}>
+          {ratingValid
+            ? `Your chess.com rapid rating, or your best guess${playerRating === null ? ` (until you set it, it starts at ${START_RATING})` : ""}. ` +
+              "Every rated game moves it up or down by Elo against the bot's rating, so it tracks how you play here."
+            : "Enter a rating between 100 and 3500."}
+        </span>
+      </label>
+      <label className="field">
         <span>Appearance</span>
         <select value={theme} onChange={(e) => saveSetting("theme", e.target.value as typeof theme)}>
           <option value="dark">Dark</option>
@@ -88,12 +116,42 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         </span>
       </label>
       {isTauri && <PhoneAccess />}
+      {isRemote && <StartupTimes />}
       <footer>
-        <button className="primary" onClick={save} disabled={choice === "custom" && !custom.trim()}>
+        <button className="primary" onClick={save} disabled={(choice === "custom" && !custom.trim()) || !ratingValid}>
           {changed ? "Save" : "Done"}
         </button>
       </footer>
     </Modal>
+  );
+}
+
+/** Phones: how long the last few launches took, step by step (perf.ts). */
+function StartupTimes() {
+  const launches = useLaunches();
+  return (
+    <details className="field startup-times">
+      <summary>Startup timing</summary>
+      {launches.map((l) => (
+        <div key={l.at} className="startup-launch">
+          <div className="muted small">
+            {new Date(l.at).toLocaleString()} · {l.from === "snapshot" ? "from the saved screen" : "nothing saved yet"}
+          </div>
+          <table className="stat-table">
+            <tbody>
+              {Object.entries(l.marks)
+                .sort((a, b) => a[1] - b[1])
+                .map(([step, ms]) => (
+                  <tr key={step}>
+                    <td>{step}</td>
+                    <td>{(ms / 1000).toFixed(2)} s</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </details>
   );
 }
 
@@ -239,8 +297,10 @@ function Problem({ text }: { text: string }) {
 /** Preview buttons, plus where to drop custom sound files. */
 function SoundOptions() {
   const [folder, setFolder] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState<string[]>(customSounds());
+  const [loaded, setLoaded] = useState<SoundName[]>(customSounds());
   const [failed, setFailed] = useState<string[]>(soundFailures());
+  const [chosen, setPick] = useState<SoundName>("move-self");
+  const pick = loaded.includes(chosen) ? chosen : (loaded[0] as SoundName);
 
   useEffect(() => {
     if (hasBackend()) invoke<string>("sounds_folder").then(setFolder, () => setFolder(null));
@@ -254,16 +314,23 @@ function SoundOptions() {
 
   return (
     <div className="sound-options">
-      <div className="sound-preview">
-        {SOUND_NAMES.map((n) => (
-          <button key={n} onClick={() => play(n)} title={`Play the ${n} sound`}>
-            ▶ {n}
+      {loaded.length > 0 && (
+        <div className="sound-preview">
+          <select value={pick} onChange={(e) => setPick(e.target.value as SoundName)} title="Sound to preview">
+            {loaded.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <button onClick={() => play(pick)} title={`Play the ${pick} sound`}>
+            ▶ Play
           </button>
-        ))}
-      </div>
+        </div>
+      )}
       {folder && (
         <span className="muted small">
-          Sounds play from files named {SOUND_NAMES.map((n) => `${n}.mp3`).join(", ")} (or .wav/.ogg) in{" "}
+          Sound files go in{" "}
           {isTauri ? (
             <a href="#" onClick={(e) => (e.preventDefault(), revealItemInDir(folder))}>
               this folder
@@ -271,8 +338,9 @@ function SoundOptions() {
           ) : (
             <code>{folder}</code>
           )}
-          , then <a href="#" onClick={(e) => (e.preventDefault(), reload())}>reload sounds</a>.
-          {` Found: ${loaded.join(", ") || "none"}. Missing ones use the move sound (game-end stays silent).`}
+          , named after the event (e.g. <code>move-self.mp3</code>);{" "}
+          <a href="#" onClick={(e) => (e.preventDefault(), reload())}>reload sounds</a> after changing them.
+          {` ${loaded.length} of ${SOUND_NAMES.length} found.`}
         </span>
       )}
       {failed.length > 0 && <span className="error small">Couldn't play on this device: {failed.join(", ")}</span>}

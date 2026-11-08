@@ -12,6 +12,11 @@ import { stepView, viewedPly, type Step } from "../chess/view";
 import type { Color } from "../store";
 import { findPuzzles, recordAttempt, themeLabel, usePuzzleDb, type Puzzle } from "./puzzles";
 import { fromLichess } from "../rating";
+import { stopEndgame } from "../endgames/session";
+import { stopGuess } from "../guess/session";
+import { stopOpening } from "../openings/session";
+
+const stopTrainers = () => (stopEndgame(), stopOpening(), stopGuess());
 
 export type Difficulty = "easier" | "normal" | "harder";
 const OFFSET: Record<Difficulty, number> = { easier: -250, normal: 0, harder: 250 };
@@ -48,6 +53,57 @@ export interface PuzzleSession {
 
 export const usePuzzle = create<PuzzleSession | null>(() => null);
 
+/**
+ * The session is kept in localStorage so a reload picks up the same puzzle where the student left
+ * it: a phone drops the page when the student switches apps while thinking over a puzzle.
+ */
+const SAVE_KEY = "cc-puzzle";
+
+/** Restores the last session (if any) and keeps saving it. Call once at startup. */
+export function initPuzzleSession() {
+  let saved: PuzzleSession | null = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(SAVE_KEY) ?? "null");
+  } catch {
+    saved = null;
+  }
+  usePuzzle.subscribe((s) => {
+    try {
+      if (s) localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+      else localStorage.removeItem(SAVE_KEY);
+    } catch {
+      // Private mode or full storage: the session just won't survive a reload.
+    }
+  });
+  if (saved?.set && Array.isArray(saved.queue)) resume(saved);
+}
+
+/** Picks a saved session back up, redoing whatever a timer was about to do when the page went away. */
+function resume(saved: PuzzleSession) {
+  usePuzzle.setState(saved, true);
+  const puzzle = saved.queue[saved.index];
+  if (saved.status === "loading" || saved.status === "intro" || !saved.line) {
+    // Mid-refill or before the opponent's first move: start this puzzle over (or reload the set).
+    if (puzzle) begin(saved.index);
+    else if (!saved.set.fromCoach) startPuzzles(saved.choice);
+    return;
+  }
+  if (saved.status !== "solving") return;
+  const line = saved.line;
+  const ply = line.sans.length;
+  // A wrong move still on the board (it's taken back after a moment): take it back now.
+  if (ply > 0 && line.sans[ply - 1] !== saved.solution[ply - 1]) {
+    const back = ply - 1;
+    set({
+      line: { ...line, sans: line.sans.slice(0, back), fens: line.fens.slice(0, back + 1), lastMoves: line.lastMoves.slice(0, back), notes: line.notes.slice(0, back) },
+      message: saved.message ? `${line.sans[back]} isn't it. Try again, or view the solution.` : "",
+    });
+  }
+  // The opponent's reply was due: play it.
+  const now = get()!.line!;
+  if (sideToMove(now.fens[now.sans.length]) !== saved.color && now.sans.length < saved.solution.length) autoplay();
+}
+
 const get = () => usePuzzle.getState();
 const set = (patch: Partial<PuzzleSession>) => usePuzzle.setState(patch);
 const current = () => {
@@ -64,13 +120,30 @@ function toSan(fen: string, moves: string[]): string[] {
   return moves.map((m) => uciMove(chess, m).san);
 }
 
-const DEFAULT_CHOICE: Choice = { theme: null, opening: null, difficulty: "normal" };
+/** The last difficulty the student picked: a new session starts on it, not back on "normal". */
+const DIFFICULTY_KEY = "cc-puzzle-difficulty";
+function savedDifficulty(): Difficulty {
+  try {
+    const d = localStorage.getItem(DIFFICULTY_KEY);
+    if (d && d in OFFSET) return d as Difficulty;
+  } catch {
+    // Private mode: normal.
+  }
+  return "normal";
+}
+const defaultChoice = (): Choice => ({ theme: null, opening: null, difficulty: savedDifficulty() });
 
 /** Opens the trainer with puzzles picked from the student's own filters. */
 export async function startPuzzles(choice: Partial<Choice> = {}) {
   stopDrills();
-  const prev = get()?.choice ?? DEFAULT_CHOICE;
+  stopTrainers();
+  const prev = get()?.choice ?? defaultChoice();
   const next = { ...prev, ...choice };
+  try {
+    localStorage.setItem(DIFFICULTY_KEY, next.difficulty);
+  } catch {
+    // Private mode: not remembered.
+  }
   usePuzzle.setState(blank({ title: "Puzzles", fromCoach: false }, next), true);
   try {
     await refill();
@@ -86,7 +159,7 @@ export async function startPuzzles(choice: Partial<Choice> = {}) {
 /** A set the coach picked (find_puzzles). */
 export function startCoachSet(title: string, puzzles: Puzzle[]) {
   stopDrills();
-  usePuzzle.setState({ ...blank({ title, fromCoach: true }, get()?.choice ?? DEFAULT_CHOICE), queue: puzzles }, true);
+  usePuzzle.setState({ ...blank({ title, fromCoach: true }, get()?.choice ?? defaultChoice()), queue: puzzles }, true);
   begin(0);
 }
 

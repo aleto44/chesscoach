@@ -1,12 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { db, opponentElo, type GameSummary } from "../db";
+import { db, hasBackend, importedFrom, opponentElo, type GameSummary } from "../db";
 import { OPPONENT_RATING } from "../game/opponent";
 import { deleteGame, loadGame, newGame } from "../game/session";
 import { TIME_CONTROLS, timeControlLabel } from "../game/clock";
 import { FREE_PLAY, opponentLabel, opponentName, useStore, type Color, type GameMode, type TimeControl } from "../store";
 import { go } from "../nav";
+import { invoke } from "../backend";
+import { eloChange, signed, type PlayerRating } from "../rating";
 import { askConfirm } from "./Confirm";
-import { ModeBadge } from "./ModeBadge";
+import { ModeBadge, SiteBadge } from "./ModeBadge";
 import { OpeningSelect, RepertoireDialog } from "./RepertoireDialog";
 
 export function Modal({
@@ -39,12 +41,14 @@ export function Modal({
   );
 }
 
-/** `mode`: the game type to start with (the menu's practice / rated choice); defaults to the last game's. */
-export function NewGameDialog({ onClose, mode: initialMode }: { onClose: () => void; mode?: GameMode }) {
+/**
+ * `mode`: the game type to start with; defaults to the last game's. `withOpponent`: from the games
+ * menu a game means a computer opponent (free play is its own "Analysis board" entry).
+ */
+export function NewGameDialog({ onClose, mode: initialMode, withOpponent }: { onClose: () => void; mode?: GameMode; withOpponent?: boolean }) {
   const last = useStore((s) => s.meta);
   const [mode, setMode] = useState<GameMode>(initialMode ?? last.mode);
-  // From the menu, a game means a computer opponent (free play is its own "Analysis board" entry).
-  const [hasOpponent, setHasOpponent] = useState(!!initialMode || last.studentColor !== "both" || last.opponentElo !== null);
+  const [hasOpponent, setHasOpponent] = useState(!!withOpponent || !!initialMode || last.studentColor !== "both" || last.opponentElo !== null);
   const [rating, setRating] = useState(last.opponentElo ?? 1500);
   // A rated game is always against an opponent.
   const elo = hasOpponent || mode === "rated" ? rating : null;
@@ -52,6 +56,10 @@ export function NewGameDialog({ onClose, mode: initialMode }: { onClose: () => v
   const [timeControl, setTimeControl] = useState<TimeControl | null>(last.timeControl);
   const [focus, setFocus] = useState<string[] | null>(last.openingFocus);
   const [editingRepertoire, setEditingRepertoire] = useState(false);
+  const [player, setPlayer] = useState<PlayerRating | null>(null);
+  useEffect(() => {
+    if (hasBackend()) invoke<PlayerRating>("db_player_rating").then(setPlayer, () => setPlayer(null));
+  }, []);
 
   const start = async () => {
     const studentColor: Color | "both" =
@@ -76,7 +84,7 @@ export function NewGameDialog({ onClose, mode: initialMode }: { onClose: () => v
           </button>
         </div>
       </div>
-      {mode === "practice" && (
+      {mode === "practice" && !withOpponent && (
         <div className="field">
           <span>Opponent</span>
           <div className="segmented">
@@ -111,6 +119,13 @@ export function NewGameDialog({ onClose, mode: initialMode }: { onClose: () => v
             <span>about chess.com rapid</span>
             <span>{OPPONENT_RATING.max}</span>
           </span>
+          {player && mode === "rated" && (
+            <span className="muted small">
+              Your rating {player.rating}. This game: win {signed(eloChange(player.rating, rating, 1, player.games))}, draw{" "}
+              {signed(eloChange(player.rating, rating, 0.5, player.games))}, loss{" "}
+              {signed(eloChange(player.rating, rating, 0, player.games))}.
+            </span>
+          )}
         </label>
       )}
       {elo !== null && (
@@ -223,12 +238,14 @@ export function GamesDialog({ onClose }: { onClose: () => void }) {
           <div key={g.id} className={`game-row ${g.id === current ? "current" : ""}`}>
             <button className="game-row-open" onClick={() => open(g.id)}>
             <div className="game-row-top">
-              <ModeBadge mode={g.mode} />
+              {g.source ? <SiteBadge site={g.source} /> : <ModeBadge mode={g.mode} />}
               <strong>{describeSides(g)}</strong>
               <span className={`result ${outcome(g)}`}>{g.result ?? "in progress"}</span>
+              {g.ratingBefore !== null && g.ratingAfter !== null && <RatingChange before={g.ratingBefore} after={g.ratingAfter} />}
             </div>
             <div className="game-row-sub">
               {formatDate(g.updatedAt)} · {Math.ceil(g.plies / 2)} moves
+              {g.source && !g.analyzed ? " · review pending" : ""}
               {g.takebacks ? ` · ${g.takebacks} takeback${g.takebacks > 1 ? "s" : ""}` : ""}
               {g.termination ? ` · ${g.termination}` : ""}
             </div>
@@ -241,6 +258,16 @@ export function GamesDialog({ onClose }: { onClose: () => void }) {
         ))}
       </div>
     </Modal>
+  );
+}
+
+/** "1212 (+12)" after a rated game. */
+export function RatingChange({ before, after }: { before: number; after: number }) {
+  const d = after - before;
+  return (
+    <span className={`rating-change ${d > 0 ? "up" : d < 0 ? "down" : ""}`} title={`Your rating went from ${before} to ${after}`}>
+      {after} ({signed(d)})
+    </span>
   );
 }
 
@@ -263,7 +290,7 @@ const sameTime = (a: TimeControl | null, b: TimeControl | null) =>
   a?.initial === b?.initial && a?.increment === b?.increment;
 
 function describeSides(g: GameSummary): string {
-  const opp = opponentLabel({ ...FREE_PLAY, studentColor: g.studentColor, opponentElo: opponentElo(g.opponent) });
+  const opp = opponentLabel({ ...FREE_PLAY, studentColor: g.studentColor, opponentElo: opponentElo(g.opponent), imported: importedFrom(g) });
   if (g.studentColor === "both") return opp;
   return g.studentColor === "white" ? `You vs ${opp}` : `${opp} vs You`;
 }

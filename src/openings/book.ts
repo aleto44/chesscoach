@@ -1,6 +1,8 @@
 // Opening book: the common named lines, used to name games, steer the opponent into an opening the
 // student wants to practice, answer the coach's book_lookup and build repertoire drills.
 // Every line is checked for legality by scripts/check-book.mjs.
+import { TRAINING_SETS } from "./training";
+
 export interface Opening {
   eco: string;
   name: string;
@@ -94,6 +96,8 @@ export const OPENINGS: Opening[] = [
   L("A04", "Réti Opening", "Nf3"),
   L("A02", "Bird's Opening", "f4"),
   L("A01", "Nimzo-Larsen Attack", "b3"),
+  // Opening training lines (training.ts) name the games they come up in, too.
+  ...TRAINING_SETS.flatMap((s) => s.lines.map(({ eco, name, moves }) => ({ eco, name, moves }))),
 ];
 
 const startsWith = (sans: string[], moves: string[]) => moves.every((m, i) => m === sans[i]);

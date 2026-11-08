@@ -6,6 +6,12 @@ import { TopBar } from "./components/TopBar";
 import { DrillPanel } from "./components/DrillPanel";
 import { PuzzlePanel } from "./components/PuzzlePanel";
 import { Home } from "./components/Home";
+import { EndgamePanel } from "./components/Endgames";
+import { OpeningPanel } from "./components/OpeningPanel";
+import { openingStep, useOpening } from "./openings/session";
+import { GuessPanel } from "./components/Guess";
+import { endgameStep, useEndgame } from "./endgames/session";
+import { guessStep, useGuess } from "./guess/session";
 import { back, useNav } from "./nav";
 import { usePuzzle, viewStep } from "./puzzles/session";
 import { drillStep, useDrill } from "./analysis/drillSession";
@@ -15,6 +21,9 @@ import { goto, openTangent, screen, step, useStore } from "./store";
 export default function App() {
   const drilling = useDrill((d) => d !== null);
   const puzzling = usePuzzle((p) => p !== null);
+  const endgame = useEndgame((e) => e !== null);
+  const opening = useOpening((o) => o !== null);
+  const guessing = useGuess((g) => g !== null);
   const onBoard = useNav((n) => n.view === "board");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -22,7 +31,17 @@ export default function App() {
       if (target.closest("textarea, input, select")) return;
       // An open dialog handles its own Escape.
       if (document.querySelector(".modal-backdrop, .promo-backdrop")) return;
-      const session = usePuzzle.getState() ? viewStep : useDrill.getState() ? drillStep : null;
+      const session = usePuzzle.getState()
+        ? viewStep
+        : useDrill.getState()
+          ? drillStep
+          : useEndgame.getState()
+            ? endgameStep
+            : useOpening.getState()
+              ? openingStep
+            : useGuess.getState()
+              ? guessStep
+              : null;
       if (session) {
         // A puzzle or drill: the arrow keys step through its moves, Escape leaves it.
         const keys: Record<string, Step> = { ArrowLeft: -1, ArrowRight: 1, Home: "start", End: "end" };
@@ -58,7 +77,21 @@ export default function App() {
   return (
     <div className="app">
       <TopBar />
-      {puzzling ? <PuzzlePanel /> : drilling ? <DrillPanel /> : onBoard ? <BoardPanel /> : <Home />}
+      {puzzling ? (
+        <PuzzlePanel />
+      ) : drilling ? (
+        <DrillPanel />
+      ) : endgame ? (
+        <EndgamePanel />
+      ) : opening ? (
+        <OpeningPanel />
+      ) : guessing ? (
+        <GuessPanel />
+      ) : onBoard ? (
+        <BoardPanel />
+      ) : (
+        <Home />
+      )}
       <Chat />
       <ConfirmHost />
     </div>

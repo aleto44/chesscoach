@@ -86,6 +86,8 @@ export function PuzzlePanel() {
           orientation={s.color}
           onMove={puzzleMove}
           canMove={s.status === "solving" && s.view === null}
+          // Not while a wrong move is on the board: that position is about to be taken back.
+          premoveColor={(s.status === "intro" || s.status === "solving") && s.view === null && !s.message ? s.color : undefined}
           shapes={past ? undefined : shapes}
         />
         {line && <BoardSteps onStep={viewStep} disabled={line.sans.length === 0} />}

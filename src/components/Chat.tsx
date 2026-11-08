@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { formatMoves } from "../chess/line";
+import { hoverSquare, rehypeSquares, useHoverSquare, useTapAway } from "../chess/squareRefs";
 import { logout, useAuth } from "../coach/auth";
 import { restartCoach, sendToCoach } from "../coach/bridge";
 import { skipQuiz } from "../coach/quiz";
 import { bestSan, nudgeQuestion, useNudge } from "../coach/nudge";
+import { useTrainerChat } from "../coach/trainerChat";
 import { takeBack } from "../game/session";
 import { hasBackend } from "../db";
 import { useSettings } from "../settings";
 import { goto, isLocked, openTangent, tangentOrientation, useStore, type ChatItem } from "../store";
-import { go, useNav } from "../nav";
-import { usePuzzle } from "../puzzles/session";
-import { useDrill } from "../analysis/drillSession";
+import { anySession, go, useNav } from "../nav";
 import { useBoardBottom, usePhone, useSheet, type Sheet } from "../phone";
 import { Board } from "./Board";
 import { askConfirm } from "./Confirm";
@@ -20,6 +20,8 @@ import { UsageMeter } from "./UsageMeter";
 
 export function Chat() {
   const { chat, busy, meta } = useStore();
+  // A trainer's own thread (the opening trainer's explanations): shown under the game's chat, never saved into it.
+  const trainer = useTrainerChat();
   const locked = isLocked(meta);
   const auth = useAuth();
   const { coachModel, activeModel } = useSettings();
@@ -29,12 +31,13 @@ export function Chat() {
   const phone = usePhone();
   const sheet = useSheet((s) => s.sheet);
   useBoardBottom(phone);
+  useTapAway();
 
   useEffect(() => {
     // Scrolls the messages list only; scrollIntoView would also scroll the phone's page.
     const list = bottom.current?.parentElement;
     if (list) list.scrollTop = list.scrollHeight;
-  }, [chat, sheet]);
+  }, [chat, sheet, trainer]);
 
   const send = () => {
     const text = draft.trim();
@@ -49,7 +52,7 @@ export function Chat() {
     <aside className={`chat ${phone ? `sheet sheet-${sheet}` : ""}`}>
       {phone && <SheetBar />}
       <header>
-        <span className={`status ${busy ? "busy" : ""}`} />
+        <span className={`status ${busy || trainer.thinkingSince !== null ? "busy" : ""}`} />
         <strong>Coach</strong>
         {auth.status === "signed-in" && <UsageMeter />}
         <span className="muted small coach-model" title="Change in Settings (⚙)">{activeModel ?? (coachModel || "default model")}</span>
@@ -77,7 +80,7 @@ export function Chat() {
         {!locked && chat.length === 0 && meta.mode === "rated" && (
           <p className="hint">Game over. Ask the coach to go through it with you, e.g. <em>“Where did I go wrong?”</em></p>
         )}
-        {!locked && chat.length === 0 && meta.mode === "practice" && (
+        {!locked && chat.length === 0 && trainer.items.length === 0 && meta.mode === "practice" && (
           <p className="hint">
             Play some moves, then ask about the position, e.g. <em>“What's the idea behind this move?”</em> or{" "}
             <em>“Why not …Nf6 here?”</em>
@@ -87,6 +90,10 @@ export function Chat() {
           <ChatRow key={item.id} item={item} />
         ))}
         {busy && <Thinking />}
+        {trainer.items.map((item) => (
+          <ChatRow key={item.id} item={item} />
+        ))}
+        {trainer.thinkingSince !== null && <Thinking since={trainer.thinkingSince} />}
         {!signedIn && <SignIn />}
         <div ref={bottom} />
       </div>
@@ -131,9 +138,14 @@ const TOOL_LABELS: Record<string, string> = {
   record_observation: "Making a note",
 };
 
-/** Animated "working" row: what the coach is doing and for how long. Hidden while text streams. */
-function Thinking() {
-  const { busySince, streaming, chat } = useStore();
+/**
+ * Animated "working" row: what the coach is doing and for how long. Hidden while text streams.
+ * `since` is for a one-off answer (a trainer's), which has no tools or streaming.
+ */
+function Thinking({ since }: { since?: number }) {
+  const store = useStore();
+  const { streaming, chat } = since === undefined ? store : { streaming: false, chat: [] as ChatItem[] };
+  const busySince = since ?? store.busySince;
   const [, tick] = useState(0);
   useEffect(() => {
     const t = window.setInterval(() => tick((n) => n + 1), 1000);
@@ -164,7 +176,7 @@ function ChatRow({ item }: { item: ChatItem }) {
     case "coach":
       return (
         <div className="msg coach">
-          <Markdown components={MARKDOWN}>{item.text}</Markdown>
+          <Markdown components={MARKDOWN} rehypePlugins={[rehypeSquares]}>{item.text}</Markdown>
         </div>
       );
     case "tangent":
@@ -254,8 +266,15 @@ function QuizCard({ item }: { item: Extract<ChatItem, { kind: "quiz" }> }) {
   );
 }
 
-/** The coach links to its scenarios as [words](#s2); those become buttons that open them on the board. */
+/**
+ * The coach links to its scenarios as [words](#s2); those become buttons that open them on the board.
+ * Squares and moves it names show on the board while hovered: a square highlighted, a move as an arrow.
+ */
 const MARKDOWN: Components = {
+  span: ({ node: _node, ...props }) => {
+    const ref = (props as { "data-ref"?: string })["data-ref"];
+    return ref ? <SquareRef {...props} squareRef={ref} /> : <span {...props} />;
+  },
   a: ({ href, children }) => {
     const key = href?.match(/^#(s\d+)$/)?.[1];
     if (key) return <ScenarioLink scenarioKey={key}>{children}</ScenarioLink>;
@@ -266,6 +285,25 @@ const MARKDOWN: Components = {
     );
   },
 };
+
+/** A square or move in the coach's text. A mouse shows it while over it; a tap shows it until the next tap (useTapAway). */
+function SquareRef({ squareRef, className, ...props }: ComponentProps<"span"> & { squareRef: string }) {
+  const on = useHoverSquare((s) => s.ref === squareRef);
+  return (
+    <span
+      {...props}
+      className={`${className ?? ""} ${on ? "on" : ""}`}
+      onPointerEnter={(e) => e.pointerType === "mouse" && hoverSquare(squareRef)}
+      onPointerLeave={(e) => e.pointerType === "mouse" && hoverSquare(null)}
+      onPointerDown={(e) => {
+        if (e.pointerType === "mouse") return;
+        hoverSquare(on ? null : squareRef);
+        // The board must be in view: a full sheet drops to under it.
+        if (!on && useSheet.getState().sheet === "full") openSheet("half");
+      }}
+    />
+  );
+}
 
 function ScenarioLink({ scenarioKey, children }: { scenarioKey: string; children: ReactNode }) {
   const tangentId = useStore((s) => {
@@ -286,7 +324,7 @@ function ScenarioLink({ scenarioKey, children }: { scenarioKey: string; children
 
 /** Opens a coach scenario on the main board, leaving a puzzle or drill if one is showing. */
 function openScenario(tangentId: string) {
-  if (useNav.getState().view !== "board" || usePuzzle.getState() || useDrill.getState()) go("board");
+  if (useNav.getState().view !== "board" || anySession()) go("board");
   openTangent(tangentId);
   // On a phone, the board must be in view: the sheet drops to under it.
   if (useSheet.getState().sheet === "full") openSheet("half");
@@ -303,9 +341,11 @@ const openSheet = (sheet: Sheet) => useSheet.setState({ sheet });
  */
 function SheetBar() {
   const sheet = useSheet((s) => s.sheet);
-  const { chat, busy } = useStore();
+  const { chat, busy: gameBusy } = useStore();
+  const trainer = useTrainerChat();
+  const busy = gameBusy || trainer.thinkingSince !== null;
   const signedIn = useAuth((a) => a.status === "signed-in");
-  const last = [...chat].reverse().find((c) => c.kind === "coach");
+  const last = [...chat, ...trainer.items].reverse().find((c) => c.kind === "coach");
   const preview = last?.kind === "coach" ? last.text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_#`>]/g, "").trim() : "";
   // The bar opens and closes the sheet; the size button switches between half and full.
   const open = sheet !== "closed";

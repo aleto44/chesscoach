@@ -1,6 +1,8 @@
 mod auth;
+mod boot;
 mod coach;
 mod db;
+mod import;
 mod mcp;
 mod puzzles;
 mod relay;
@@ -68,6 +70,12 @@ fn coach_send(app: AppHandle, text: String, resume: Option<String>) -> Result<()
     send_turn(&app, relay::DESKTOP, &text, resume.as_deref())
 }
 
+/// A one-off explanation outside the game's conversation (see coach::explain).
+#[tauri::command]
+async fn coach_explain(app: AppHandle, prompt: String) -> Result<String, String> {
+    coach::explain(&app, prompt).await
+}
+
 #[tauri::command]
 fn coach_reset(app: AppHandle) {
     reset_coach(&app, relay::DESKTOP);
@@ -100,6 +108,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             coach_send,
             coach_reset,
+            coach_explain,
             tool_result,
             auth::auth_status,
             auth::auth_login,
@@ -114,6 +123,7 @@ pub fn run() {
             remote::remote_set_enabled,
             remote::remote_new_code,
             remote::remote_tailscale_serve,
+            boot::app_boot,
             db::db_create_game,
             db::db_update_game,
             db::db_set_moves,
@@ -125,6 +135,7 @@ pub fn run() {
             db::db_prune_empty_games,
             db::db_get_settings,
             db::db_set_setting,
+            db::db_player_rating,
             stats::db_save_analysis,
             stats::db_unanalyzed_games,
             stats::db_profile,
@@ -136,6 +147,11 @@ pub fn run() {
             stats::db_grade_drill,
             stats::db_retire_drill,
             stats::db_drill_overview,
+            stats::db_weakness,
+            stats::db_rating_history,
+            import::import_fetch,
+            import::db_import_known,
+            import::db_import_game,
             stats::puzzle_history,
             stats::db_repertoire,
             stats::db_add_repertoire,

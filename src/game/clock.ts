@@ -4,8 +4,16 @@ import { Chess } from "chess.js";
 import { sideToMove } from "../chess/line";
 import { useStore, type Color, type TimeControl } from "../store";
 import { finish } from "./session";
+import { useEndgame } from "../endgames/session";
+import { useOpening } from "../openings/session";
 
 const TICK_MS = 100;
+
+/**
+ * When the clock stopped for a trainer (opening or endgame) opened over a game in progress: the
+ * student isn't looking at the game, so the time isn't charged. Null while it runs.
+ */
+let pausedAt: number | null = null;
 
 /** The clock a side had after its latest move (or the starting time). */
 function lastStamp(side: Color): number | null {
@@ -24,7 +32,7 @@ function running(): boolean {
 }
 
 /** Milliseconds left on a side's clock right now; null in a game without a clock. */
-export function clockLeft(side: Color, now = Date.now()): number | null {
+export function clockLeft(side: Color, now = pausedAt ?? Date.now()): number | null {
   const stamp = lastStamp(side);
   if (stamp === null) return null;
   const { game, turnStartedAt } = useStore.getState();
@@ -61,6 +69,9 @@ export function initClock() {
     const n = s.game.sans.length;
     const before = prev.game.sans.length;
     const now = Date.now();
+    const pausedFrom = pausedAt;
+    // During a pause the turn that starts now isn't charged until the pause ends.
+    if (pausedAt !== null) pausedAt = now;
     if (n === before + 1) {
       // A move at the end of the game: charge the mover for their thinking time.
       const mover = sideToMove(s.game.fens[n - 1]);
@@ -70,7 +81,7 @@ export function initClock() {
         }
         return s.meta.timeControl!.initial * 1000;
       })();
-      const charged = n - 1 >= 2 && prev.turnStartedAt !== null ? now - prev.turnStartedAt : 0;
+      const charged = n - 1 >= 2 && prev.turnStartedAt !== null ? Math.max(0, (pausedFrom ?? now) - prev.turnStartedAt) : 0;
       const left = stamp - charged;
       if (left <= 0 && !s.meta.result) {
         // The tick missed it (e.g. the window was asleep): the flag fell before this move.
@@ -88,7 +99,21 @@ export function initClock() {
     }
   });
 
+  const trainerOpen = () => !!(useEndgame.getState() || useOpening.getState());
+  const pauseCheck = () => {
+    if (trainerOpen() && pausedAt === null) pausedAt = Date.now();
+    else if (!trainerOpen() && pausedAt !== null) {
+      const away = Date.now() - pausedAt;
+      pausedAt = null;
+      const { turnStartedAt } = useStore.getState();
+      if (turnStartedAt !== null) useStore.setState({ turnStartedAt: turnStartedAt + away });
+    }
+  };
+  useEndgame.subscribe(pauseCheck);
+  useOpening.subscribe(pauseCheck);
+
   window.setInterval(() => {
+    if (pausedAt !== null) return;
     const side = clockRunning();
     if (side && clockLeft(side) === 0) flag(side);
   }, TICK_MS);

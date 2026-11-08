@@ -143,3 +143,48 @@ fn system_prompt() -> String {
     }
     include_str!("../../coach.md").to_string()
 }
+
+/// The instructions for one-off explanations (`coach_explain`): no tools, no conversation.
+const EXPLAIN_PROMPT: &str = "You are a chess coach explaining opening theory to a club player. \
+Answer in plain prose with short Markdown headings when asked for sections. Use the engine numbers \
+you are given as the truth about how good a move is; never invent tactics or evaluations. \
+Name squares and pieces in words alongside the moves. Write Black's moves with \"...\" \
+(...Nf6, 7...Nf6) and White's without (Nf3, 8.Nf3). Be concise and concrete.";
+
+/// One question, one answer, outside the game's coach conversation: for screens that aren't a game
+/// (the opening trainer) and so work even while a rated game keeps the coach quiet. The prompt goes
+/// in on stdin; the answer is the plain text `claude -p` prints.
+pub async fn explain(app: &AppHandle, prompt: String) -> Result<String, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let model = app.state::<crate::db::Db>().setting("coachModel");
+    let model = model.as_ref().and_then(|m| m.as_str()).filter(|m| !m.is_empty()).map(str::to_string);
+    tauri::async_runtime::spawn_blocking(move || {
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let mut cmd = claude_command();
+        // Outside the project, with no tools or MCP servers: a pure question and answer.
+        cmd.current_dir(&dir)
+            .args(["-p", "--output-format", "text", "--tools", "", "--strict-mcp-config"])
+            .args(["--system-prompt", EXPLAIN_PROMPT])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if let Some(model) = &model {
+            cmd.args(["--model", model]);
+        }
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("could not start {}: {e}", claude_exe().display()))?;
+        let mut stdin = child.stdin.take().unwrap();
+        stdin.write_all(prompt.as_bytes()).map_err(|e| e.to_string())?;
+        drop(stdin);
+        let out = child.wait_with_output().map_err(|e| e.to_string())?;
+        if !out.status.success() {
+            let err = String::from_utf8_lossy(&out.stderr);
+            let msg = if err.trim().is_empty() { String::from_utf8_lossy(&out.stdout).to_string() } else { err.to_string() };
+            return Err(format!("the coach couldn't answer: {}", msg.trim()));
+        }
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}

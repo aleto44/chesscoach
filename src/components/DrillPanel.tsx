@@ -179,7 +179,11 @@ function WhySummary({ s, onOpen }: { s: DrillState; onOpen: () => void }) {
         <strong>Why {ex.played.steps[0]?.san ?? playedSan(s)} is bad:</strong> {reply ? `${reply.note} ` : ""}
         {ex.played.verdict}
       </p>
-      {better && (
+      {ex.alternatives?.length > 1 ? (
+        <p className="good">
+          <strong>Better:</strong> {ex.betterSummary.replace(/ Pick one to see the reply\.$/, "")}
+        </p>
+      ) : better && (
         <p className="good">
           <strong>Why {better.steps[0]?.san} is better:</strong> {better.steps[0]?.note}
           {better.steps.length > 1 && (

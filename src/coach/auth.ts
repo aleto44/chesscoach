@@ -1,5 +1,5 @@
 // Claude sign-in state, backed by `claude auth` (src-tauri/src/auth.rs).
-import { invoke, listen } from "../backend";
+import { invoke, listen, Unreachable } from "../backend";
 import { create } from "zustand";
 import { hasBackend } from "../db";
 import { refreshUsage } from "./usage";
@@ -62,6 +62,8 @@ export async function checkAuth() {
       codeSent: false,
     });
   } catch (e) {
+    // Out of reach is not signed out: keep what the phone last knew (see snapshot.ts).
+    if (e instanceof Unreachable && useAuth.getState().status !== "checking") return;
     useAuth.setState({ status: "signed-out", error: String(e) });
   }
 }

@@ -101,7 +101,8 @@ pub fn db_save_analysis(
     tx.commit().map_err(err)
 }
 
-/// Finished games with moves that haven't been analyzed yet, oldest first.
+/// Finished games with moves that haven't been analyzed yet, newest first (a fresh import of many
+/// games shows its latest ones first).
 #[tauri::command]
 pub fn db_unanalyzed_games(db: State<Db>) -> Result<Vec<i64>, String> {
     let conn = db.conn();
@@ -109,7 +110,7 @@ pub fn db_unanalyzed_games(db: State<Db>) -> Result<Vec<i64>, String> {
         .prepare(
             "SELECT id FROM games g WHERE result IS NOT NULL AND analyzed_at IS NULL
                AND EXISTS (SELECT 1 FROM moves m WHERE m.game_id = g.id)
-             ORDER BY ended_at, id",
+             ORDER BY ended_at DESC, id DESC",
         )
         .map_err(err)?;
     let ids = stmt.query_map([], |r| r.get(0)).map_err(err)?.collect::<Result<Vec<i64>, _>>().map_err(err);
@@ -132,7 +133,7 @@ pub fn db_profile(db: State<Db>) -> Result<Value, String> {
                 sum(CASE WHEN (result = '1-0') = (student_color = 'white') AND result != '1/2-1/2' THEN 1 ELSE 0 END) AS wins,
                 sum(CASE WHEN result = '1/2-1/2' THEN 1 ELSE 0 END) AS draws,
                 sum(CASE WHEN (result = '0-1') = (student_color = 'white') AND result != '1/2-1/2' THEN 1 ELSE 0 END) AS losses,
-                avg(CAST(substr(opponent, instr(opponent, ':') + 1) AS INTEGER)) AS avg_opponent
+                avg(coalesce(opponent_rating, CAST(substr(opponent, instr(opponent, ':') + 1) AS INTEGER))) AS avg_opponent
          FROM games WHERE mode = 'rated' AND result IS NOT NULL GROUP BY student_color",
         [],
     )?;
@@ -178,7 +179,7 @@ pub fn db_profile(db: State<Db>) -> Result<Value, String> {
     let recent = rows(
         &conn,
         "SELECT g.id, date(g.ended_at) AS date, g.student_color AS color, g.opponent, g.result, g.termination,
-                g.time_control, g.opening_name,
+                g.time_control, g.opening_name, g.rating_before, g.rating_after,
                 (SELECT round(avg(cp_loss)) FROM moves WHERE game_id = g.id AND by_student = 1) AS avg_cp_loss,
                 (SELECT count(*) FROM moves WHERE game_id = g.id AND by_student = 1 AND class = 'blunder') AS blunders
          FROM games g WHERE g.mode = 'rated' AND g.result IS NOT NULL ORDER BY g.ended_at DESC LIMIT 5",
@@ -197,6 +198,7 @@ pub fn db_profile(db: State<Db>) -> Result<Value, String> {
          FROM drills d WHERE retired = 0 GROUP BY kind",
         [],
     )?;
+    let (rating, rated_games) = crate::db::player_rating(&conn)?;
     Ok(json!({
         "counts": counts.into_iter().next(),
         "record": record,
@@ -207,6 +209,7 @@ pub fn db_profile(db: State<Db>) -> Result<Value, String> {
         "observations": observations,
         "drills": drills,
         "puzzles": crate::puzzles::profile(&conn)?,
+        "gameRating": { "rating": rating, "games": rated_games },
     }))
 }
 
@@ -253,6 +256,7 @@ pub fn db_query_games(db: State<Db>, mode: String, limit: i64, game_id: Option<i
         &conn,
         "SELECT g.id, date(g.started_at) AS date, g.mode, g.student_color AS color, g.opponent, g.result,
                 g.termination, g.time_control, g.opening_name, g.takebacks, g.analyzed_at IS NOT NULL AS analyzed,
+                g.source, g.opponent_rating, g.student_rating,
                 (SELECT count(*) FROM moves WHERE game_id = g.id) AS plies,
                 (SELECT round(avg(cp_loss)) FROM moves WHERE game_id = g.id AND by_student = 1) AS avg_cp_loss
          FROM games g
@@ -290,6 +294,174 @@ pub fn db_record_observation(
     )
     .map_err(err)?;
     Ok(conn.last_insert_rowid())
+}
+
+// ---- Weaknesses and ratings (the Profile menu) ----
+
+/// Which real games the dashboard covers: 'all', 'app' (rated games here) or 'imported'
+/// (chess.com and Lichess).
+fn scope_sql(source: &str) -> &'static str {
+    match source {
+        "app" => "g.source IS NULL",
+        "imported" => "g.source IS NOT NULL",
+        _ => "1",
+    }
+}
+
+/// What goes wrong in the student's real games (rated games here and imported ones, analyzed),
+/// over the `last` most recent. Practice games are left out: help was on. Moves are the student's.
+#[tauri::command]
+pub fn db_weakness(db: State<Db>, source: String, last: i64) -> Result<Value, String> {
+    weakness(&db.conn(), &source, last)
+}
+
+pub(crate) fn weakness(conn: &rusqlite::Connection, source: &str, last: i64) -> Result<Value, String> {
+    let scope = scope_sql(source);
+    let real = format!("g.mode = 'rated' AND g.result IS NOT NULL AND g.student_color != 'both' AND {scope}");
+    let ids = format!(
+        "SELECT g.id FROM games g WHERE {real} AND g.analyzed_at IS NOT NULL ORDER BY g.ended_at DESC, g.id DESC LIMIT {}",
+        last.clamp(1, 1000)
+    );
+    let mine = format!("m.game_id IN ({ids}) AND m.by_student = 1 AND m.class IS NOT NULL");
+    let summary = rows(
+        &conn,
+        &format!(
+            "SELECT count(*) AS games,
+                    coalesce(sum(CASE WHEN result = '1/2-1/2' THEN 0 WHEN (result = '1-0') = (student_color = 'white') THEN 1 ELSE 0 END), 0) AS wins,
+                    coalesce(sum(result = '1/2-1/2'), 0) AS draws,
+                    coalesce(sum(CASE WHEN result = '1/2-1/2' THEN 0 WHEN (result = '1-0') = (student_color = 'white') THEN 0 ELSE 1 END), 0) AS losses,
+                    (SELECT count(*) FROM moves m WHERE {mine}) AS moves,
+                    (SELECT round(avg(cp_loss)) FROM moves m WHERE {mine}) AS avgCpLoss,
+                    (SELECT coalesce(sum(class = 'blunder'), 0) FROM moves m WHERE {mine}) AS blunders,
+                    (SELECT coalesce(sum(class = 'mistake'), 0) FROM moves m WHERE {mine}) AS mistakes,
+                    (SELECT coalesce(sum(class = 'inaccuracy'), 0) FROM moves m WHERE {mine}) AS inaccuracies,
+                    (SELECT count(*) FROM games g WHERE {real} AND g.analyzed_at IS NULL) AS waiting
+             FROM games WHERE id IN ({ids})"
+        ),
+        [],
+    )?;
+    let phases = rows(
+        &conn,
+        &format!(
+            "SELECT m.phase, count(*) AS moves, count(DISTINCT m.game_id) AS games, round(avg(m.cp_loss)) AS avgCpLoss,
+                    sum(m.class = 'inaccuracy') AS inaccuracies, sum(m.class = 'mistake') AS mistakes,
+                    sum(m.class = 'blunder') AS blunders
+             FROM moves m WHERE {mine} GROUP BY m.phase"
+        ),
+        [],
+    )?;
+    // The patterns behind the student's mistakes and blunders, and how many games they cost.
+    let tags = rows(
+        &conn,
+        &format!(
+            "SELECT t.value AS tag, count(*) AS count, count(DISTINCT m.game_id) AS games,
+                    sum(m.class = 'blunder') AS blunders
+             FROM moves m, json_each(m.tags) t
+             WHERE {mine} AND m.class IN ('mistake', 'blunder')
+             GROUP BY t.value ORDER BY count DESC"
+        ),
+        [],
+    )?;
+    let colors = rows(
+        &conn,
+        &format!(
+            "SELECT g.student_color AS color, count(*) AS games,
+                    sum(CASE WHEN g.result = '1/2-1/2' THEN 0.5 WHEN (g.result = '1-0') = (g.student_color = 'white') THEN 1 ELSE 0 END) AS points,
+                    (SELECT round(avg(m.cp_loss)) FROM moves m JOIN games g2 ON g2.id = m.game_id
+                     WHERE {mine} AND g2.student_color = g.student_color) AS avgCpLoss
+             FROM games g WHERE g.id IN ({ids}) GROUP BY g.student_color"
+        ),
+        [],
+    )?;
+    // How the student does in each opening, and how well they play its first dozen moves.
+    let openings = rows(
+        &conn,
+        &format!(
+            "SELECT g.student_color AS color, coalesce(g.opening_name, 'Unnamed opening') AS opening, count(*) AS games,
+                    sum(CASE WHEN g.result = '1/2-1/2' THEN 0.5 WHEN (g.result = '1-0') = (g.student_color = 'white') THEN 1 ELSE 0 END) AS points,
+                    (SELECT round(avg(m.cp_loss)) FROM moves m JOIN games g2 ON g2.id = m.game_id
+                     WHERE {mine} AND m.ply <= 24 AND g2.student_color = g.student_color
+                       AND coalesce(g2.opening_name, '') = coalesce(g.opening_name, '')) AS avgCpLoss
+             FROM games g WHERE g.id IN ({ids})
+             GROUP BY g.student_color, g.opening_name HAVING count(*) >= 2 ORDER BY games DESC LIMIT 10"
+        ),
+        [],
+    )?;
+    // Game by game, oldest first: is it getting better?
+    let trend = rows(
+        &conn,
+        &format!(
+            "SELECT g.id, date(g.ended_at) AS date, g.source,
+                    (SELECT round(avg(cp_loss)) FROM moves m WHERE m.game_id = g.id AND m.by_student = 1) AS avgCpLoss,
+                    (SELECT count(*) FROM moves m WHERE m.game_id = g.id AND m.by_student = 1 AND m.class = 'blunder') AS blunders,
+                    (SELECT count(*) FROM moves m WHERE m.game_id = g.id AND m.by_student = 1 AND m.class = 'mistake') AS mistakes
+             FROM games g WHERE g.id IN ({ids}) ORDER BY g.ended_at, g.id"
+        ),
+        [],
+    )?;
+    Ok(json!({
+        "summary": summary.into_iter().next(),
+        "phases": phases,
+        "tags": tags,
+        "colors": colors,
+        "openings": openings,
+        "trend": trend,
+        "puzzles": crate::puzzles::profile(&conn)?,
+    }))
+}
+
+/// Every rating the student has, over time, oldest first, each point [time, rating]: the in-app
+/// game rating (chess.com scale), the puzzle rating (Lichess scale; the frontend converts it), and
+/// the student's own rating in imported games (chess.com scale already), per site and speed.
+#[tauri::command]
+pub fn db_rating_history(db: State<Db>) -> Result<Value, String> {
+    rating_history(&db.conn())
+}
+
+pub(crate) fn rating_history(conn: &rusqlite::Connection) -> Result<Value, String> {
+    let points = |sql: &str, args: &[&dyn rusqlite::ToSql]| -> Result<Vec<Value>, String> {
+        let mut stmt = conn.prepare(sql).map_err(err)?;
+        let out = stmt
+            .query_map(args, |r| Ok(json!([r.get::<_, String>(0)?, r.get::<_, i64>(1)?])))
+            .map_err(err)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(err);
+        out
+    };
+    let game = points(
+        "SELECT * FROM (SELECT ended_at, rating_after FROM games WHERE rating_after IS NOT NULL AND ended_at IS NOT NULL
+         ORDER BY ended_at DESC LIMIT 500) ORDER BY 1",
+        &[],
+    )?;
+    let puzzles = points(
+        "SELECT * FROM (SELECT at, rating_after FROM puzzle_attempts WHERE rated = 1 ORDER BY id DESC LIMIT 1000) ORDER BY 1",
+        &[],
+    )?;
+    let series: Vec<(String, String)> = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT DISTINCT source, coalesce(speed, 'other') FROM games
+                 WHERE source IS NOT NULL AND student_rating IS NOT NULL ORDER BY 1, 2",
+            )
+            .map_err(err)?;
+        let out = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .map_err(err)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(err)?;
+        out
+    };
+    let mut imported = Vec::new();
+    for (source, speed) in series {
+        let pts = points(
+            "SELECT * FROM (SELECT ended_at, student_rating FROM games
+                WHERE source = ?1 AND coalesce(speed, 'other') = ?2 AND student_rating IS NOT NULL
+                ORDER BY ended_at DESC LIMIT 500) ORDER BY 1",
+            &[&source, &speed],
+        )?;
+        imported.push(json!({ "source": source, "speed": speed, "points": pts }));
+    }
+    Ok(json!({ "game": game, "puzzles": puzzles, "imported": imported }))
 }
 
 // ---- Drills ----
@@ -347,19 +519,22 @@ pub fn db_add_drills(db: State<Db>, drills: Vec<NewDrill>) -> Result<usize, Stri
     Ok(added)
 }
 
-/// Drills due now (or all of them with `all`), most overdue first.
+/// Drills due now (or all of them with `all`), most overdue first. `tag` picks the mistake drills
+/// with that review tag (e.g. "hung-piece"), due or not: the weakness dashboard's "drill these".
 #[tauri::command]
-pub fn db_due_drills(db: State<Db>, limit: i64, all: Option<bool>) -> Result<Vec<Drill>, String> {
+pub fn db_due_drills(db: State<Db>, limit: i64, all: Option<bool>, tag: Option<String>) -> Result<Vec<Drill>, String> {
     let conn = db.conn();
     let mut stmt = conn
         .prepare(
             "SELECT id, kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply, due_at, reps, lapses
-             FROM drills WHERE retired = 0 AND (?2 OR due_at <= datetime('now'))
+             FROM drills WHERE retired = 0
+               AND (CASE WHEN ?3 IS NULL THEN ?2 OR due_at <= datetime('now')
+                         ELSE kind = 'mistake' AND (', ' || coalesce(note, '') || ',') LIKE '%, ' || ?3 || ',%' END)
              ORDER BY due_at, id LIMIT ?1",
         )
         .map_err(err)?;
     let drills = stmt
-        .query_map(params![limit, all.unwrap_or(false)], |r| {
+        .query_map(params![limit, all.unwrap_or(false), tag], |r| {
             let line: String = r.get(6)?;
             Ok(Drill {
                 id: r.get(0)?,

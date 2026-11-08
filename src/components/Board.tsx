@@ -6,6 +6,8 @@ import type { Key } from "chessground/types";
 import type { DrawShape } from "chessground/draw";
 import { Chess } from "chess.js";
 import { legalDests, sideToMove } from "../chess/line";
+import { resolveRef, useHoverSquare } from "../chess/squareRefs";
+import { play } from "../sound";
 
 interface Props {
   fen: string;
@@ -19,7 +21,7 @@ interface Props {
   preview?: boolean;
   /** False locks the pieces without making the board view-only (e.g. opponent's turn). */
   canMove?: boolean;
-  /** While the student can't move, this side may queue a premove (played when its turn comes). */
+  /** The student's side: on the other side's turn its pieces still pick up and queue a premove (played when its turn comes). */
   premoveColor?: "white" | "black";
   coordinates?: boolean;
   className?: string;
@@ -61,8 +63,11 @@ export function Board({
     const cg = api.current;
     if (!cg) return;
     const turn = sideToMove(p.fen);
-    const live = !p.viewOnly && p.canMove;
-    const premove = !p.viewOnly && !p.canMove && p.premoveColor !== turn ? p.premoveColor : undefined;
+    // On the other side's turn the student's pieces still pick up, as a premove: they often know
+    // the next moves and reach for the piece before the reply lands. That holds whether or not
+    // the screen calls the board movable then (drills and puzzles leave it on through the reply).
+    const premove = !p.viewOnly && p.premoveColor && p.premoveColor !== turn ? p.premoveColor : undefined;
+    const live = !p.viewOnly && p.canMove && !premove;
     const config: Config = {
       // Passing the fen clears the drawings, so only pass it when the position changed.
       ...(shown.current === p.fen ? {} : { fen: p.fen }),
@@ -86,7 +91,7 @@ export function Board({
       viewOnly: !!preview,
       animation: { enabled: true, duration: 180 },
       highlight: { lastMove: true, check: true },
-      premovable: { enabled: true, showDests: true, castle: true },
+      premovable: { enabled: true, showDests: true, castle: true, events: { set: () => play("premove") } },
       // Arrows go between any two squares, not just ones a piece could reach.
       drawable: { defaultSnapToValidMove: false },
       movable: {
@@ -114,6 +119,19 @@ export function Board({
   }, []);
 
   useEffect(sync, [fen, orientation, lastMove, viewOnly, canMove, premoveColor, shapes]);
+
+  // A square or move the mouse is over in the coach's chat shows here (not on thumbnails):
+  // a move as an arrow from its piece, a bare square highlighted.
+  const hoveredRef = useHoverSquare((s) => (preview ? null : s.ref));
+  useEffect(() => {
+    const cg = api.current;
+    if (!cg) return;
+    const hit = hoveredRef ? resolveRef(fen, hoveredRef) : null;
+    const square = hit && !hit.from ? [[hit.to as Key, "chat-hover"] as const] : [];
+    cg.set({ highlight: { custom: new Map(square) } });
+    const arrow: DrawShape[] = hit?.from ? [{ orig: hit.from, dest: hit.to, brush: "blue" }] : [];
+    cg.setAutoShapes([...(shapes ?? []), ...arrow]);
+  }, [hoveredRef, fen, shapes]);
 
   const choose = (piece: string | null) => {
     const move = promo;

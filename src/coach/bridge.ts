@@ -10,6 +10,9 @@ import { useSettings } from "../settings";
 import { describeCall, handleTool } from "./tools";
 import { drillContext } from "../analysis/drillSession";
 import { puzzleContext } from "../puzzles/session";
+import { endgameContext } from "../endgames/session";
+import { openingContext } from "../openings/session";
+import { guessContext } from "../guess/session";
 import { cancelQuizzes } from "./quiz";
 import { refreshUsageSoon } from "./usage";
 
@@ -118,6 +121,13 @@ async function screenLines(): Promise<string[]> {
   const drill = drillContext();
   if (drill)
     return [`Showing: drill "${drill.title}" (not a game)`, `FEN: ${drill.fen}`, ...(await engineLines(drill.fen, " (the drill's answer: don't reveal it unless asked)"))];
+  const trainer = endgameContext() ?? openingContext() ?? guessContext();
+  if (trainer)
+    return [
+      `Showing: ${trainer.title} (not a game): ${trainer.detail}`,
+      `FEN: ${trainer.fen}`,
+      ...(await engineLines(trainer.fen, trainer.detail.includes("don't reveal") ? " (this includes the answer: don't reveal it)" : "")),
+    ];
   const s = useStore.getState();
   const { line, ply, tangent } = screen();
   const from = Math.max(0, ply - 6);

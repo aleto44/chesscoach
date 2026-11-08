@@ -3,7 +3,7 @@ import { hasBackend, invoke, Unreachable } from "./backend";
 import type { MoveAnnotation } from "./analysis/review";
 import type { Line } from "./chess/line";
 import { fromEngineElo } from "./engine/stockfish";
-import { useStore, type ChatItem, type GameMeta, type Tangent } from "./store";
+import { useStore, type ChatItem, type GameMeta, type ImportedFrom, type ImportSite, type Tangent } from "./store";
 
 export { hasBackend };
 
@@ -50,6 +50,16 @@ export interface GameSummary {
   openingFocus: string[] | null;
   plies: number;
   opening: string;
+  /** The student's rating before and after this rated game; null = it didn't count. */
+  ratingBefore: number | null;
+  ratingAfter: number | null;
+  /** Imported games (games/import.ts): the site, and the players' ratings in chess.com scale. */
+  source: ImportSite | null;
+  url: string | null;
+  opponentName: string | null;
+  opponentRating: number | null;
+  studentRating: number | null;
+  speed: string | null;
 }
 
 export interface GameRecord {
@@ -187,7 +197,13 @@ export const opponentElo = (key: string | null) =>
       ? fromEngineElo(Number(key.slice(10)))
       : null;
 
-function moveRows(line: Line, studentColor: GameMeta["studentColor"], clocks: (number | null)[]): MoveRow[] {
+/** What GameMeta.imported holds for a stored game; null for games played here. */
+export function importedFrom(g: GameSummary): ImportedFrom | null {
+  if (!g.source) return null;
+  return { site: g.source, opponent: g.opponentName ?? "?", opponentRating: g.opponentRating, studentRating: g.studentRating, url: g.url };
+}
+
+export function moveRows(line: Line, studentColor: GameMeta["studentColor"], clocks: (number | null)[]): MoveRow[] {
   return line.sans.map((san, i) => {
     const [from, to] = line.lastMoves[i];
     const promo = san.match(/=([QRBN])/)?.[1].toLowerCase() ?? "";
@@ -258,8 +274,25 @@ export function discardPending() {
   dirtyChat.clear();
 }
 
+// A phone that opened on its saved snapshot may be behind the database (the game went on at the
+// desktop). Until the boot call says which is right, this device's game writes wait, so a stale
+// copy can't overwrite newer moves.
+let held: Promise<void> | null = null;
+/** Holds game writes back; call the returned function to let them through. */
+export function holdWrites(): () => void {
+  let release!: () => void;
+  const hold = new Promise<void>((r) => (release = r));
+  held = hold;
+  return () => {
+    if (held === hold) held = null;
+    release();
+  };
+}
+export const writesHeld = () => held !== null;
+
 export async function flush() {
   clearTimeout(timer);
+  while (held) await held;
   const s = useStore.getState();
   const gameId = s.gameId;
   if (gameId === null) return;

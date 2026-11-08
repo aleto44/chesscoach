@@ -12,6 +12,7 @@ import { useStore, type Color, type GameMeta } from "../store";
 import { inBook, openingName } from "../openings/book";
 import { addMistakeDrills } from "./drills";
 import { isFollowing } from "../game/sync";
+import { create } from "zustand";
 
 const DEPTH = 13;
 const MATE_CP = 10000;
@@ -330,10 +331,31 @@ export function initReview() {
       enqueueCurrent();
     }
   });
-  if (!hasBackend()) return;
+  analyzeBacklog();
+}
+
+/** Finished games still waiting for their review (e.g. just imported): how far along it is. */
+export const useBacklog = create<{ done: number; total: number } | null>(() => null);
+let backlogQueued = false;
+
+/** Analyzes every finished game that has no review yet, newest first, one at a time. */
+export function analyzeBacklog() {
+  if (!hasBackend() || backlogQueued) return;
+  backlogQueued = true;
   queue = queue.then(async () => {
-    const ids = await invoke<number[]>("db_unanalyzed_games");
-    for (const id of ids) await analyzeStored(id);
+    backlogQueued = false;
+    let ids: number[] = [];
+    try {
+      ids = await invoke<number[]>("db_unanalyzed_games");
+    } catch (e) {
+      console.warn("could not list the games waiting for review", e);
+    }
+    const total = ids.length;
+    for (const [i, id] of ids.entries()) {
+      useBacklog.setState({ done: i, total }, true);
+      await analyzeStored(id);
+    }
+    useBacklog.setState(null, true);
   });
 }
 

@@ -464,6 +464,14 @@ button.link {
   line-height: 1.1;
 }
 
+.stat-big.up {
+  color: var(--accent);
+}
+
+.stat-big.down {
+  color: var(--error);
+}
+
 .stat-table {
   border-collapse: collapse;
   width: 100%;
@@ -554,6 +562,34 @@ button.link {
   align-items: flex-end;
 }
 
+/* How often an opening training line comes up. */
+.line-tag {
+  flex: none;
+  width: 78px;
+  padding: 2px 0;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.line-tag.occasional {
+  background: transparent;
+  border: 1px solid var(--accent);
+}
+
+.line-tag.rare {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.history-side button {
+  padding: 3px 12px;
+}
+
 .rating-spark {
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -584,4 +620,261 @@ button.link {
   .topbar .trail {
     display: none;
   }
+}
+
+/* ---- Charts (Profile): the reference categorical palette, validated against these surfaces ---- */
+:root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
+}
+:root[data-theme="dark"] {
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+  }
+}
+
+.chart {
+  position: relative;
+  width: 100%;
+  margin: 4px 0 8px;
+}
+.chart svg {
+  display: block;
+  touch-action: pan-y;
+}
+.chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.chart-tick {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.chart-end {
+  fill: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+}
+.chart-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.chart-dot {
+  stroke: var(--panel);
+  stroke-width: 2;
+}
+.chart-cross {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.chart-tip {
+  position: absolute;
+  top: 4px;
+  pointer-events: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.15);
+  white-space: nowrap;
+}
+.chart-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chart-legend button {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.chart-legend button.off {
+  opacity: 0.45;
+}
+.chart-legend button.off .chart-swatch {
+  background: transparent !important;
+  outline: 1.5px solid var(--muted);
+}
+.chart-table summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.filter-row .segmented {
+  flex-wrap: wrap;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+.empty-state p {
+  margin: 0;
+}
+
+.leak-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.leak {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.leak p {
+  margin: 4px 0 8px;
+}
+.leak-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.leak-rank {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+}
+.leak-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Imported games: which site. */
+.mode-badge.site {
+  color: var(--accent);
+  background: var(--accent-soft);
+  text-transform: none;
+}
+
+.import-inputs {
+  display: flex;
+  gap: 8px;
+}
+.import-inputs input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+/* Phones away from the computer (offline.ts). */
+.offline-chip {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  white-space: nowrap;
+}
+.offline-chip.syncing {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.pgn-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: 12px/1.4 ui-monospace, Consolas, monospace;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  resize: vertical;
+}
+
+/* Opening training: side, then opening. Wraps on phones. */
+.opening-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.opening-pick .segmented {
+  flex-wrap: wrap;
+}
+
+/* Trainers whose status can run to more lines under the board (the opening trainer's engine numbers,
+   the endgame hint): the board leaves room for them, the same in every state so it doesn't jump. If
+   it still doesn't fit (a very short window), the panel scrolls rather than hiding the buttons. */
+@media (min-width: 761px) {
+  .board-panel.tall-status {
+    --board-w: min(100%, calc(100vh - 345px));
+    overflow-y: auto;
+  }
+}
+.status-extra {
+  display: block;
+  margin-top: 2px;
+}
+
+/* Opening trainer, off the line: the engine on both moves, the status's second line. */
+.opening-why-evals {
+  font-variant-numeric: tabular-nums;
+}
+.opening-why-evals .good strong {
+  color: var(--accent);
+}
+.opening-why-evals .bad strong {
+  color: var(--error);
 }

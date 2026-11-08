@@ -2,6 +2,7 @@
 // the tag names shown in the UI and accepted from the coach.
 import { create } from "zustand";
 import { hasBackend, invoke, listen } from "../backend";
+import { markPuzzleUsed, orOffline, packPuzzle, packPuzzles } from "../offline";
 
 export interface Puzzle {
   id: string;
@@ -55,7 +56,12 @@ export const usePuzzleDb = create<PuzzleDb>(() => ({
 
 export async function refreshPuzzleDb() {
   if (!hasBackend()) return;
-  const s = await invoke<Omit<PuzzleDb, "loaded" | "importing">>("puzzle_status");
+  applyPuzzleStatus(await invoke<PuzzleStatus>("puzzle_status"));
+}
+
+export type PuzzleStatus = Omit<PuzzleDb, "loaded" | "importing">;
+
+export function applyPuzzleStatus(s: PuzzleStatus) {
   usePuzzleDb.setState({ ...s, tags: s.tags ?? [], count: s.count ?? 0, loaded: true });
 }
 
@@ -65,7 +71,7 @@ export function initPuzzles() {
     usePuzzleDb.setState({ importing: e.payload });
     if (e.payload.phase === "done") refreshPuzzleDb();
   });
-  refreshPuzzleDb().catch((e) => console.error("puzzle status failed", e));
+  // The status itself comes with the boot call (boot.ts).
   // A download may already be running (started from the other device, or before a reload).
   invoke<ImportProgress | null>("puzzle_import_progress")
     .then((p) => p && !usePuzzleDb.getState().importing && usePuzzleDb.setState({ importing: p }))
@@ -92,21 +98,26 @@ export interface Filter {
   exclude?: string[];
 }
 
-export const findPuzzles = (filter: Filter) =>
-  invoke<Puzzle[]>("puzzle_find", { filter: { themes: [], exclude: [], opening: null, ...filter } });
+export function findPuzzles(filter: Filter) {
+  const full = { themes: [], exclude: [], opening: null, ...filter };
+  // Offline (phones), from the puzzles kept on the phone.
+  return orOffline<Puzzle[]>("puzzle_find", { filter: full }, () => packPuzzles(full));
+}
 
 /** One puzzle by its Lichess id; null when the set isn't downloaded or doesn't have it. */
-export const getPuzzle = (id: string) => invoke<Puzzle | null>("puzzle_get", { id });
+export const getPuzzle = (id: string) => orOffline<Puzzle | null>("puzzle_get", { id }, () => packPuzzle(id));
 
 /** Saves the attempt; the rating only moves on a puzzle's first try. */
 export async function recordAttempt(p: Puzzle, correct: boolean, ms: number) {
-  const r = await invoke<{ before: number; after: number; rated: boolean }>("puzzle_record", {
-    id: p.id,
-    rating: p.rating,
-    themes: p.themes,
-    correct,
-    ms,
-  });
+  markPuzzleUsed(p.id);
+  // Offline, the attempt waits on the phone; the rating moves when the computer gets it.
+  const rating = usePuzzleDb.getState().rating;
+  const r = await orOffline<{ before: number; after: number; rated: boolean }>(
+    "puzzle_record",
+    { id: p.id, rating: p.rating, themes: p.themes, correct, ms },
+    () => ({ before: rating, after: rating, rated: false }),
+    true,
+  );
   if (r.rated) usePuzzleDb.setState((s) => ({ rating: r.after, attempts: s.attempts + 1 }));
   return r;
 }

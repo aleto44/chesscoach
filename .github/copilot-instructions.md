@@ -31,11 +31,30 @@ Rules:
 ## Layout and navigation
 
 - The left/middle column shows the **home menu** (`src/components/Home.tsx`) or the screen picked from it:
-  Games (practice / rated / saved games), Drills, and Puzzles, each with its own sub-menu. The top bar's
-  back button returns one level, and the brand / home button returns to the main menu.
-- The view lives in `useNav` (`src/nav.ts`). Puzzle and drill sessions have their own stores
-  (`src/puzzles/session.ts`, `src/analysis/drillSession.ts`); starting one shows its board.
-- Board sounds (`src/sound.ts`) follow whichever board is on screen: game, puzzle or drill.
+  Games (play a rated or practice game, analysis board), School (drills, opening training with the
+  repertoire, the endgame trainer, guess the move), Puzzles, and Profile (weaknesses, rating history,
+  saved games, import from chess.com and Lichess), each with its own sub-menu. The top bar's back button
+  returns one level, and the brand / home button returns to the main menu.
+- The view lives in `useNav` (`src/nav.ts`). Puzzle, drill, opening, endgame and guess-the-move sessions have
+  their own stores (`src/puzzles/session.ts`, `src/analysis/drillSession.ts`, `src/openings/session.ts`,
+  `src/endgames/session.ts`, `src/guess/session.ts`); starting one shows its board, and starting one stops
+  the others.
+- The opening and endgame trainers are not games: they never create a game or show up in saved games, and
+  they can start while a game is in progress (a rated game's clock pauses meanwhile, `src/game/clock.ts`).
+  Opening sets live in `src/openings/training.ts`, checked by `node scripts/check-book.mjs`. The trainer
+  matches moves by what's left of the line, not by ply (`src/openings/order.ts`): a move the line plays
+  later is fine when the engine says the order costs nothing, and an engine-equal move outside the line
+  is marked "≈", not wrong.
+- Screens that aren't a game ask the coach one-off questions with `coach_explain` (`src/coach.rs` `explain`):
+  no tools, no conversation, so it works during a rated game. Its answers show in the chat column through
+  `src/coach/trainerChat.ts`, a thread of their own that is never saved into the game's chat. Hand it computed
+  facts (engine evals) the way the chat coach gets them; the opening trainer's "why not" is the example
+  (`src/openings/explain.ts`).
+- "Real games" are rated games here plus imported ones (`games.source` set, stored as rated, never moving
+  the in-app rating). The Profile and the coach's profile judge the student on those, never on practice.
+- Phones keep working offline for puzzles and drills (`src/offline.ts`): calls fall back to a pack kept on
+  the phone and writes wait in an outbox. A new puzzle or drill call should go through `orOffline`.
+- Board sounds (`src/sound.ts`) follow whichever board is on screen: game, puzzle, drill, endgame or guess.
 
 ## Boards: the student can always draw
 

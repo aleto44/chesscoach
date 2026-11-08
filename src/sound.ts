@@ -2,21 +2,48 @@
 import { invoke } from "./backend";
 import { hasBackend } from "./db";
 import { useSettings } from "./settings";
-import { screen, useStore } from "./store";
-import type { Line } from "./chess/line";
+import { screen, useStore, type Color } from "./store";
+import { sideToMove, type Line } from "./chess/line";
 import { usePuzzle } from "./puzzles/session";
 import { viewedPly } from "./chess/view";
 import { useDrill } from "./analysis/drillSession";
+import { endgameOf, useEndgame } from "./endgames/session";
+import { openingSetOf, useOpening } from "./openings/session";
+import { useGuess } from "./guess/session";
 
-export const SOUND_NAMES = ["move", "capture", "castle", "check", "promotion", "game-end"] as const;
+/**
+ * Each event plays `<name>.mp3` (or .wav/.ogg/...) from the sounds folder. Any file that's missing
+ * falls back along FALLBACK, so a folder with just move.mp3 still works.
+ */
+export const SOUND_NAMES = [
+  "move",
+  "move-self",
+  "move-opponent",
+  "capture",
+  "castle",
+  "check",
+  "checkmate",
+  "promotion",
+  "premove",
+  "game-start",
+  "game-end",
+] as const;
 export type SoundName = (typeof SOUND_NAMES)[number];
 
 const RATE = 48000;
 let ctx: AudioContext | null = null;
 const buffers = new Map<SoundName, AudioBuffer>();
 
-/** Sounds without their own file borrow the plain move sound; game-end stays silent. */
-const FALLBACK: Partial<Record<SoundName, SoundName>> = { capture: "move", castle: "move", check: "move", promotion: "move" };
+/** Sounds without their own file borrow another (followed until one loads); premove, game-start and game-end stay silent. */
+const FALLBACK: Partial<Record<SoundName, SoundName>> = {
+  "move-self": "move",
+  "move-opponent": "move",
+  capture: "move",
+  castle: "move",
+  check: "move",
+  checkmate: "check",
+  promotion: "move",
+};
 
 /** Why a sound file didn't load, shown in Settings (on a phone there's no console to look at). */
 const failures = new Map<SoundName, string>();
@@ -46,7 +73,12 @@ export async function loadSounds() {
 /** The sounds that have their own file. */
 export const customSounds = () => SOUND_NAMES.filter((n) => buffers.has(n));
 export const soundFailures = () => [...failures].map(([name, why]) => `${name} (${why})`);
-const bufferFor = (name: SoundName) => buffers.get(name) ?? (FALLBACK[name] && buffers.get(FALLBACK[name]));
+function bufferFor(name: SoundName): AudioBuffer | undefined {
+  for (let n: SoundName | undefined = name; n; n = FALLBACK[n]) {
+    const buf = buffers.get(n);
+    if (buf) return buf;
+  }
+}
 
 /**
  * Phone browsers keep a page's audio off until it is started during a touch, and a sound first
@@ -79,22 +111,41 @@ export function play(name: SoundName) {
   src.start();
 }
 
-export function soundForMove(san: string): SoundName {
-  if (san.includes("+") || san.includes("#")) return "check";
+/** `self`: the move was the student's (plain moves sound different for each side). */
+export function soundForMove(san: string, self: boolean): SoundName {
+  if (san.includes("#")) return "checkmate";
+  if (san.includes("+")) return "check";
   if (san.includes("=")) return "promotion";
   if (san.startsWith("O-O")) return "castle";
   if (san.includes("x")) return "capture";
-  return "move";
+  return self ? "move-self" : "move-opponent";
 }
 
 /** The board on screen: a puzzle or drill replaces the game while it runs. */
-function onScreen(): { line: Line; ply: number; key: unknown } {
+function onScreen(): { line: Line; ply: number; key: unknown; student: Color | "both" } {
   const puzzle = usePuzzle.getState();
-  if (puzzle?.line) return { line: puzzle.line, ply: viewedPly(puzzle.line.sans.length, puzzle.view), key: puzzle.queue[puzzle.index] };
+  if (puzzle?.line) return { line: puzzle.line, ply: viewedPly(puzzle.line.sans.length, puzzle.view), key: puzzle.queue[puzzle.index], student: puzzle.color };
   const drill = useDrill.getState();
-  if (drill?.line) return { line: drill.line, ply: viewedPly(drill.line.sans.length, drill.view), key: drill.queue[drill.index] };
+  if (drill?.line) {
+    const card = drill.queue[drill.index];
+    return { line: drill.line, ply: viewedPly(drill.line.sans.length, drill.view), key: card, student: card?.color ?? "both" };
+  }
+  const endgame = useEndgame.getState();
+  if (endgame)
+    return { line: endgame.line, ply: viewedPly(endgame.line.sans.length, endgame.view), key: endgame.line.startFen + endgame.id, student: endgameOf(endgame).side };
+  const opening = useOpening.getState();
+  if (opening)
+    return {
+      line: opening.line,
+      ply: viewedPly(opening.line.sans.length, opening.view),
+      key: opening.setId + opening.line.startFen,
+      student: openingSetOf(opening).color,
+    };
+  const guess = useGuess.getState();
+  if (guess) return { line: guess.line, ply: viewedPly(guess.line.sans.length, guess.view), key: guess.game, student: guess.side };
   const { line, ply } = screen();
-  return { line, ply, key: useStore.getState().gameId };
+  const s = useStore.getState();
+  return { line, ply, key: s.gameId, student: s.meta.studentColor };
 }
 
 /** Plays a sound whenever the board on screen advances by exactly one move (played or stepped). */
@@ -108,14 +159,22 @@ export function initSounds() {
     const fen = now.line.fens[now.ply];
     if (fen === prevFen && now.key === prev.key) return;
     // Same game / puzzle / drill and one move further: a move sound. Anything else is a new board.
-    if (now.key === prev.key && now.ply > 0 && now.line.fens[now.ply - 1] === prevFen) play(soundForMove(now.line.sans[now.ply - 1]));
+    if (now.key === prev.key && now.ply > 0 && now.line.fens[now.ply - 1] === prevFen) {
+      const mover = sideToMove(now.line.fens[now.ply - 1]);
+      play(soundForMove(now.line.sans[now.ply - 1], now.student === "both" || now.student === mover));
+    }
     prev = now;
     prevFen = fen;
   };
   useStore.subscribe((s, before) => {
     check();
-    if (s.meta.result && !before.meta.result && s.gameId === before.gameId) window.setTimeout(() => play("game-end"), 250);
+    // A mate already played the checkmate sound on its move; game-end is for every other ending.
+    const mated = s.game.sans[s.game.sans.length - 1]?.includes("#") && buffers.has("checkmate");
+    if (s.meta.result && !before.meta.result && s.gameId === before.gameId && !mated) window.setTimeout(() => play("game-end"), 250);
   });
   usePuzzle.subscribe(check);
   useDrill.subscribe(check);
+  useEndgame.subscribe(check);
+  useOpening.subscribe(check);
+  useGuess.subscribe(check);
 }

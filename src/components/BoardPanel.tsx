@@ -25,9 +25,11 @@ import { ModeBadge } from "./ModeBadge";
 import { PlayerCard } from "./Clock";
 import { GameReportPanel, LabelIcon, listLabel, ReviewBar, useGameReport, useMoment, useVerdict, VerdictLine } from "./Review";
 import { WhyButton } from "./Why";
+import { RatingResult } from "./RatingResult";
 import type { MoveLabel } from "../analysis/review";
 import { bestShape, useNudge } from "../coach/nudge";
 import { saveSetting, useSettings } from "../settings";
+import { signed } from "../rating";
 
 /**
  * The board, with a side column like lichess's: the player at the top of the board, the moves and
@@ -115,6 +117,7 @@ export function BoardPanel() {
           </button>
         )}
         {showEval && <EvalBar orientation={orientation} />}
+        {!tangent && <RatingResult />}
         <MaterialStrip fen={line.fens[ply]} side={top} />
         <Board
           fen={line.fens[ply]}
@@ -231,7 +234,8 @@ function gameStatus(meta: GameMeta, thinking: boolean, endFen: string): string {
           : (meta.result === "1-0") === (meta.studentColor === "white")
             ? "You won"
             : "You lost";
-    return `${mine ? `${mine} · ` : ""}${meta.termination ?? meta.result}`;
+    const rating = meta.rating ? ` · ${meta.rating.after} (${signed(meta.rating.after - meta.rating.before)})` : "";
+    return `${mine ? `${mine} · ` : ""}${meta.termination ?? meta.result}${rating}`;
   }
   if (meta.studentColor === "both") return "Move both sides";
   if (thinking) return "Thinking…";

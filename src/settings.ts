@@ -12,9 +12,29 @@ export interface Settings {
   theme: "dark" | "light" | "system";
   /** Practice games: flag the student's mistakes right after they play them (local engine, no AI). */
   nudges: "off" | "blunders" | "mistakes";
+  /**
+   * The student's game rating, chess.com scale; null = not set (START_RATING). Rated games move
+   * it by Elo against the bot's rating; the computer updates it as each one ends (db.rs rate_game).
+   */
+  playerRating: number | null;
+  /** The student's usernames for importing their games (games/import.ts); "" = not set. */
+  chesscomUser: string;
+  lichessUser: string;
+  /** Desktop: look for new games on those accounts when the app opens (every few hours at most). */
+  autoImport: boolean;
 }
 
-const DEFAULTS: Settings = { coachModel: "", sounds: true, showEval: false, theme: "dark", nudges: "blunders" };
+const DEFAULTS: Settings = {
+  coachModel: "",
+  sounds: true,
+  showEval: false,
+  theme: "dark",
+  nudges: "blunders",
+  playerRating: null,
+  chesscomUser: "",
+  lichessUser: "",
+  autoImport: true,
+};
 
 export const MODEL_CHOICES = [
   { value: "", label: "Default", hint: "Whatever your Claude Code default is" },
@@ -39,7 +59,11 @@ export function initTheme() {
 
 export async function loadSettings() {
   if (!hasBackend()) return useSettings.setState({ loaded: true });
-  const saved = await invoke<Partial<Settings>>("db_get_settings");
+  applySettings(await invoke<Partial<Settings>>("db_get_settings"));
+}
+
+/** The settings as the database has them (absent = default). */
+export function applySettings(saved: Partial<Settings>) {
   useSettings.setState({ ...DEFAULTS, ...saved, loaded: true });
 }
 

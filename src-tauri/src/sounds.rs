@@ -1,5 +1,5 @@
 //! Optional custom sounds: audio files the student drops into `<app data>/sounds`, named after
-//! the event they replace (move.mp3, capture.wav, castle.ogg, check.mp3, promotion.mp3, game-end.mp3).
+//! the event they play on (move-self.mp3, capture.wav, castle.ogg, ...; see SOUND_NAMES in src/sound.ts).
 
 use std::path::PathBuf;
 

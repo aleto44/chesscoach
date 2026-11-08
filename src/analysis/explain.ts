@@ -1,19 +1,29 @@
-// Why a move was bad, as lines to step through on a board: what the opponent does after it, and
-// what the better move would have done, each played out to where the material settles, with a
-// caption per move and a one-line verdict. Computed on demand (two short searches), so stored
-// analyses need nothing new.
+// Why a move was bad, as lines to step through on a board: what the opponent does after it, played
+// out to where the material settles, and the moves that would have been fine instead (one, played
+// out, when it stands out; otherwise several, each with just its reply). A caption per move and a
+// one-line verdict. Computed on demand (a few short searches), so stored analyses need nothing new.
 import { Chess, type Move, type Square } from "chess.js";
 import type { Key } from "chessground/types";
-import { getReviewEngine } from "../engine/stockfish";
+import { getReviewEngine, type EngineLine } from "../engine/stockfish";
 import { whiteWinPercent } from "../engine/live";
 import { pieceCounts, PIECE_NAMES, PIECE_VALUES, type PieceType } from "../chess/material";
 import type { Color } from "../store";
 
 const DEPTH = 14;
-/** How far a line is followed when judging what it wins: far enough for an exchange to finish. */
-const MAX_PLIES = 9;
-/** A line where nothing is captured still shows a few moves, to show the idea. */
+/** How far a line is followed at most: far enough for an exchange to finish. */
+const MAX_PLIES = 12;
+/** The line after the move played shows at least this many moves, to show the idea. */
 const QUIET_PLIES = 5;
+/** A sound alternative shows the move and the reply (more only while captures go on). */
+const ALT_PLIES = 2;
+/** Plies taken from one search before searching again: a PV's tail is too shallow to trust. */
+const CHUNK = 4;
+/** Root candidates searched for "better" moves. */
+const CANDIDATES = 5;
+/** Moves within this many winning-chance points of the best count as just as good. */
+const SOUND = 5;
+/** The best move "stands out" when the next best keeps this many points less. */
+const STANDOUT = 10;
 
 export interface Step {
   san: string;
@@ -35,14 +45,27 @@ export interface ExplainedLine {
   verdict: string;
   /** Eval at the end of the line, mover's view, as text (+1.2, #3). */
   evalText: string;
+  /** The mover's winning chances along the line (%). */
+  win: number;
 }
 
 export interface Explanation {
   mover: Color;
   /** The move played, then the opponent's best answers. */
   played: ExplainedLine;
-  /** The engine's move instead, then its continuation. Null when it's the move played. */
+  /** The best move instead, then its continuation. Null when nothing beats the move played. */
   better: ExplainedLine | null;
+  /**
+   * Every move that would have been fine, best first (`better` is the first). When the best one
+   * stands out (mate, wins material, or clearly ahead of the rest) it's the only one, followed
+   * until the material settles; otherwise each shows just the move and the reply, since a solid
+   * move needs no long line to justify it.
+   */
+  alternatives: ExplainedLine[];
+  /** The best move is *the* move here, not one of several. */
+  standout: boolean;
+  /** A sentence about the alternatives together. */
+  betterSummary: string;
   evalBefore: string;
   evalAfter: string;
   winBefore: number;
@@ -130,23 +153,33 @@ function caption(chess: Chess, m: Move, prev: Move | undefined, mover: Color): s
   return `${text}.`;
 }
 
-/** Plays `ucis` from `fen` and cuts the line where the material settles. */
-function playOut(fen: string, ucis: string[], mover: Color): { steps: Step[]; mate: boolean } {
+interface Followed {
+  steps: Step[];
+  mate: boolean;
+  /** Net material each side lost over the line. */
+  lost: Record<Color, PieceType[]>;
+  /** The line's eval (White's view, stored format), from the latest search along it. */
+  eval: number | null;
+  mateFor: number | undefined;
+}
+
+/**
+ * `first`, then the engine's best play, followed until the material settles: at least `quiet`
+ * plies, and on past that while the next move is a capture (so an exchange or a hanging piece is
+ * always finished). The engine searches again every CHUNK plies: the tail of one long PV is
+ * shallow and can contain moves the engine wouldn't really play (a piece left hanging), which made
+ * lines end on a blunder that had nothing to do with the move being judged. `pv` (the engine's
+ * line after `first`, if already known) saves the first search.
+ */
+async function followLine(fen: string, first: string, mover: Color, quiet: number, pv?: string[], pvEval?: EngineLine): Promise<Followed> {
   const chess = new Chess(fen);
   const steps: Step[] = [];
-  let settled = 0;
-  let captures = false;
   let prev: Move | undefined;
-  for (let i = 0; i < Math.min(ucis.length, MAX_PLIES); i++) {
-    const uci = ucis[i];
+  let queue: string[] = [];
+  let latest: EngineLine | undefined = pvEval;
+  const play = (uci: string) => {
     const [, turn, , , , full] = chess.fen().split(" ");
-    let m: Move;
-    try {
-      m = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
-    } catch {
-      break;
-    }
-    if (m.captured) captures = true;
+    const m = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
     steps.push({
       san: m.san,
       label: `${full}${turn === "w" ? "." : "..."}${m.san}`,
@@ -156,13 +189,36 @@ function playOut(fen: string, ucis: string[], mover: Color): { steps: Step[]; ma
       note: caption(chess, m, prev, mover),
     });
     prev = m;
-    if (chess.isCheckmate()) return { steps, mate: true };
-    // Settled: the next move doesn't capture, so no exchange is half done.
-    const next = ucis[i + 1];
-    if (!next || !chess.get(next.slice(2, 4) as Square)) settled = i + 1;
+  };
+  play(first);
+  if (pv) queue = pv.slice(0, CHUNK);
+  while (!chess.isGameOver() && steps.length < MAX_PLIES) {
+    if (!queue.length) {
+      const [l] = await getReviewEngine().analyze(chess.fen(), 1, DEPTH);
+      if (!l?.pv.length) break;
+      latest = l;
+      queue = l.pv.slice(0, CHUNK);
+    }
+    const next = queue[0];
+    // Stop once the idea is shown and nothing is left hanging mid-exchange.
+    if (steps.length >= quiet && !chess.get(next.slice(2, 4) as Square)) break;
+    try {
+      play(next);
+    } catch {
+      break;
+    }
+    queue.shift();
   }
-  const keep = captures ? Math.max(settled, 1) : Math.min(steps.length, QUIET_PLIES);
-  return { steps: steps.slice(0, keep), mate: false };
+  const mate = chess.isCheckmate();
+  // Mated: the side to move lost. Otherwise the latest search's eval is the line's.
+  const mateEval = chess.turn() === "w" ? -10000 : 10000;
+  return {
+    steps,
+    mate,
+    lost: netLosses(fen, chess.fen()),
+    eval: mate ? mateEval : latest ? stored(latest) : null,
+    mateFor: mate ? undefined : latest?.mate,
+  };
 }
 
 const pawns = (cp: number) => (cp >= 0 ? "+" : "") + (cp / 100).toFixed(1);
@@ -179,63 +235,85 @@ const winFor = (cp: number, side: Color) => {
 const stored = (l: { cp?: number; mate?: number }) =>
   l.mate !== undefined ? Math.sign(l.mate) * (10000 - Math.abs(l.mate)) : (l.cp ?? 0);
 
-/** `first`, then the engine's best play after it, cut where the material settles. */
-async function lineAfter(fen: string, first: string, mover: Color) {
-  const chess = new Chess(fen);
-  chess.move({ from: first.slice(0, 2), to: first.slice(2, 4), promotion: first[4] });
-  const [line] = chess.isGameOver() ? [] : await getReviewEngine().analyze(chess.fen(), 1, DEPTH);
-  const { steps, mate } = playOut(fen, [first, ...(line?.pv ?? [])], mover);
-  const end = steps[steps.length - 1]?.fen ?? fen;
-  return { steps, mate, lost: netLosses(fen, end), eval: line ? stored(line) : null, mateFor: line?.mate };
-}
+/** Whether a stored eval is a forced mate for `side`. */
+const matesFor = (cp: number | null, side: Color) => cp !== null && Math.abs(cp) >= 9000 && cp > 0 === (side === "white");
+
+/** "a, b and c". */
+const andList = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}` : (xs[0] ?? ""));
 
 export async function explainMove(m: MoveToExplain): Promise<Explanation> {
   const mover = colorOf(m.fenBefore);
   const opp = other(mover);
+  const [winBefore, winAfter] = [winFor(m.evalBefore, mover), winFor(m.evalAfter, mover)];
 
-  const p = await lineAfter(m.fenBefore, m.uci, mover);
-  const oppMates = p.mate || (p.mateFor !== undefined && p.mateFor > 0 === (opp === "white"));
+  const p = await followLine(m.fenBefore, m.uci, mover, QUIET_PLIES);
   const [lost, got] = [p.lost[mover], p.lost[opp]];
   let verdict: string;
-  if (oppMates) verdict = `${sideName(opp)} has a forced mate.`;
+  if (matesFor(p.eval, opp)) verdict = `${sideName(opp)} has a forced mate.`;
   else if (value(lost) - value(got) >= 1) verdict = `You lose ${listPieces(lost)}${got.length ? ` for ${listPieces(got)}` : ""}.`;
   else {
-    // No material: say how much worse it gets, in the student's winning chances.
-    const drop = winFor(m.evalBefore, mover) - winFor(p.eval ?? m.evalAfter, mover);
+    // No material: say how much worse it gets, in the student's winning chances. The stored
+    // evals, so the numbers agree with the header and the rest of the review.
+    const drop = winBefore - winAfter;
     const much = drop >= 20 ? "a lot " : drop >= 10 ? "clearly " : "";
     verdict =
       `No material goes right away, but ${sideName(opp)}'s position gets ${much}better: ` +
-      `your winning chances drop from ${winFor(m.evalBefore, mover)}% to ${winFor(p.eval ?? m.evalAfter, mover)}%.`;
+      `your winning chances drop from ${winBefore}% to ${winAfter}%.`;
   }
   const played: ExplainedLine = {
     startFen: m.fenBefore,
     steps: p.steps,
     verdict,
     evalText: evalFor(p.eval ?? m.evalAfter, mover),
+    win: winAfter,
   };
 
-  let better: ExplainedLine | null = null;
-  if (m.bestUci && m.bestUci !== m.uci) {
-    const b = await lineAfter(m.fenBefore, m.bestUci, mover);
-    const myMate = b.mate || (b.mateFor !== undefined && b.mateFor > 0 === (mover === "white"));
-    const [gave, won] = [b.lost[mover], b.lost[opp]];
-    const first = b.steps[0]?.san ?? "";
-    let v: string;
-    if (myMate) v = `${first} leads to mate.`;
-    else if (value(won) - value(gave) >= 1) v = `${first} wins ${listPieces(won)}${gave.length ? ` for ${listPieces(gave)}` : ""}.`;
-    // The stored eval, so the numbers agree with the rest of the review.
-    else v = `${first} keeps the game at ${evalFor(m.evalBefore, mover)} for you.`;
-    better = { startFen: m.fenBefore, steps: b.steps, verdict: v, evalText: evalFor(b.eval ?? m.evalBefore, mover) };
+  // The moves that would have been fine. Usually there are several, and showing only the engine's
+  // favourite with a long PV teaches little: the deep line is often moves only an engine would
+  // find. So a lone best move gets its full line only when it really stands out.
+  const root = await getReviewEngine().analyze(m.fenBefore, CANDIDATES, DEPTH);
+  const winOf = (l: EngineLine) => winFor(stored(l), mover);
+  const candidates = root.filter((l) => l.pv[0] && l.pv[0] !== m.uci);
+  const top = candidates[0];
+  const alternatives: ExplainedLine[] = [];
+  let standout = false;
+  let betterSummary = "";
+  if (top && winOf(top) > winAfter) {
+    const runnerUp = root.find((l) => l !== top && l.pv[0]);
+    const topWin = winOf(top);
+    standout = !runnerUp || matesFor(stored(top), mover) || topWin - winOf(runnerUp) >= STANDOUT;
+    const picks = standout ? [top] : candidates.filter((l) => l === top || (winOf(l) >= topWin - SOUND && winOf(l) >= winAfter + SOUND)).slice(0, 4);
+    for (const l of picks) {
+      const b = await followLine(m.fenBefore, l.pv[0], mover, standout ? QUIET_PLIES : ALT_PLIES, l.pv.slice(1), l);
+      const [gave, won] = [b.lost[mover], b.lost[opp]];
+      const san = b.steps[0]?.san ?? "";
+      const w = winOf(l);
+      let v: string;
+      if (matesFor(stored(l), mover)) v = `${san} leads to mate.`;
+      else if (value(won) - value(gave) >= 1) v = `${san} wins ${listPieces(won)}${gave.length ? ` for ${listPieces(gave)}` : ""}.`;
+      else if (standout)
+        v = `${san} is the move here: it keeps your winning chances at ${w}%, and every other move gives some away (the next best keeps ${runnerUp ? winOf(runnerUp) : w}%).`;
+      else if (w >= winBefore + 3) v = `${san} improves your position: your winning chances go to ${w}%.`;
+      else v = `${san} is solid: your winning chances stay at ${w}%.`;
+      alternatives.push({ startFen: m.fenBefore, steps: b.steps, verdict: v, evalText: evalFor(stored(l), mover), win: w });
+    }
+    if (alternatives.length > 1)
+      betterSummary =
+        `No single move stands out: ${andList(alternatives.map((a) => a.steps[0].san))} all keep your winning chances ` +
+        `around ${alternatives[0].win}%, against ${winAfter}% after the move you played. Pick one to see the reply.`;
   }
 
   return {
     mover,
     played,
-    better,
+    better: alternatives[0] ?? null,
+    alternatives,
+    standout,
+    betterSummary,
     evalBefore: evalFor(m.evalBefore, mover),
     evalAfter: evalFor(m.evalAfter, mover),
-    winBefore: winFor(m.evalBefore, mover),
-    winAfter: winFor(m.evalAfter, mover),
+    winBefore,
+    winAfter,
   };
 }
 

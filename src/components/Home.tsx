@@ -2,16 +2,25 @@ import { useEffect, useState, type ReactNode } from "react";
 import { startDrills } from "../analysis/drillSession";
 import { useDrillCounts } from "../analysis/drills";
 import { hasBackend, invoke, openUrl } from "../backend";
+import { cachedRead, keepRead } from "../snapshot";
 import { newGame } from "../game/session";
 import { timeControlLabel } from "../game/clock";
 import { go, useNav } from "../nav";
 import { refreshPuzzleDb, themeLabel, usePuzzleDb } from "../puzzles/puzzles";
 import { startPuzzles } from "../puzzles/session";
-import { fromLichess } from "../rating";
-import { isLocked, opponentLabel, useStore, type GameMode } from "../store";
-import { GamesDialog, NewGameDialog } from "./GameDialogs";
+import { commonness, findSet, pickLine, seenCounts, shortName, TRAINING_SETS, type Commonness, type TrainingLine } from "../openings/training";
+import { startOpening, useOpening } from "../openings/session";
+import { getRepertoire, repertoireSetId, useRepertoire } from "../openings/repertoire";
+import { fromLichess, signed, type PlayerRating } from "../rating";
+import { SettingsDialog } from "./SettingsDialog";
+import { useSettings } from "../settings";
+import { isLocked, opponentLabel, useStore } from "../store";
+import { NewGameDialog } from "./GameDialogs";
 import { ModeBadge } from "./ModeBadge";
 import { RepertoireDialog } from "./RepertoireDialog";
+import { ProfileMenu, RatingHistory, Weaknesses } from "./Profile";
+import { EndgameMenu } from "./Endgames";
+import { GuessMenu } from "./Guess";
 
 /** Drills and puzzles would leave a rated game's clock (or position) sitting mid-game. */
 export function useSessionsBlocked() {
@@ -20,7 +29,7 @@ export function useSessionsBlocked() {
   return !meta.result && (isLocked(meta) || (meta.timeControl !== null && started));
 }
 
-const BLOCKED = "Finish your current game first";
+export const BLOCKED = "Finish your current game first";
 
 /** The left column when no board is showing: the home menu and each section's menu. */
 export function Home() {
@@ -30,16 +39,23 @@ export function Home() {
       <div className="home-inner">
         {view === "home" && <MainMenu />}
         {view === "games" && <GamesMenu />}
+        {view === "school" && <SchoolMenu />}
         {view === "drills" && <DrillsMenu />}
         {view === "drill-history" && <DrillHistory />}
+        {view === "openings" && <OpeningTraining />}
         {view === "puzzles" && <PuzzlesMenu />}
         {view === "puzzle-history" && <PuzzleHistory />}
+        {view === "profile" && <ProfileMenu />}
+        {view === "weaknesses" && <Weaknesses />}
+        {view === "ratings" && <RatingHistory />}
+        {view === "endgames" && <EndgameMenu />}
+        {view === "guess" && <GuessMenu />}
       </div>
     </main>
   );
 }
 
-function Tile({
+export function Tile({
   icon,
   title,
   sub,
@@ -107,14 +123,14 @@ function MainMenu() {
       </h1>
       <ResumeGame />
       <div className="menu-grid main">
-        <Tile big icon="♟" title="Games" sub="Practice and rated games, your saved games" onClick={() => go("games")} />
+        <Tile big icon="♟" title="Games" sub="Play the computer, rated or practice" onClick={() => go("games")} />
         <Tile
           big
-          icon="↻"
-          title="Drills"
-          sub={drills.total ? `${drills.due} due of ${drills.total}` : "Practice positions from your games"}
+          icon="✎"
+          title="School"
+          sub={drills.due ? `${drills.due} drills due · opening training` : "Drills and opening training"}
           badge={drills.due ? <span className="count">{drills.due}</span> : null}
-          onClick={() => go("drills")}
+          onClick={() => go("school")}
         />
         <Tile
           big
@@ -123,45 +139,60 @@ function MainMenu() {
           sub={pdb.installed ? `Rating ${fromLichess(pdb.rating)}` : "Tactics from real games"}
           onClick={() => go("puzzles")}
         />
+        <Tile big icon="◔" title="Profile" sub="Your games, weaknesses and ratings" onClick={() => go("profile")} />
       </div>
     </>
   );
 }
 
 function GamesMenu() {
-  const [dialog, setDialog] = useState<GameMode | "saved" | "repertoire" | null>(null);
+  const [dialog, setDialog] = useState<"play" | "settings" | null>(null);
+  const { data: rating } = useRead<PlayerRating>("db_player_rating", {}, "Your rating is kept on the computer.");
   const hasGame = useStore((s) => s.gameId !== null || s.game.sans.length > 0);
   const close = () => setDialog(null);
   return (
     <>
       <h2 className="section-title">Games</h2>
       <ResumeGame />
+      {rating && <GameRating r={rating} onSet={() => setDialog("settings")} />}
       <div className="menu-grid">
-        <Tile icon="▶" title="Practice game" sub="Engine, coach and takebacks whenever you want" onClick={() => setDialog("practice")} />
-        <Tile icon="★" title="Rated game" sub="No help. Shows how you really play" onClick={() => setDialog("rated")} />
+        <Tile icon="▶" title="Play a game" sub="Against the computer, rated or practice" onClick={() => setDialog("play")} />
         <Tile
           icon="⊞"
           title="Analysis board"
           sub="Move both sides freely and ask the coach"
           onClick={async () => {
-            await newGame({ mode: "practice", studentColor: "both", opponentElo: null });
+            await newGame({
+              mode: "practice",
+              studentColor: "both",
+              opponentElo: null,
+            });
             go("board");
           }}
         />
-        <Tile icon="☰" title="Saved games" sub="Open, review or delete past games" onClick={() => setDialog("saved")} />
-        <Tile icon="♜" title="Opening repertoire" sub="The lines you want to play" onClick={() => setDialog("repertoire")} />
         {hasGame && <Tile icon="◻" title="Current board" sub="Back to the last game you opened" onClick={() => go("board")} />}
       </div>
-      {(dialog === "practice" || dialog === "rated") && <NewGameDialog mode={dialog} onClose={close} />}
-      {dialog === "saved" && <GamesDialog onClose={close} />}
-      {dialog === "repertoire" && <RepertoireDialog onClose={close} />}
+      {dialog === "play" && <NewGameDialog withOpponent onClose={close} />}
+      {dialog === "settings" && <SettingsDialog onClose={close} />}
     </>
   );
 }
 
 interface DrillOverview {
-  kinds: { kind: "mistake" | "opening" | "coach" | "puzzle"; cards: number; due: number; pctCorrect: number | null }[];
-  recent: { id: number; at: string; correct: number; played: string; kind: string; title: string }[];
+  kinds: {
+    kind: "mistake" | "opening" | "coach" | "puzzle";
+    cards: number;
+    due: number;
+    pctCorrect: number | null;
+  }[];
+  recent: {
+    id: number;
+    at: string;
+    correct: number;
+    played: string;
+    kind: string;
+    title: string;
+  }[];
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -172,14 +203,194 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 function useDrillOverview(limit: number) {
-  const [data, setData] = useState<DrillOverview | null>(null);
+  return useRead<DrillOverview>("db_drill_overview", { limit }, "Drills are saved on the computer; open the app there or from the home server.");
+}
+
+/**
+ * A read-only query for a screen. On a phone the last answer shows at once (snapshot.ts) while
+ * the computer is asked again; an error only shows when there's nothing to show instead.
+ */
+export function useRead<T>(cmd: string, args: Record<string, unknown>, offline: string) {
+  const key = `${cmd}:${JSON.stringify(args)}`;
+  const [data, setData] = useState<T | null>(() => cachedRead<T>(key));
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    if (!hasBackend()) return setError("Drills are saved on the computer; open the app there or from the home server.");
-    invoke<DrillOverview>("db_drill_overview", { limit }).then(setData, (e) => setError(String(e)));
-  }, [limit]);
-  return { data, error };
+    if (!hasBackend()) return setError(offline);
+    let live = true;
+    invoke<T>(cmd, args).then(
+      (d) => {
+        keepRead(key, d);
+        if (live) (setData(d), setError(null));
+      },
+      (e) => live && setError(String(e)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [key]);
+  return { data, error: data ? null : error };
 }
+
+function SchoolMenu() {
+  const drills = useDrillCounts();
+  const seen = seenCounts();
+  const lines = TRAINING_SETS.flatMap((s) => s.lines);
+  const faced = lines.filter((l) => seen[l.moves.join(" ")]).length;
+  return (
+    <>
+      <h2 className="section-title">School</h2>
+      <div className="menu-grid">
+        <Tile
+          icon="↻"
+          title="Drills"
+          sub={drills.total ? `${drills.due} due of ${drills.total}` : "Practice positions from your games"}
+          badge={drills.due ? <span className="count">{drills.due}</span> : null}
+          onClick={() => go("drills")}
+        />
+        <Tile
+          icon="♜"
+          title="Opening training"
+          sub={faced ? `Faced ${faced} of ${lines.length} lines · your repertoire` : "Your repertoire, and every reply to your opening"}
+          onClick={() => go("openings")}
+        />
+        <Tile icon="♚" title="Endgame trainer" sub="Win the standard endings against Stockfish" onClick={() => go("endgames")} />
+        <Tile icon="?" title="Guess the move" sub="Play through master games, move by move" onClick={() => go("guess")} />
+      </div>
+    </>
+  );
+}
+
+const COMMONNESS_LABEL: Record<Commonness, string> = {
+  common: "Common",
+  occasional: "Occasional",
+  rare: "Rare",
+};
+
+/** The opening picked last time, so coming back to the menu starts where the student was. */
+const OPENING_KEY = "cc-opening-set";
+function savedSetId(): string {
+  try {
+    const id = localStorage.getItem(OPENING_KEY);
+    if (id && findSet(id)) return id;
+  } catch {
+    // Private mode: start at the first set.
+  }
+  return TRAINING_SETS[0].id;
+}
+
+/**
+ * Practice against the replies to one opening: pick a side, then the opening, then a line on
+ * purpose or a weighted-random one, so the common ones come up most and the rare ones still show.
+ */
+function OpeningTraining() {
+  const [setId, setSetIdState] = useState(savedSetId);
+  const setSetId = (id: string) => {
+    setSetIdState(id);
+    try {
+      localStorage.setItem(OPENING_KEY, id);
+    } catch {
+      // Private mode: not kept.
+    }
+  };
+  // Re-read the counts when a session ends and the list shows again.
+  const training = useOpening((o) => o !== null);
+  const [seen, setSeen] = useState(seenCounts);
+  useEffect(() => setSeen(seenCounts()), [training]);
+  const [repertoire, setRepertoire] = useState(false);
+  // The student's own lines are a set too; re-read them so the list follows edits in the dialog.
+  useRepertoire();
+  useEffect(() => {
+    getRepertoire().catch(() => undefined);
+  }, []);
+  const set = findSet(setId) ?? TRAINING_SETS[0];
+  const mine = set.id === repertoireSetId(set.color);
+  const faced = set.lines.filter((l) => seen[l.moves.join(" ")]).length;
+
+  // A session of its own, not a game: it doesn't touch the game in progress or the saved games.
+  const play = (line: TrainingLine) => startOpening(set.id, line);
+
+  return (
+    <>
+      <h2 className="section-title">Opening training</h2>
+      <div className="opening-pick">
+        <div className="segmented">
+          {(["white", "black"] as const).map((c) => (
+            <button
+              key={c}
+              className={set.color === c ? "on" : ""}
+              onClick={() => set.color !== c && setSetId(TRAINING_SETS.find((s) => s.color === c)!.id)}
+            >
+              {c === "white" ? "Openings as White" : "Defences as Black"}
+            </button>
+          ))}
+        </div>
+        <div className="segmented">
+          <button className={mine ? "on" : ""} onClick={() => setSetId(repertoireSetId(set.color))}>
+            ★ Your repertoire
+          </button>
+          {TRAINING_SETS.filter((s) => s.color === set.color).map((s) => (
+            <button key={s.id} className={s.id === setId ? "on" : ""} onClick={() => setSetId(s.id)}>
+              {s.name}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="section-lede muted">
+        {mine ? (
+          <>
+            {set.blurb} Each line is also a drill under Drills, and new games can steer into it. Practice only: these don't go into your games.
+          </>
+        ) : (
+          <>
+            <strong>{set.name}</strong> as {set.color}. {set.blurb} Each time the computer picks a reply, the common ones most often, and plays it
+            from the book until the line ends. Practice only: these don't go into your games.
+          </>
+        )}
+      </p>
+      <div className="menu-grid">
+        {mine && (
+          <Tile icon="♜" title="Edit repertoire" sub={`Add or remove your ${set.color} lines`} onClick={() => setRepertoire(true)} />
+        )}
+        <Tile
+          icon="⚄"
+          title="Surprise me"
+          sub={mine ? "A random line from your repertoire" : `A random ${set.name} line, weighted by how often it's played`}
+          disabled={!set.lines.length}
+          onClick={() => play(pickLine(set))}
+        />
+      </div>
+      <h3 className="sub-title">
+        Lines{" "}
+        <span className="muted small">
+          · faced {faced} of {set.lines.length}
+        </span>
+      </h3>
+      {mine && !set.lines.length && <p className="muted">No {set.color} lines yet. Add the openings you play with Edit repertoire.</p>}
+      <div className="history-list">
+        {set.lines.map((l) => {
+          const n = seen[l.moves.join(" ")] ?? 0;
+          const c = commonness(l);
+          return (
+            <div key={l.moves.join(" ")} className="history-row">
+              {!mine && <span className={`line-tag ${c}`}>{COMMONNESS_LABEL[c]}</span>}
+              <span className="history-main">
+                <span>{shortName(set, l)}</span>
+                <span className="muted small">{numberedMoves(l.moves)}</span>
+              </span>
+              <span className="history-side">
+                <button onClick={() => play(l)}>Play</button>
+                <span className="muted small">{n ? `faced ${n}×` : "new"}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {repertoire && <RepertoireDialog initialColor={set.color} onClose={() => setRepertoire(false)} />}
+    </>
+  );
+}
+
+const numberedMoves = (moves: string[]) => moves.map((m, i) => (i % 2 === 0 ? `${i / 2 + 1}.${m}` : m)).join(" ");
 
 function DrillsMenu() {
   const counts = useDrillCounts();
@@ -190,8 +401,8 @@ function DrillsMenu() {
     <>
       <h2 className="section-title">Drills</h2>
       <p className="section-lede muted">
-        Positions you got wrong come back on a schedule until they stick: mistakes from your analyzed games, missed
-        puzzles, your repertoire, and positions the coach set.
+        Positions you got wrong come back on a schedule until they stick: mistakes from your analyzed games, missed puzzles, your repertoire, and
+        positions the coach set.
       </p>
       <div className="menu-grid">
         <Tile
@@ -288,13 +499,7 @@ interface PuzzleHistoryData {
 }
 
 function usePuzzleHistory(limit: number) {
-  const [data, setData] = useState<PuzzleHistoryData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!hasBackend()) return setError("Puzzles are saved on the computer; open the app there or from the home server.");
-    invoke<PuzzleHistoryData>("puzzle_history", { limit }).then(setData, (e) => setError(String(e)));
-  }, [limit]);
-  return { data, error };
+  return useRead<PuzzleHistoryData>("puzzle_history", { limit }, "Puzzles are saved on the computer; open the app there or from the home server.");
 }
 
 function PuzzlesMenu() {
@@ -357,12 +562,17 @@ function PuzzlesMenu() {
 
 function PuzzleHistory() {
   const { data, error } = usePuzzleHistory(200);
-  const ratings = data ? data.attempts.filter((a) => a.rated).map((a) => fromLichess(a.ratingAfter)).reverse() : [];
+  const ratings = data
+    ? data.attempts
+        .filter((a) => a.rated)
+        .map((a) => fromLichess(a.ratingAfter))
+        .reverse()
+    : [];
   return (
     <>
       <h2 className="section-title">Puzzle history</h2>
       {error && <p className="muted">{error}</p>}
-      {ratings.length > 1 && <RatingSpark ratings={ratings} />}
+      {ratings.length > 1 && <RatingSpark ratings={ratings} label={`Rating over your last ${ratings.length} rated puzzles`} />}
       {data?.attempts.length === 0 && <p className="muted">No puzzles tried yet.</p>}
       <div className="history-list">
         {data?.attempts.map((a) => (
@@ -376,7 +586,10 @@ function PuzzleHistory() {
               <span className="muted small">
                 {a.themes
                   .split(" ")
-                  .filter((t) => t && !["short", "long", "veryLong", "oneMove", "crushing", "advantage", "middlegame", "endgame", "opening", "mate"].includes(t))
+                  .filter(
+                    (t) =>
+                      t && !["short", "long", "veryLong", "oneMove", "crushing", "advantage", "middlegame", "endgame", "opening", "mate"].includes(t),
+                  )
                   .map(themeLabel)
                   .join(", ")}
               </span>
@@ -394,8 +607,52 @@ function PuzzleHistory() {
   );
 }
 
-/** The puzzle rating after each rated puzzle, oldest first. */
-function RatingSpark({ ratings }: { ratings: number[] }) {
+/** The games menu's headline: the rating rated games move, its last change and its trend. */
+function GameRating({ r: read, onSet }: { r: PlayerRating; onSet: () => void }) {
+  // The setting changes here too (Settings, or a game that just ended); the read may be older.
+  const live = useSettings((s) => s.playerRating);
+  const r = live === null ? read : { ...read, rating: live, set: true };
+  const last = r.history[r.history.length - 1];
+  const ratings = r.history.length ? [r.history[0][0], ...r.history.map((h) => h[1])] : [];
+  return (
+    <>
+      <div className="stat-row">
+        <div>
+          <span className="stat-big">{r.rating}</span>
+          <span className="muted small">
+            your rating{" "}
+            <button className="link" onClick={onSet}>
+              {r.set ? "change" : "set it"}
+            </button>
+          </span>
+        </div>
+        <div>
+          <span className="stat-big">{r.games}</span>
+          <span className="muted small">rated games counted</span>
+        </div>
+        {last && (
+          <div>
+            <span className={`stat-big ${last[1] >= last[0] ? "up" : "down"}`}>{signed(last[1] - last[0])}</span>
+            <span className="muted small">last game</span>
+          </div>
+        )}
+      </div>
+      {!r.set && r.games === 0 && (
+        <p className="muted small">
+          Rated games start you at {r.rating}. If you know your chess.com rapid rating,{" "}
+          <button className="link" onClick={onSet}>
+            set it in Settings
+          </button>{" "}
+          so it's right from the first game.
+        </p>
+      )}
+      {ratings.length > 2 && <RatingSpark ratings={ratings} label={`Rating over your last ${r.history.length} rated games`} />}
+    </>
+  );
+}
+
+/** A rating over time, oldest first. */
+export function RatingSpark({ ratings, label }: { ratings: number[]; label: string }) {
   const w = 600;
   const h = 90;
   const min = Math.min(...ratings) - 10;
@@ -406,15 +663,18 @@ function RatingSpark({ ratings }: { ratings: number[] }) {
   return (
     <div className="rating-spark">
       <div className="muted small">
-        Rating over your last {ratings.length} rated puzzles: {ratings[0]} → <strong>{ratings[ratings.length - 1]}</strong>
+        {label}: {ratings[0]} → <strong>{ratings[ratings.length - 1]}</strong>
       </div>
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label="Puzzle rating over time">
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label="Rating over time">
         <path d={d} fill="none" stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
       </svg>
     </div>
   );
 }
 
-function formatDate(sqlite: string): string {
-  return new Date(sqlite.replace(" ", "T") + "Z").toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+export function formatDate(sqlite: string): string {
+  return new Date(sqlite.replace(" ", "T") + "Z").toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }

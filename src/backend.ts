@@ -4,6 +4,7 @@ import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen as tauriListen } from "@tauri-apps/api/event";
 import { openUrl as tauriOpenUrl } from "@tauri-apps/plugin-opener";
 import { create } from "zustand";
+import { mark } from "./perf";
 
 declare global {
   interface Window {
@@ -36,6 +37,10 @@ export const clientId = (() => {
 /** The phone couldn't reach the computer (or the server failed): trying again may work. */
 export class Unreachable extends Error {}
 
+/** Phones: whether the computer answered the last call (offline.ts works from its pack when not). */
+export const useConnection = create<{ reachable: boolean }>(() => ({ reachable: true }));
+const reachable = (r: boolean) => useConnection.getState().reachable !== r && useConnection.setState({ reachable: r });
+
 export async function invoke<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
   if (isTauri) return tauriInvoke<T>(cmd, args);
   if (!isRemote) throw new Error("No backend: open the app from the desktop window or the home server.");
@@ -47,8 +52,11 @@ export async function invoke<T>(cmd: string, args: Record<string, unknown> = {})
       body: JSON.stringify(args),
     });
   } catch (e) {
+    reachable(false);
     throw new Unreachable(`${cmd}: can't reach your computer (${e})`);
   }
+  // A proxy in front (Tailscale serve) answers 502 when the computer itself is away.
+  reachable(res.status !== 502 && res.status !== 503 && res.status !== 504);
   if (res.status >= 500) throw new Unreachable(`${cmd} failed (${res.status})`);
   if (res.status === 401) {
     usePairing.setState({ status: "unpaired" });
@@ -66,6 +74,7 @@ let source: EventSource | null = null;
 function connect() {
   source?.close();
   source = new EventSource(`/api/events?client=${encodeURIComponent(clientId)}`);
+  source.onopen = () => mark("live updates connected");
   source.onmessage = (e) => {
     try {
       const { event, payload } = JSON.parse(e.data);

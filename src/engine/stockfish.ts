@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { mark } from "../perf";
 
 export interface EngineLine {
   /** Centipawns from White's point of view; undefined when mate is set. */
@@ -17,9 +18,9 @@ class Engine {
 
   constructor() {
     this.worker.onmessage = (e) => this.onLine?.(String(e.data));
-    this.queue = this.run("uci", (l) => l === "uciok").then(() =>
-      this.run("isready", (l) => l === "readyok"),
-    );
+    this.queue = this.run("uci", (l) => l === "uciok")
+      .then(() => this.run("isready", (l) => l === "readyok"))
+      .then(() => mark("stockfish ready"));
   }
 
   private run(cmd: string, done: (line: string) => boolean, onInfo?: (line: string) => void) {

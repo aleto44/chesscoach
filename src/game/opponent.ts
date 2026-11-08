@@ -7,6 +7,8 @@ import { getOpponentEngine, STOCKFISH_RATING, toEngineElo } from "../engine/stoc
 import { MAIA_MAX_RATING, useStore } from "../store";
 import { clockLeft } from "./clock";
 import { isFollowing } from "./sync";
+import { writesHeld } from "../db";
+import { mark } from "../perf";
 import { bookMove } from "../openings/book";
 import { Chess } from "chess.js";
 
@@ -33,6 +35,19 @@ const THINK_MS = { min: 1000, max: 3000 };
 const ANIMATION_GAP_MS = 220;
 let thinkingOn: string | null = null;
 
+let preloadTimer: number | undefined;
+/**
+ * Setting Maia up takes the phone a few seconds and briefly blocks it, so on launch it waits
+ * until the screen is up rather than competing with it. The first move doesn't wait for this.
+ */
+function preloadSoon() {
+  if (preloadTimer !== undefined) return;
+  preloadTimer = window.setTimeout(() => {
+    const t = performance.now();
+    preloadMaia().then((ok) => ok && mark(`maia ready (took ${Math.round(performance.now() - t)} ms)`));
+  }, 1500);
+}
+
 /** Replies whenever the end of the game line is the opponent's turn. */
 export function initOpponent() {
   useStore.subscribe((s, prev) => {
@@ -52,10 +67,15 @@ async function pickMove(fen: string, rating: number, movetime: number): Promise<
   return getOpponentEngine().bestMove(fen, toEngineElo(rating), movetime);
 }
 
+/** After launch: the opponent may owe a move in the game that was on screen. */
+export const resumeOpponent = () => void maybeMove();
+
 async function maybeMove() {
   const { game, meta, gameId } = useStore.getState();
   if (!meta.opponentElo || meta.result || meta.studentColor === "both" || isFollowing()) return;
-  if (meta.opponentElo <= MAIA_MAX_RATING) preloadMaia();
+  if (meta.opponentElo <= MAIA_MAX_RATING) preloadSoon();
+  // A snapshot on screen may be behind the database; the opponent waits until it's settled (boot.ts).
+  if (writesHeld()) return;
   const end = game.sans.length;
   const fen = game.fens[end];
   if (sideToMove(fen) === meta.studentColor || thinkingOn === fen) return;

@@ -1,6 +1,7 @@
-// Service worker for the phone app (installed as a PWA from the home server). The app needs the
-// computer for games, the coach and the database, so this only makes the shell load fast and
-// lets the app open (and say it can't reach the computer) when it's off.
+// Service worker for the phone app (installed as a PWA from the home server). Games and the coach
+// need the computer; this makes the shell load fast and lets the app open without it, where
+// puzzles and drills run from the pack the phone keeps (src/offline.ts) with the engine files
+// cached here.
 const CACHE = "chesscoach-v1";
 
 self.addEventListener("install", () => self.skipWaiting());
@@ -16,24 +17,40 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(immutable(url.pathname) ? cacheFirst(e.request) : networkFirst(e.request));
 });
 
-/** How long reopening the app waits for the computer before showing the page it had last time. */
-const PAGE_WAIT = 1200;
-
 /**
- * The page itself: the computer's current one when it answers quickly, else the last one kept,
- * so coming back to the app after the phone dropped it doesn't sit on a blank screen while the
- * network wakes up. The fresh page is still kept for next time.
+ * The page itself: the one kept from last time, at once, so reopening the app after the phone
+ * dropped it doesn't wait on the computer. The computer's current page is fetched alongside and
+ * kept for next time; if it changed (the app was updated), the page is told so it can reload
+ * while it's in the background (pwa.ts). With nothing usable kept, it waits for the computer.
  */
 async function page(e) {
   const fresh = fetch(e.request).then(async (res) => {
     if (res.ok) await (await caches.open(CACHE)).put(e.request, res.clone());
     return res;
   });
-  e.waitUntil(fresh.catch(() => {}));
   const kept = await caches.match(e.request);
-  if (!kept) return fresh;
-  const wait = new Promise((resolve) => setTimeout(() => resolve(kept), PAGE_WAIT));
-  return Promise.race([fresh.catch(() => kept), wait]);
+  if (!kept || !(await assetsKept(kept.clone()))) return fresh.catch(() => kept ?? Response.error());
+  const before = await kept.clone().text();
+  e.waitUntil(
+    fresh
+      .then(async (res) => {
+        if (!res.ok || (await res.clone().text()) === before) return;
+        for (const client of await self.clients.matchAll({ type: "window" })) client.postMessage({ type: "page-updated" });
+      })
+      .catch(() => {}),
+  );
+  return kept;
+}
+
+/**
+ * Whether the build files a kept page loads are all kept too. An old page whose files were
+ * dropped can't load them from the computer any more (a newer build replaced them).
+ */
+async function assetsKept(res) {
+  const html = await res.text();
+  const urls = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
+  for (const url of urls) if (!(await caches.match(url))) return false;
+  return true;
 }
 
 async function cacheFirst(req) {

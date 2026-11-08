@@ -6,6 +6,7 @@ import { START_FEN } from "../chess/line";
 import { addDrills } from "../analysis/drills";
 import { hasBackend } from "../db";
 import type { Color } from "../store";
+import type { TrainingSet } from "./training";
 
 export interface RepertoireLine {
   id: number;
@@ -15,6 +16,23 @@ export interface RepertoireLine {
 }
 
 export const useRepertoire = create<RepertoireLine[]>(() => []);
+
+/** Set ids for the student's own lines in the opening trainer, one per color. */
+export const repertoireSetId = (color: Color) => `mine-${color}`;
+
+/** The student's lines for one color, as an opening trainer set: equal weights, the computer plays the other side. */
+export function repertoireSet(color: Color): TrainingSet {
+  return {
+    id: repertoireSetId(color),
+    name: "Your repertoire",
+    color,
+    blurb: `Your own ${color} lines, picked from the book. The computer plays the other side of one of them.`,
+    lines: useRepertoire
+      .getState()
+      .filter((r) => r.color === color)
+      .map((r) => ({ eco: "", name: r.name, moves: r.moves, weight: 1 })),
+  };
+}
 
 export async function getRepertoire(): Promise<RepertoireLine[]> {
   if (!hasBackend()) return useRepertoire.getState();

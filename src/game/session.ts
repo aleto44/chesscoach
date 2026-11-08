@@ -2,12 +2,17 @@
 import { invoke } from "../backend";
 import { Chess } from "chess.js";
 import { cancelQuizzes } from "../coach/quiz";
+import { signed } from "../rating";
+import { useSettings } from "../settings";
+import { play } from "../sound";
+import { create } from "zustand";
 import { buildLine, emptyLine, sideToMove, START_FEN, type Line } from "../chess/line";
 import {
   db,
   discardPending,
   flush,
   hasBackend,
+  importedFrom,
   opponentElo,
   opponentKey,
   unsavedPatch,
@@ -73,6 +78,7 @@ export async function newGame(opts: NewGameOptions) {
       orientation: opts.studentColor === "black" ? "black" : "white",
     }),
   );
+  play("game-start");
 }
 
 export async function loadGame(id: number) {
@@ -101,6 +107,11 @@ export async function reloadGame(id: number) {
 }
 
 function applyRecord(record: GameRecord) {
+  withoutSaving(() => useStore.setState(recordState(record)));
+}
+
+/** What the store holds for a game read from the database. */
+function recordState(record: GameRecord) {
   const { moves, tangents, chat } = record;
   // This device's own changes still on their way to the database (e.g. a resignation sent
   // while the phone was out of reach) win over the stored copy.
@@ -126,43 +137,79 @@ function applyRecord(record: GameRecord) {
     };
   }
 
-  // A tool call can't still be running in a freshly loaded game.
-  const items: ChatItem[] = chat.map(({ data }) =>
+  return {
+    gameId: game.id,
+    meta: {
+      mode: game.mode,
+      takebacks: game.takebacks,
+      timeControl: parseTimeControl(game.timeControl),
+      openingFocus: game.openingFocus,
+      studentColor: game.studentColor,
+      opponentElo: opponentElo(game.opponent),
+      result: game.result,
+      termination: game.termination,
+      rating: game.ratingBefore !== null && game.ratingAfter !== null ? { before: game.ratingBefore, after: game.ratingAfter } : null,
+      imported: importedFrom(game),
+    },
+    game: line,
+    gamePly: line.sans.length,
+    tangents: tangentMap,
+    active: null,
+    chat: settleChat(chat.map((c) => c.data)),
+    busy: false,
+    sessionId: game.coachSessionId,
+    clocks: line.sans.map((_, i) => moves[i]?.clockMs ?? null),
+    annotations: line.sans.map((_, i) => moves[i]?.analysis ?? null),
+    review: null,
+    // Time spent away from the game isn't charged: the clock resumes on reopening.
+    turnStartedAt: Date.now(),
+    orientation: (game.studentColor === "black" ? "black" : "white") as Color,
+  };
+}
+
+/** A tool call or quiz can't still be running in a freshly opened game. */
+export function settleChat(chat: ChatItem[]): ChatItem[] {
+  return chat.map((data) =>
     data.kind === "tool" && data.status === "running"
       ? { ...data, status: "error", detail: "interrupted" }
       : data.kind === "quiz" && (data.status === "waiting" || data.status === "checking")
         ? { ...data, status: "skipped", result: "Not answered." }
         : data,
   );
+}
 
-  withoutSaving(() =>
-    useStore.setState({
-      gameId: game.id,
-      meta: {
-        mode: game.mode,
-        takebacks: game.takebacks,
-        timeControl: parseTimeControl(game.timeControl),
-        openingFocus: game.openingFocus,
-        studentColor: game.studentColor,
-        opponentElo: opponentElo(game.opponent),
-        result: game.result,
-        termination: game.termination,
-      },
-      game: line,
-      gamePly: line.sans.length,
-      tangents: tangentMap,
-      active: null,
-      chat: items,
-      busy: false,
-      sessionId: game.coachSessionId,
-      clocks: line.sans.map((_, i) => moves[i]?.clockMs ?? null),
-      annotations: line.sans.map((_, i) => moves[i]?.analysis ?? null),
-      review: null,
-      // Time spent away from the game isn't charged: the clock resumes on reopening.
-      turnStartedAt: Date.now(),
-      orientation: game.studentColor === "black" ? "black" : "white",
-    }),
-  );
+type GameContent = Pick<
+  ReturnType<typeof useStore.getState>,
+  "gameId" | "meta" | "game" | "tangents" | "chat" | "sessionId" | "clocks" | "annotations"
+>;
+
+/** What a game holds that the database also has (not where the student is looking), to compare copies. */
+export function contentKey(s: GameContent): string {
+  const tangents = Object.values(s.tangents)
+    .map((t) => [t.id, t.parentId, t.title, t.author, t.line.startFen, t.line.sans, t.line.notes])
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+  return JSON.stringify([s.gameId, s.meta, s.game.startFen, s.game.sans, s.game.notes, s.chat, s.sessionId, s.clocks, s.annotations, tangents]);
+}
+
+/**
+ * Opens the game the boot call returned. `shown` is the content key of the snapshot put on
+ * screen at launch (phones only): when the database has the same, what's on screen stays as it
+ * is (the student may have moved since); when it differs, the database wins. `release` lets the
+ * game writes held back since launch through (see holdWrites), once it's settled which copy wins.
+ */
+export async function openBooted(record: GameRecord | null, shown: string | null, release: () => void) {
+  // The coach process from before the page went away can't report to this page.
+  invoke("coach_reset").catch((e) => console.warn("could not reset the coach", e));
+  const fresh = record && recordState(record);
+  const keep = fresh && shown !== null && contentKey(fresh) === shown && useStore.getState().gameId === fresh.gameId;
+  if (!keep) {
+    cancelQuizzes();
+    discardPending();
+  }
+  release();
+  if (keep) return;
+  if (fresh) withoutSaving(() => useStore.setState(fresh));
+  else await newGame({ mode: "practice", studentColor: "white", opponentElo: 1500 });
 }
 
 /**
@@ -187,16 +234,6 @@ export async function deleteGame(id: number) {
   await db.deleteGame(id);
   if (!current) return;
   withoutSaving(() => useStore.setState({ gameId: null }));
-  const [latest] = await db.listGames(1);
-  if (latest) await loadGame(latest.id);
-  else await newGame({ mode: "practice", studentColor: "white", opponentElo: 1500 });
-}
-
-/** On launch, reopen the most recent game, or start one against the opponent. */
-export async function bootstrap() {
-  if (!hasBackend()) return;
-  // Games abandoned before the student moved (e.g. the app was closed) go on launch.
-  await db.pruneEmptyGames(null);
   const [latest] = await db.listGames(1);
   if (latest) await loadGame(latest.id);
   else await newGame({ mode: "practice", studentColor: "white", opponentElo: 1500 });
@@ -257,7 +294,31 @@ export async function finish(result: NonNullable<GameMeta["result"]>, terminatio
   useStore.setState({ meta: { ...meta, result, termination } });
   const review = meta.mode === "rated" ? " The coach is on again: ask it to go through the game with you." : "";
   pushChat({ kind: "system", id: newId("c"), text: `Game over: ${result} (${termination}).${review}` });
-  if (gameId !== null && hasBackend()) await db.updateGame(gameId, { result, termination });
+  if (gameId === null || !hasBackend()) return;
+  await db.updateGame(gameId, { result, termination });
+  if (meta.mode === "rated") await showRatingChange(gameId);
+}
+
+/** The rated game that just ended on this device, for the card over the board (RatingResult). */
+export const useRatingResult = create<{ shown: { gameId: number; before: number; after: number } | null }>(() => ({
+  shown: null,
+}));
+
+/** The computer rated the game as it saved the result (db.rs rate_game): show what changed. */
+async function showRatingChange(gameId: number) {
+  const record = await db.loadGame(gameId).catch(() => null);
+  const g = record?.game;
+  if (!g || g.ratingBefore === null || g.ratingAfter === null) return;
+  const rating = { before: g.ratingBefore, after: g.ratingAfter };
+  useSettings.setState({ playerRating: rating.after });
+  if (useStore.getState().gameId !== gameId) return;
+  useStore.setState((s) => ({ meta: { ...s.meta, rating } }));
+  useRatingResult.setState({ shown: { gameId, ...rating } });
+  pushChat({
+    kind: "system",
+    id: newId("c"),
+    text: `Your rating: ${rating.before} → ${rating.after} (${signed(rating.after - rating.before)}).`,
+  });
 }
 
 /** Ends the game when the position at the end of the game line is terminal. */

@@ -91,20 +91,43 @@ function WhyDialog({ i, onClose }: { i: number; onClose: () => void }) {
 /** An explanation's two lines, each on its own board: after the move played, and the better move. */
 export function WhyLines({ ex, playedSan, orientation }: { ex: Explanation; playedSan: string; orientation: "white" | "black" }) {
   const [tab, setTab] = useState<"played" | "better">("played");
-  const line = tab === "better" && ex.better ? ex.better : ex.played;
+  const [pick, setPick] = useState(0);
+  const alts = ex.alternatives ?? (ex.better ? [ex.better] : []);
+  const several = alts.length > 1;
+  const line = tab === "better" && alts.length ? alts[Math.min(pick, alts.length - 1)] : ex.played;
+  // With several sound moves the board opens before the move, all of them drawn as arrows.
+  const options = several ? alts.map((a, k) => ({ from: a.steps[0].from, to: a.steps[0].to, on: k === pick })) : undefined;
   return (
     <>
-      {ex.better && (
+      {alts.length > 0 && (
         <div className="why-tabs" role="tablist">
           <button role="tab" aria-selected={tab === "played"} className={tab === "played" ? "on bad" : ""} onClick={() => setTab("played")}>
             After {playedSan}
           </button>
           <button role="tab" aria-selected={tab === "better"} className={tab === "better" ? "on good" : ""} onClick={() => setTab("better")}>
-            Better: {ex.better.steps[0]?.san}
+            {several ? `Better moves (${alts.length})` : `Better: ${alts[0].steps[0]?.san}`}
           </button>
         </div>
       )}
-      <LineViewer key={tab} line={line} kind={tab} orientation={orientation} />
+      {tab === "better" && several && (
+        <div className="why-options">
+          <p className="muted small">{ex.betterSummary}</p>
+          <div className="why-moves">
+            {alts.map((a, k) => (
+              <button key={k} className={`better ${k === pick ? "current" : ""}`} onClick={() => setPick(k)}>
+                {a.steps[0].san} <span className="muted">{a.evalText}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <LineViewer
+        key={`${tab}-${tab === "better" ? pick : 0}`}
+        line={line}
+        kind={tab}
+        orientation={orientation}
+        options={tab === "better" ? options : undefined}
+      />
     </>
   );
 }
@@ -125,10 +148,22 @@ function toLine(line: ExplainedLine): Line {
  * The student can play their own moves on it ("what if he takes instead?"): they fork off the
  * line, and stepping back to the fork brings the line back (chess/explore.ts).
  */
-function LineViewer({ line, kind, orientation }: { line: ExplainedLine; kind: "played" | "better"; orientation: "white" | "black" }) {
+function LineViewer({
+  line,
+  kind,
+  orientation,
+  options,
+}: {
+  line: ExplainedLine;
+  kind: "played" | "better";
+  orientation: "white" | "black";
+  /** Several sound moves: drawn together on the start position, the picked one brighter. */
+  options?: { from: Key; to: Key; on: boolean }[];
+}) {
   const base = useMemo(() => toLine(line), [line]);
-  // Opens on the move itself, so the board shows what was played (or should have been).
-  const [x, setX] = useState<Explore>(() => explore(base, Math.min(1, base.sans.length)));
+  // Opens on the move itself, so the board shows what was played (or should have been); with
+  // several options, before it, so all of them show.
+  const [x, setX] = useState<Explore>(() => explore(base, options ? 0 : Math.min(1, base.sans.length)));
   const [showEval, setShowEval] = useState(true);
   const { ply, forkAt } = x;
   const n = x.line.sans.length;
@@ -158,11 +193,15 @@ function LineViewer({ line, kind, orientation }: { line: ExplainedLine; kind: "p
   const shapes = useMemo<DrawShape[]>(() => {
     const out: DrawShape[] = [];
     if (forked) return out;
+    if (ply === 0 && options) {
+      for (const o of options) out.push({ orig: o.from, dest: o.to, brush: o.on ? "green" : "paleGreen" });
+      return out;
+    }
     // The judged move in its colour on the move itself; the next move faintly, as a hint.
     if (ply === 1 && step) out.push({ orig: step.from, dest: step.to, brush: kind === "played" ? "red" : "green" });
     if (next) out.push({ orig: next.from, dest: next.to, brush: ply === 0 ? (kind === "played" ? "red" : "green") : "paleBlue" });
     return out;
-  }, [ply, step, next, kind, forked]);
+  }, [ply, step, next, kind, forked, options]);
 
   const top = orientation === "white" ? "black" : "white";
   const lastMove = ply > 0 ? x.line.lastMoves[ply - 1] : undefined;
@@ -213,6 +252,8 @@ function LineViewer({ line, kind, orientation }: { line: ExplainedLine; kind: "p
             </>
           ) : step ? (
             step.note
+          ) : options ? (
+            "Green arrows: moves that would have kept the position. Step forward to see the brighter one and the reply."
           ) : (
             "The position before the move. Step forward to play through the line, or play your own moves on the board."
           )}

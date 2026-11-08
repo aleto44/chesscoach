@@ -1,7 +1,7 @@
 // Spaced-repetition drills (SM-2 scheduling lives in src-tauri/src/stats.rs). Mistake drills come
 // from post-game analysis; opening drills from the repertoire; coach drills from ask_move;
 // puzzle drills from missed Lichess puzzles.
-import { invoke } from "../backend";
+import { gradedOffline, orOffline, packDrillCounts, packDrills, retiredOffline } from "../offline";
 import { create } from "zustand";
 import { sideToMove, type Line } from "../chess/line";
 import { hasBackend } from "../db";
@@ -40,27 +40,29 @@ export const useDrillCounts = create<{ total: number; due: number }>(() => ({ to
 
 export async function refreshDrillCounts() {
   if (!hasBackend()) return;
-  useDrillCounts.setState(await invoke<{ total: number; due: number }>("db_drill_counts"));
+  useDrillCounts.setState(await orOffline<{ total: number; due: number }>("db_drill_counts", {}, packDrillCounts));
 }
 
 export async function addDrills(drills: NewDrill[]): Promise<number> {
   if (!hasBackend() || drills.length === 0) return 0;
-  const added = await invoke<number>("db_add_drills", { drills });
+  const added = await orOffline<number>("db_add_drills", { drills }, () => 0, true);
   await refreshDrillCounts();
   return added;
 }
 
-export const dueDrills = (limit = 20, all = false) => invoke<Drill[]>("db_due_drills", { limit, all });
+/** `tag`: only the mistake drills from games with that review tag (e.g. "hung-piece"), due or not. */
+export const dueDrills = (limit = 20, all = false, tag: string | null = null) =>
+  orOffline<Drill[]>("db_due_drills", { limit, all, tag }, () => packDrills(limit, all, tag));
 
 /** Records the attempt; returns when the drill is next due. */
 export async function gradeDrill(id: number, correct: boolean, played: string, ms: number): Promise<string> {
-  const due = await invoke<string>("db_grade_drill", { id, correct, played, ms });
+  const due = await orOffline<string>("db_grade_drill", { id, correct, played, ms }, () => gradedOffline(id, correct), true);
   await refreshDrillCounts();
   return due;
 }
 
 export async function retireDrill(id: number) {
-  await invoke("db_retire_drill", { id });
+  await orOffline("db_retire_drill", { id }, () => retiredOffline(id), true);
   await refreshDrillCounts();
 }
 

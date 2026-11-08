@@ -49,9 +49,9 @@ export function OpeningSelect({
 }
 
 /** The student's repertoire per color. Each line is also an opening drill. */
-export function RepertoireDialog({ onClose }: { onClose: () => void }) {
+export function RepertoireDialog({ onClose, initialColor = "white" }: { onClose: () => void; initialColor?: Color }) {
   const repertoire = useRepertoire();
-  const [color, setColor] = useState<Color>("white");
+  const [color, setColor] = useState<Color>(initialColor);
   const [pick, setPick] = useState("");
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {

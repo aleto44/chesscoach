@@ -1,9 +1,9 @@
-// Checks that every line in src/openings/book.ts is legal: node scripts/check-book.mjs
+// Checks that every line in the book and the opening training sets is legal: node scripts/check-book.mjs
 import { readFileSync } from "node:fs";
 import { Chess } from "chess.js";
 
-const src = readFileSync("src/openings/book.ts", "utf8");
-const lines = [...src.matchAll(/L\("([A-E]\d\d)", "([^"]+)", "([^"]+)"\)/g)];
+const src = readFileSync("src/openings/book.ts", "utf8") + readFileSync("src/openings/training.ts", "utf8");
+const lines = [...src.matchAll(/[LT]\("([A-E]\d\d)", "([^"]+)", "([^"]+)"(?:, \d+)?\)/g)];
 let bad = 0;
 const seen = new Map();
 for (const [, eco, name, moves] of lines) {

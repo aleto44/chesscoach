@@ -71,6 +71,22 @@ export interface GameMeta {
   termination: string | null;
   /** Practice games only. */
   takebacks: number;
+  /** A finished rated game: the student's rating before and after it (chess.com scale). */
+  rating: { before: number; after: number } | null;
+  /** A game imported from chess.com or Lichess (games/import.ts); null for games played here. */
+  imported?: ImportedFrom | null;
+}
+
+export type ImportSite = "chesscom" | "lichess";
+export const SITE_NAME: Record<ImportSite, string> = { chesscom: "chess.com", lichess: "Lichess" };
+
+export interface ImportedFrom {
+  site: ImportSite;
+  opponent: string;
+  /** chess.com scale (Lichess ratings are converted on import). */
+  opponentRating: number | null;
+  studentRating: number | null;
+  url: string | null;
 }
 
 interface State {
@@ -120,6 +136,8 @@ export const FREE_PLAY: GameMeta = {
   result: null,
   termination: null,
   takebacks: 0,
+  rating: null,
+  imported: null,
 };
 
 export const useStore = create<State>(() => ({
@@ -172,6 +190,15 @@ export function gameDescription(): string {
   const { meta } = get();
   if (meta.studentColor === "both") return "practice, free play (student moves both sides, no opponent)";
   const side = meta.studentColor === "white" ? "White" : "Black";
+  if (meta.imported) {
+    const own = meta.imported.studentRating ? `, student rated ${meta.imported.studentRating}` : "";
+    const tc = meta.timeControl ? `, ${formatTimeControl(meta.timeControl)}` : "";
+    return (
+      `game imported from the student's ${SITE_NAME[meta.imported.site]} account (a real game against a person, ` +
+      `no help, so it counts like a rated game): student played ${side} vs ${opponentLabel(meta)}${own}${tc}, ` +
+      `finished ${meta.result} by ${meta.termination}. Ratings are chess.com scale`
+    );
+  }
   const state = meta.result ? `finished ${meta.result} by ${meta.termination}` : "in progress";
   const clock = meta.timeControl ? `, ${formatTimeControl(meta.timeControl)} clock` : ", no clock";
   const focus = meta.openingFocus ? `, practicing the opening ${meta.openingFocus.join(" ")}` : "";
@@ -191,6 +218,7 @@ export const opponentName = (rating: number) => (rating <= MAIA_MAX_RATING ? "Ma
 export const formatTimeControl = (tc: TimeControl) => `${tc.initial / 60}+${tc.increment}`;
 
 export function opponentLabel(meta: GameMeta): string {
+  if (meta.imported) return meta.imported.opponent + (meta.imported.opponentRating ? ` (${meta.imported.opponentRating})` : "");
   return meta.opponentElo ? `${opponentName(meta.opponentElo)} ${meta.opponentElo}` : "Free play";
 }
 
