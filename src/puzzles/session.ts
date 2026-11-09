@@ -11,7 +11,7 @@ import { emptyLine, playAt, sideToMove, type Line } from "../chess/line";
 import { stepView, viewedPly, type Step } from "../chess/view";
 import type { Color } from "../store";
 import { findPuzzles, recordAttempt, themeLabel, usePuzzleDb, type Puzzle, type ThemeGain } from "./puzzles";
-import { fromLichess } from "../rating";
+import { fromLichess, toLichess } from "../rating";
 import { stopEndgame } from "../endgames/session";
 import { stopGuess } from "../guess/session";
 import { stopOpening } from "../openings/session";
@@ -30,9 +30,28 @@ export interface Choice {
   difficulty: Difficulty;
 }
 
+/**
+ * "rated": at the student's puzzle rating, a little above or below, no filters. "custom": the
+ * student's theme / opening / difficulty. "rush": unrated, three lives, each puzzle harder than
+ * the last (rushRating). Coach sets have none.
+ */
+export type PuzzleMode = "rated" | "custom" | "rush";
+
+export interface Rush {
+  lives: number;
+  /** Puzzles solved this run. */
+  score: number;
+  /** The best run on this device, before this one. */
+  best: number;
+}
+
+export const RUSH_LIVES = 3;
+
 export interface PuzzleSession {
   /** Where the puzzles come from: the student's own choice, or a set the coach picked. */
-  set: { title: string; fromCoach: boolean };
+  set: { title: string; fromCoach: boolean; mode?: PuzzleMode };
+  /** A puzzle rush run (mode "rush"); null otherwise. */
+  rush: Rush | null;
   choice: Choice;
   queue: Puzzle[];
   index: number;
@@ -92,11 +111,13 @@ export function initPuzzleSession() {
 function resume(saved: PuzzleSession) {
   // Saved by an older version (a different shape): dropped.
   const mastery = saved.mastery?.every((g) => typeof g.after?.xp === "number") ? saved.mastery : null;
-  usePuzzle.setState({ ...saved, mastery, autoNextAt: null }, true);
+  usePuzzle.setState({ ...saved, rush: saved.rush ?? null, mastery, autoNextAt: null }, true);
   const puzzle = saved.queue[saved.index];
   if (saved.status === "loading" || saved.status === "intro" || !saved.line) {
     // Mid-refill or before the opponent's first move: start this puzzle over (or reload the set).
     if (puzzle) begin(saved.index);
+    else if (saved.set.mode === "rush") startRush();
+    else if (saved.set.mode === "rated") startRatedPuzzles();
     else if (!saved.set.fromCoach) startPuzzles(saved.choice);
     return;
   }
@@ -147,8 +168,6 @@ const defaultChoice = (): Choice => ({ theme: null, opening: null, difficulty: s
 
 /** Opens the trainer with puzzles picked from the student's own filters. */
 export async function startPuzzles(choice: Partial<Choice> = {}) {
-  stopDrills();
-  stopTrainers();
   const prev = get()?.choice ?? defaultChoice();
   const next = { ...prev, ...choice };
   try {
@@ -156,7 +175,56 @@ export async function startPuzzles(choice: Partial<Choice> = {}) {
   } catch {
     // Private mode: not remembered.
   }
-  usePuzzle.setState(blank({ title: "Puzzles", fromCoach: false }, next), true);
+  await open(blank({ title: "Puzzles", fromCoach: false, mode: "custom" }, next));
+}
+
+const NO_FILTER: Choice = { theme: null, opening: null, difficulty: "normal" };
+
+/** Puzzles at the student's own puzzle rating, a bit above or below; no filters. */
+export function startRatedPuzzles() {
+  return open(blank({ title: "Rated puzzles", fromCoach: false, mode: "rated" }, NO_FILTER));
+}
+
+const RUSH_BEST_KEY = "cc-rush-best";
+/** The best rush score on this device. */
+export function rushBest(): number {
+  try {
+    return Number(localStorage.getItem(RUSH_BEST_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Puzzle rush: starts dead easy and gets harder with every puzzle, until three misses. */
+export function startRush() {
+  const session = blank({ title: "Puzzle rush", fromCoach: false, mode: "rush" }, NO_FILTER);
+  return open({ ...session, rush: { lives: RUSH_LIVES, score: 0, best: rushBest() } });
+}
+
+/**
+ * The rush's difficulty for its nth puzzle (from 1), chess.com scale: dead easy at the start,
+ * climbing fast through the easy ones, ~1350 by the 17th and ~1575 by the 26th, then +25 a puzzle.
+ */
+const RUSH_CURVE: [n: number, rating: number][] = [
+  [1, 300],
+  [8, 900],
+  [17, 1350],
+  [26, 1575],
+];
+export function rushRating(n: number): number {
+  const c = RUSH_CURVE;
+  const last = c[c.length - 1];
+  if (n >= last[0]) return last[1] + (n - last[0]) * 25;
+  let i = 1;
+  while (n > c[i][0]) i++;
+  const [a, b] = [c[i - 1], c[i]];
+  return Math.round(a[1] + ((Math.max(n, 1) - a[0]) / (b[0] - a[0])) * (b[1] - a[1]));
+}
+
+async function open(session: PuzzleSession) {
+  stopDrills();
+  stopTrainers();
+  usePuzzle.setState(session, true);
   try {
     await refill();
   } catch (e) {
@@ -184,6 +252,7 @@ function blank(set: PuzzleSession["set"], choice: Choice): PuzzleSession {
   return {
     set,
     choice,
+    rush: null,
     queue: [],
     index: 0,
     line: null,
@@ -206,10 +275,13 @@ function blank(set: PuzzleSession["set"], choice: Choice): PuzzleSession {
 async function refill() {
   const s = get();
   if (!s || s.set.fromCoach) return;
+  if (s.set.mode === "rush") return refillRush();
   const { rating } = usePuzzleDb.getState();
-  const center = rating + OFFSET[s.choice.difficulty];
+  // Rated: the student's own rating, the window giving a mix of a bit easier and a bit harder.
+  const rated = s.set.mode === "rated";
+  const center = rating + (rated ? 0 : OFFSET[s.choice.difficulty]);
   const exclude = s.queue.map((p) => p.id);
-  for (const width of [100, 250, 600]) {
+  for (const width of rated ? [150, 300, 600] : [100, 250, 600]) {
     const found = await findPuzzles({
       themes: s.choice.theme ? [s.choice.theme] : [],
       opening: s.choice.opening,
@@ -223,6 +295,27 @@ async function refill() {
       usePuzzle.setState((st) => st && { queue: [...st.queue, ...found] });
       return;
     }
+  }
+}
+
+/** The rush queue: one puzzle per step of the curve, kept a few ahead of the one on the board. */
+async function refillRush() {
+  const s = get();
+  if (!s) return;
+  for (let i = s.queue.length; i <= s.index + 3; i++) {
+    const center = toLichess(rushRating(i + 1));
+    const exclude = get()?.queue.map((p) => p.id) ?? [];
+    let found: Puzzle[] = [];
+    for (const width of [40, 100, 250, 600]) {
+      found = await findPuzzles({ minRating: center - width, maxRating: center + width, limit: 5, exclude });
+      if (found.length) break;
+    }
+    // Left the rush meanwhile, or another refill already got this step.
+    const now = get();
+    if (!found.length || !now?.rush || now.queue.length !== i) return;
+    // The one closest to the curve, so the climb stays steady.
+    const pick = found.reduce((a, b) => (Math.abs(b.rating - center) < Math.abs(a.rating - center) ? b : a));
+    usePuzzle.setState((st) => st && { queue: [...st.queue, pick] });
   }
 }
 
@@ -277,7 +370,14 @@ export async function nextPuzzle() {
   const s = get();
   if (!s) return;
   const next = s.index + 1;
+  if (s.rush && s.rush.lives <= 0) return;
   if (!s.set.fromCoach && next >= s.queue.length - 2) {
+    // Rush keeps a few ready ahead: only wait when the next one isn't there yet.
+    if (s.rush && next < s.queue.length) {
+      begin(next);
+      refill().catch(() => undefined);
+      return;
+    }
     set({ status: "loading" });
     await refill();
   }
@@ -318,7 +418,10 @@ export async function puzzleMove(from: Key, to: Key) {
     await save(false);
   }
   window.setTimeout(() => {
-    if (get()?.line === played.line) set({ line: s.line, message: `${played.san} isn't it. Try again, or view the solution.` });
+    if (get()?.line !== played.line) return;
+    set({ line: s.line, message: s.rush ? `${played.san} isn't it.` : `${played.san} isn't it. Try again, or view the solution.` });
+    // Rush: one try per puzzle; the miss costs a life and the solution plays out.
+    if (s.rush) showSolution();
   }, 700);
 }
 
@@ -373,23 +476,36 @@ function replaySolution() {
   replay = window.setTimeout(step, REPLAY_MS);
 }
 
+/** A rush solve moves on quicker than the usual auto-next: there's no rating to count up. */
+const RUSH_NEXT_MS = 900;
+
 async function finish(correct: boolean) {
   const s = get()!;
   const puzzle = current()!;
   buzz(BUZZ_END);
+  const rush = s.rush && { ...s.rush, score: s.rush.score + (correct ? 1 : 0), lives: s.rush.lives - (correct ? 0 : 1) };
   set({
     status: correct ? "solved" : "failed",
     message: correct ? "Solved." : `The solution: ${s.solution.slice(1).join(" ")}.`,
     view: null,
     results: [...s.results, { id: puzzle.id, correct, themes: puzzle.themes, rating: puzzle.rating }],
+    rush,
   });
-  if (correct && useSettings.getState().puzzleAutoNext) {
-    const at = Date.now() + AUTO_NEXT_MS;
+  if (rush && rush.lives <= 0 && rush.score > rush.best) {
+    try {
+      localStorage.setItem(RUSH_BEST_KEY, String(rush.score));
+    } catch {
+      // Private mode: not remembered.
+    }
+  }
+  if (correct && (rush || useSettings.getState().puzzleAutoNext)) {
+    const wait = rush ? RUSH_NEXT_MS : AUTO_NEXT_MS;
+    const at = Date.now() + wait;
     set({ autoNextAt: at });
     window.setTimeout(() => {
       const now = get();
       if (now && now.autoNextAt === at && current() === puzzle && now.status === "solved") nextPuzzle();
-    }, AUTO_NEXT_MS);
+    }, wait);
   }
   if (correct) await save(true);
 }
@@ -404,8 +520,9 @@ async function save(correct: boolean) {
   const s = get()!;
   const puzzle = current()!;
   try {
-    const r = await recordAttempt(puzzle, correct, Date.now() - s.startedAt);
-    if (current() === puzzle) {
+    // Rush is unrated (its easy puzzles would only pad the rating); a miss still becomes a drill.
+    const r = s.rush ? null : await recordAttempt(puzzle, correct, Date.now() - s.startedAt);
+    if (r && current() === puzzle) {
       set({ change: r.rated ? { before: r.before, after: r.after } : null, mastery: r.mastery?.length ? r.mastery : null });
       // A new star (or tier): hold the puzzle so auto-next doesn't skip the moment.
       const ups = r.mastery?.filter((g) => g.after.stars > g.before.stars) ?? [];

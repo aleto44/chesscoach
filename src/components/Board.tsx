@@ -89,6 +89,9 @@ export function Board({
       coordinates,
       // Only thumbnails are view-only in Chessground's sense, which also turns drawing off.
       viewOnly: !!preview,
+      // Every touch on the board is the board's, not only ones near a piece: a touch the page
+      // doesn't claim lets the phone start its long press, which cancels the touch mid-drag.
+      blockTouchScroll: true,
       animation: { enabled: true, duration: 180 },
       highlight: { lastMove: true, check: true },
       premovable: { enabled: true, showDests: true, castle: true, events: { set: () => play("premove") } },

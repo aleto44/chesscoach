@@ -179,7 +179,7 @@ pub fn db_profile(db: State<Db>) -> Result<Value, String> {
     let recent = rows(
         &conn,
         "SELECT g.id, date(g.ended_at) AS date, g.student_color AS color, g.opponent, g.result, g.termination,
-                g.time_control, g.opening_name, g.rating_before, g.rating_after,
+                g.time_control, g.opening_name, g.rating_before, g.rating_after, g.rating_pool,
                 (SELECT round(avg(cp_loss)) FROM moves WHERE game_id = g.id AND by_student = 1) AS avg_cp_loss,
                 (SELECT count(*) FROM moves WHERE game_id = g.id AND by_student = 1 AND class = 'blunder') AS blunders
          FROM games g WHERE g.mode = 'rated' AND g.result IS NOT NULL ORDER BY g.ended_at DESC LIMIT 5",
@@ -198,7 +198,11 @@ pub fn db_profile(db: State<Db>) -> Result<Value, String> {
          FROM drills d WHERE retired = 0 GROUP BY kind",
         [],
     )?;
-    let (rating, rated_games) = crate::db::player_rating(&conn)?;
+    let mut game_rating = serde_json::Map::new();
+    for pool in crate::db::RATING_POOLS {
+        let (rating, games) = crate::db::player_rating(&conn, pool)?;
+        game_rating.insert(pool.into(), json!({ "rating": rating, "games": games }));
+    }
     Ok(json!({
         "counts": counts.into_iter().next(),
         "record": record,
@@ -209,7 +213,7 @@ pub fn db_profile(db: State<Db>) -> Result<Value, String> {
         "observations": observations,
         "drills": drills,
         "puzzles": crate::puzzles::profile(&conn)?,
-        "gameRating": { "rating": rating, "games": rated_games },
+        "gameRating": game_rating,
     }))
 }
 
@@ -415,7 +419,7 @@ pub(crate) fn weakness(conn: &rusqlite::Connection, source: &str, last: i64) -> 
 }
 
 /// Every rating the student has, over time, oldest first, each point [time, rating]: the in-app
-/// game rating (chess.com scale), the puzzle rating (Lichess scale; the frontend converts it), and
+/// bullet, blitz and rapid ratings (chess.com scale), the puzzle rating (Lichess scale; the frontend converts it), and
 /// the student's own rating in imported games (chess.com scale already), per site and speed.
 #[tauri::command]
 pub fn db_rating_history(db: State<Db>) -> Result<Value, String> {
@@ -432,11 +436,17 @@ pub(crate) fn rating_history(conn: &rusqlite::Connection) -> Result<Value, Strin
             .map_err(err);
         out
     };
-    let game = points(
-        "SELECT * FROM (SELECT ended_at, rating_after FROM games WHERE rating_after IS NOT NULL AND ended_at IS NOT NULL
-         ORDER BY ended_at DESC LIMIT 500) ORDER BY 1",
-        &[],
-    )?;
+    // The in-app ratings, one series per clock (db.rs RATING_POOLS).
+    let mut game = serde_json::Map::new();
+    for pool in crate::db::RATING_POOLS {
+        let pts = points(
+            "SELECT * FROM (SELECT ended_at, rating_after FROM games
+                WHERE rating_after IS NOT NULL AND ended_at IS NOT NULL AND rating_pool = ?1
+                ORDER BY ended_at DESC LIMIT 500) ORDER BY 1",
+            &[&pool],
+        )?;
+        game.insert(pool.into(), json!(pts));
+    }
     let puzzles = points(
         "SELECT * FROM (SELECT at, rating_after FROM puzzle_attempts WHERE rated = 1 ORDER BY id DESC LIMIT 1000) ORDER BY 1",
         &[],

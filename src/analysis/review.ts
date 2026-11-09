@@ -4,7 +4,7 @@
 // patterns, saves it all to SQLite and turns the student's mistakes into drills.
 import { invoke } from "../backend";
 import { Chess } from "chess.js";
-import { buildLine, sideToMove, START_FEN, type Line } from "../chess/line";
+import { buildLine, moveLabel, sideToMove, START_FEN, type Line } from "../chess/line";
 import { db, hasBackend, notifyChanged, reliably } from "../db";
 import { whiteWinPercent } from "../engine/live";
 import { getReviewEngine, type EngineLine } from "../engine/stockfish";
@@ -104,18 +104,21 @@ const pov = (e: Score, side: Color) => (side === "white" ? e.cp : -e.cp);
  * What a move threw away, in points (≈ percentage points of winning chances, as lichess).
  * Winning chances alone flatten out once a game is decided: from −5 another lost rook barely
  * moves them, so a student who keeps hanging pieces in a bad position would see "good" moves.
- * So unless the mover is still clearly winning afterwards (then a lost pawn or two really doesn't
- * matter), the centipawns lost count too: 10 cp per point, more forgiving as the eval grows
- * (engine numbers are noisy at −10), so 50 / 100 / 200 cp make an inaccuracy / mistake / blunder
- * in a level position.
+ * So once the mover is clearly worse (where that flattening starts), the centipawns lost count too:
+ * 10 cp per point, more forgiving as the eval grows (engine numbers are noisy at −10), so at −4
+ * a lost piece is a mistake and a lost rook a blunder, while a pawn or so stays unmarked, as on
+ * chess.com. Around equal, winning chances alone decide, also as there: centipawns there made
+ * 1-pawn slips into mistakes that chess.com doesn't flag at all.
  */
 function lossPoints(before: Score, after: Score, mover: Color): number {
   const drop = Math.max(0, winPct(before, mover) - winPct(after, mover));
-  if (pov(after, mover) >= 150) return drop;
+  if (pov(after, mover) >= 150 || pov(before, mover) > -LOST_CP) return drop;
   const cpLoss = Math.min(1000, Math.max(0, pov(before, mover) - pov(after, mover)));
-  const scale = 1 + Math.min(Math.abs(pov(before, mover)), 1500) / 1500;
+  const scale = 1 + Math.min(Math.abs(pov(before, mover)), 1500) / 450;
   return Math.max(drop, cpLoss / (10 * scale));
 }
+/** How far behind (centipawns) the mover must be before lossPoints counts centipawns. */
+const LOST_CP = 200;
 
 /** lossPoints from stored evals (White's view, mates as ±(10000 − distance)). */
 export const lossFromEvals = (before: number, after: number, mover: Color) =>
@@ -211,13 +214,19 @@ function threatened(fen: string): Map<string, number> {
  * Leaving a piece that was already attacked doesn't count.
  */
 function isSacrifice(fenBefore: string, fenAfter: string, played: string): boolean {
+  return sacrificed(fenBefore, fenAfter, played) !== null;
+}
+
+/** The square of the piece a sacrifice offers (see isSacrifice), or null when it isn't one. */
+function sacrificed(fenBefore: string, fenAfter: string, played: string): string | null {
   const captured = moveFacts(fenBefore, played)?.captured;
   const before = threatened(fenBefore);
   let gain = 0;
+  let square: string | null = null;
   for (const [sq, g] of captureGains(fenAfter)) {
-    if (sq === played.slice(2, 4) || !before.has(sq)) gain = Math.max(gain, g);
+    if ((sq === played.slice(2, 4) || !before.has(sq)) && g > gain) [gain, square] = [g, sq];
   }
-  return gain >= 2 && gain - (captured ? VALUES[captured] : 0) >= 1;
+  return gain >= 2 && gain - (captured ? VALUES[captured] : 0) >= 1 ? square : null;
 }
 
 /**
@@ -226,7 +235,8 @@ function isSacrifice(fenBefore: string, fenAfter: string, played: string): boole
  * - book: still on a line of the opening book.
  * - brilliant: a sound sacrifice: gives up a piece, not losing, and best or nearly (only the best
  *   move when already winning, where any sensible move would do).
- * - great: the only good move (the engine's second choice is a blunder), not a plain recapture.
+ * - great: the only good move (the engine's second choice is a blunder), not a plain recapture,
+ *   a mate or taking a piece the opponent just blundered.
  * - excellent / good: not the engine's move, losing under 2 / 5 points.
  * - miss: a mistake or blunder that fails to punish the opponent's own mistake (leaving you about
  *   where you were before it), or lets a forced mate slip while still winning.
@@ -251,7 +261,10 @@ function labelFor(g: GameInput, evals: Eval[], i: number, cls: MoveClass, drops:
   if (cls === "best" && before.second) {
     const gap = winBefore - winPct(before.second, mover);
     const recapture = i > 0 && lastMoves[i][1] === lastMoves[i - 1][1] && sans[i - 1].includes("x");
-    if (gap >= 15 && !recapture) return "great";
+    // Like chess.com, mating or taking what a blunder just left hanging is plain "best".
+    const mates = sans[i].includes("#");
+    const takesBlunder = i > 0 && drops[i - 1] >= 20 && sans[i].includes("x");
+    if (gap >= 15 && !recapture && !mates && !takesBlunder) return "great";
   }
   if (cls === "best") return "best";
   return drop < 2 ? "excellent" : "good";
@@ -402,16 +415,139 @@ async function analyzeStored(id: number) {
   }
 }
 
-/** The student's worst moments in the open game, for the review bar and the coach. */
-export function keyMoments(limit = 6): number[] {
+// ---- Key moments ----
+
+/**
+ * A move of the student's that swung the game: a mistake or blunder that cost them, or a move that
+ * won it for them (brilliant, the only good move, punishing the opponent's mistake). `reason` says
+ * in words what happened, from the engine's numbers and the position; never how it ranks.
+ */
+export interface KeyMoment {
+  /** Index of the move (the position before it is game.fens[i]). */
+  i: number;
+  good: boolean;
+  reason: string;
+}
+
+const PIECE: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
+
+type Anns = (MoveAnnotation | null | undefined)[];
+
+/** Eval before move i (White's view): older analyses only kept the eval after each move. */
+const evalBeforeAt = (anns: Anns, i: number) => anns[i]?.evalBefore ?? (i > 0 ? anns[i - 1]?.evalAfter : undefined) ?? 0;
+const winAt = (cp: number, side: Color) => Math.round(winPct({ cp, mate: Math.abs(cp) >= 9000 }, side));
+const lossAt = (anns: Anns, i: number, mover: Color) => lossFromEvals(evalBeforeAt(anns, i), anns[i]!.evalAfter, mover);
+const evalFor = (cp: number, side: Color) => {
+  const v = side === "white" ? cp : -cp;
+  return Math.abs(v) >= 9000 ? (v > 0 ? "a forced mate" : "mate against you") : (v >= 0 ? "+" : "") + (v / 100).toFixed(1);
+};
+
+/** How a bad move changed the game, from the mover's winning chances (or the eval, once decided). */
+function lossSwing(before: number, after: number, side: Color): string {
+  const [wb, wa] = [winAt(before, side), winAt(after, side)];
+  const chances = `winning chances ${wb}% → ${wa}%`;
+  if (wa === 0 && Math.abs(after) >= 9000) return `After this the game was lost (${chances}).`;
+  if (wb - wa < 10) return `You were already ${wb < 50 ? "worse" : "winning"}, but it gave away more (eval ${evalFor(before, side)} → ${evalFor(after, side)}).`;
+  if (wb >= 65 && wa < 55) return `You were winning, and this threw the advantage away (${chances}).`;
+  if (wa <= 15 && wb >= 30) return `After this the game was as good as lost (${chances}).`;
+  if (wb >= 35 && wa < 35) return `The game was level, and after this you were clearly worse (${chances}).`;
+  return `It cost you a lot (${chances}).`;
+}
+
+function badReason(game: Line, anns: Anns, i: number): string {
+  const a = anns[i]!;
+  const fen = game.fens[i];
+  const mover = sideToMove(fen);
+  const best = moveFacts(fen, a.bestUci);
+  // The engine's best reply is the next move's best move.
+  const replyUci = i + 1 < game.sans.length ? (anns[i + 1]?.bestUci ?? null) : null;
+  const reply = moveFacts(game.fens[i + 1], replyUci);
+  const parts: string[] = [];
+  if (a.tags.includes("allowed-mate") && reply) parts.push(`It allows a forced mate, starting with ${reply.san}.`);
+  else if (a.tags.includes("missed-mate") && best) parts.push(`You had a forced mate, starting with ${best.san}.`);
+  else if (a.tags.includes("hung-piece") && reply?.captured)
+    parts.push(`It leaves your ${PIECE[reply.captured]} on ${replyUci!.slice(2, 4)} to be taken: ${reply.san}.`);
+  else if (a.tags.includes("missed-capture") && best?.captured)
+    parts.push(`${best.san} would have won their ${PIECE[best.captured]} on ${a.bestUci!.slice(2, 4)}.`);
+  else if (labelOf(a) === "miss" && i > 0)
+    parts.push(`${moveLabel(game.fens[i - 1], game.sans[i - 1])} was a mistake by your opponent, and this let them off the hook.`);
+  else if (a.tags.includes("missed-check") && best) parts.push(`${best.san} was a strong check you missed.`);
+  parts.push(lossSwing(evalBeforeAt(anns, i), a.evalAfter, mover));
+  if (a.tags.includes("time-trouble")) parts.push("You were short on time.");
+  else if (a.tags.includes("rushed")) parts.push("You played it within three seconds.");
+  return parts.join(" ");
+}
+
+function goodReason(game: Line, anns: Anns, i: number, punished: boolean): string {
+  const a = anns[i]!;
+  const fen = game.fens[i];
+  const mover = sideToMove(fen);
+  const played = game.lastMoves[i].join("") + (game.sans[i].match(/=([QRBN])/)?.[1].toLowerCase() ?? "");
+  const label = labelOf(a);
+  const parts: string[] = [];
+  if (label === "brilliant") {
+    const sq = sacrificed(fen, game.fens[i + 1], played);
+    const piece = sq ? new Chess(game.fens[i + 1]).get(sq as never) : null;
+    parts.push(
+      piece
+        ? `You offered your ${PIECE[piece.type]} on ${sq}, and taking it doesn't work out for them.`
+        : "You gave up material here, and it works.",
+    );
+  } else if (label === "great") {
+    parts.push("The only good move here: the engine's next choice would have given away most of your edge.");
+  }
+  if (punished) {
+    const prev = anns[i - 1]!;
+    const took = moveFacts(fen, played)?.captured;
+    parts.push(
+      `${moveLabel(game.fens[i - 1], game.sans[i - 1])} was a ${prev.class} by your opponent, and you made them pay` +
+        (took && took !== "p" ? `, taking the ${PIECE[took]} on ${played.slice(2, 4)}` : "") +
+        ` (winning chances ${winAt(evalBeforeAt(anns, i - 1), mover)}% → ${winAt(a.evalAfter, mover)}%).`,
+    );
+  } else {
+    const w = winAt(a.evalAfter, mover);
+    parts.push(`It kept you ${w >= 60 ? "on top" : "in the game"} (winning chances ${w}%).`);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * The moments that swung the game for the student: their costliest mistakes and blunders (up to
+ * five) and their best finds (up to three), in game order.
+ */
+export function findKeyMoments(game: Line, anns: Anns, meta: Pick<GameMeta, "studentColor">): KeyMoment[] {
+  const bad: { i: number; w: number }[] = [];
+  const good: { i: number; w: number; punished: boolean }[] = [];
+  anns.forEach((a, i) => {
+    if (!a || !isStudentMove(game, meta, i)) return;
+    const mover = sideToMove(game.fens[i]);
+    if (a.class === "mistake" || a.class === "blunder") return void bad.push({ i, w: lossAt(anns, i, mover) });
+    const label = labelOf(a);
+    if (!["best", "excellent", "great", "brilliant"].includes(label)) return;
+    // Punished: the opponent's move just before was a mistake, and this move cashed it in.
+    const prev = i > 0 ? anns[i - 1] : null;
+    const gained = prev ? winAt(a.evalAfter, mover) - winAt(evalBeforeAt(anns, i - 1), mover) : 0;
+    const punished = !!prev && (prev.class === "mistake" || prev.class === "blunder") && gained >= 10;
+    if (label === "brilliant") good.push({ i, w: 100, punished });
+    else if (label === "great") good.push({ i, w: Math.max(20, a.secondLoss ?? 0), punished });
+    else if (punished) good.push({ i, w: gained, punished });
+  });
+  const top = <T extends { w: number }>(xs: T[], n: number) => [...xs].sort((x, y) => y.w - x.w).slice(0, n);
+  return [
+    ...top(bad, 5).map(({ i }) => ({ i, good: false, reason: badReason(game, anns, i) })),
+    ...top(good, 3).map(({ i, punished }) => ({ i, good: true, reason: goodReason(game, anns, i, punished) })),
+  ].sort((x, y) => x.i - y.i);
+}
+
+let cached: { anns: Anns; game: Line; color: string; moments: KeyMoment[] } | null = null;
+
+/** Key moments of the open game, for the review bar, the board and the coach. */
+export function keyMoments(): KeyMoment[] {
   const { annotations, game, meta } = useStore.getState();
-  return annotations
-    .map((a, i) => ({ a, i }))
-    .filter(({ a, i }) => a && (a.class === "mistake" || a.class === "blunder") && isStudentMove(game, meta, i))
-    .sort((x, y) => y.a!.cpLoss - x.a!.cpLoss)
-    .slice(0, limit)
-    .map(({ i }) => i)
-    .sort((x, y) => x - y);
+  if (cached?.anns !== annotations || cached.game !== game || cached.color !== meta.studentColor) {
+    cached = { anns: annotations, game, color: meta.studentColor, moments: findKeyMoments(game, annotations, meta) };
+  }
+  return cached.moments;
 }
 
 export const isStudentMove = (game: Line, meta: Pick<GameMeta, "studentColor">, i: number) =>

@@ -2,8 +2,8 @@
 import { invoke } from "../backend";
 import { Chess } from "chess.js";
 import { cancelQuizzes } from "../coach/quiz";
-import { signed } from "../rating";
-import { useSettings } from "../settings";
+import { POOL_LABEL, signed, type RatingPool } from "../rating";
+import { RATING_KEYS, useSettings } from "../settings";
 import { play } from "../sound";
 import { create } from "zustand";
 import { buildLine, emptyLine, sideToMove, START_FEN, type Line } from "../chess/line";
@@ -148,7 +148,10 @@ function recordState(record: GameRecord) {
       opponentElo: opponentElo(game.opponent),
       result: game.result,
       termination: game.termination,
-      rating: game.ratingBefore !== null && game.ratingAfter !== null ? { before: game.ratingBefore, after: game.ratingAfter } : null,
+      rating:
+        game.ratingBefore !== null && game.ratingAfter !== null
+          ? { before: game.ratingBefore, after: game.ratingAfter, pool: game.ratingPool ?? "rapid" }
+          : null,
       imported: importedFrom(game),
     },
     game: line,
@@ -312,7 +315,7 @@ export async function finish(result: NonNullable<GameMeta["result"]>, terminatio
 }
 
 /** The rated game that just ended on this device, for the card over the board (RatingResult). */
-export const useRatingResult = create<{ shown: { gameId: number; before: number; after: number } | null }>(() => ({
+export const useRatingResult = create<{ shown: { gameId: number; before: number; after: number; pool: RatingPool } | null }>(() => ({
   shown: null,
 }));
 
@@ -321,15 +324,15 @@ async function showRatingChange(gameId: number) {
   const record = await db.loadGame(gameId).catch(() => null);
   const g = record?.game;
   if (!g || g.ratingBefore === null || g.ratingAfter === null) return;
-  const rating = { before: g.ratingBefore, after: g.ratingAfter };
-  useSettings.setState({ playerRating: rating.after });
+  const rating = { before: g.ratingBefore, after: g.ratingAfter, pool: g.ratingPool ?? "rapid" };
+  useSettings.setState({ [RATING_KEYS[rating.pool]]: rating.after });
   if (useStore.getState().gameId !== gameId) return;
   useStore.setState((s) => ({ meta: { ...s.meta, rating } }));
   useRatingResult.setState({ shown: { gameId, ...rating } });
   pushChat({
     kind: "system",
     id: newId("c"),
-    text: `Your rating: ${rating.before} → ${rating.after} (${signed(rating.after - rating.before)}).`,
+    text: `Your ${POOL_LABEL[rating.pool].toLowerCase()} rating: ${rating.before} → ${rating.after} (${signed(rating.after - rating.before)}).`,
   });
 }
 

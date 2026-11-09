@@ -28,7 +28,10 @@ import {
   setChoice,
   setSummary,
   showSolution,
+  RUSH_LIVES,
   startPuzzles,
+  startRatedPuzzles,
+  startRush,
   stopPuzzles,
   usePuzzle,
   viewStep,
@@ -65,12 +68,15 @@ export function PuzzlePanel() {
   }, [pdb.loaded]);
   // The first time the set appears (just downloaded), load puzzles.
   useEffect(() => {
-    if (pdb.installed && s.status === "error") startPuzzles();
+    if (pdb.installed && s.status === "error") (s.rush ? startRush : s.set.mode === "rated" ? startRatedPuzzles : startPuzzles)();
   }, [pdb.installed]);
 
   if (pdb.loaded && !pdb.installed) return <InstallPanel />;
 
   const change = s.change ? fromLichess(s.change.after) - fromLichess(s.change.before) : null;
+  // Filters only for the student's own pick: rated puzzles and the rush choose for themselves.
+  const filters = !s.set.fromCoach && (s.set.mode ?? "custom") === "custom";
+  const rushOver = !!s.rush && s.rush.lives <= 0 && over;
   const fen = line ? line.fens[ply] : START_FEN;
   return (
     <main className="board-panel play puzzles">
@@ -110,7 +116,7 @@ export function PuzzlePanel() {
 
       <aside className="game-side">
         <div className="game-head">
-          <strong>Puzzles</strong>
+          <strong>{s.rush ? "Puzzle rush" : "Puzzles"}</strong>
           {/* Phones drop the crumbs row: where you are in the set, and the filters, go here. */}
           {puzzle && (
             <span className="muted head-count">
@@ -118,13 +124,17 @@ export function PuzzlePanel() {
               {s.set.fromCoach ? ` of ${s.queue.length}` : ""}
             </span>
           )}
-          {!s.set.fromCoach && <ChoiceSummary className="head-choice" />}
+          {filters && <ChoiceSummary className="head-choice" />}
           <span className="spacer" />
-          <RatingTicker rating={fromLichess(pdb.rating)} change={change} attempts={pdb.attempts} puzzleId={puzzle?.id ?? ""} />
-          <PuzzleSettings filters={!s.set.fromCoach} />
+          {s.rush ? (
+            <RushStatus lives={s.rush.lives} score={s.rush.score} />
+          ) : (
+            <RatingTicker rating={fromLichess(pdb.rating)} change={change} attempts={pdb.attempts} puzzleId={puzzle?.id ?? ""} />
+          )}
+          {!s.rush && <PuzzleSettings filters={filters} />}
         </div>
 
-        {!s.set.fromCoach && <ChoiceSummary />}
+        {filters && <ChoiceSummary />}
 
         <div className="side-body puzzle-body">
           <div className={`puzzle-status ${s.status}`}>
@@ -149,6 +159,12 @@ export function PuzzlePanel() {
                 )}
               </>
             )}
+            {rushOver && (
+              <div className="rush-over">
+                <strong>Rush over.</strong> You solved {s.rush!.score} {s.rush!.score === 1 ? "puzzle" : "puzzles"}
+                {s.rush!.score > s.rush!.best ? (s.rush!.best > 0 ? `, a new best (was ${s.rush!.best}).` : ".") : `. Your best is ${s.rush!.best}.`}
+              </div>
+            )}
             {s.status === "solved" && (
               <>
                 <strong className="solved-line">✓ Solved!</strong>
@@ -167,6 +183,8 @@ export function PuzzlePanel() {
                 <>
                   <strong>Set done.</strong> Solved {s.results.filter((r) => r.correct).length} of {s.results.length}.
                 </>
+              ) : s.rush ? (
+                "No more puzzles at this level."
               ) : (
                 "No puzzles match these filters. Try another theme or difficulty."
               ))}
@@ -216,7 +234,13 @@ export function PuzzlePanel() {
                   Ask the coach
                 </button>
               )}
-              <NextButton autoNextAt={s.autoNextAt} />
+              {rushOver ? (
+                <button className="primary" onClick={() => startRush()}>
+                  Play again
+                </button>
+              ) : (
+                <NextButton autoNextAt={s.autoNextAt} />
+              )}
             </>
           )}
           {s.status === "empty" && s.set.fromCoach && (
@@ -368,6 +392,24 @@ function SquareCue({ kind, square, orientation }: { kind: string; square: Key; o
     <div className={`square-cue ${good ? "good" : "bad"}`} style={{ left: `${col * 12.5}%`, top: `${row * 12.5}%` }}>
       <span className="square-badge">{good ? "✓" : "✗"}</span>
     </div>
+  );
+}
+
+/** The rush's lives left (hearts) and puzzles solved. */
+function RushStatus({ lives, score }: { lives: number; score: number }) {
+  return (
+    <span className="rush-status" title={`${lives} of ${RUSH_LIVES} lives left`}>
+      <span className="rush-lives" aria-label={`${lives} lives left`}>
+        {Array.from({ length: RUSH_LIVES }, (_, i) => (
+          <span key={i} className={i < lives ? "life" : "life lost"}>
+            ♥
+          </span>
+        ))}
+      </span>
+      <span className="rush-score">
+        Score <strong>{score}</strong>
+      </span>
+    </span>
   );
 }
 

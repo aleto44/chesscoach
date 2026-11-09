@@ -11,8 +11,12 @@ import { START_FEN } from "../chess/line";
 import { getRepertoire } from "../openings/repertoire";
 import { askMove } from "./quiz";
 import { findPuzzles, openingLabel, openingTag, refreshPuzzleDb, themeKey, themeLabel, usePuzzleDb } from "../puzzles/puzzles";
-import { startCoachSet, usePuzzle } from "../puzzles/session";
-import { useDrill } from "../analysis/drillSession";
+import { puzzleContext, startCoachSet, usePuzzle } from "../puzzles/session";
+import { drillContext, useDrill } from "../analysis/drillSession";
+import { openingContext, openingSetOf, useOpening } from "../openings/session";
+import { endgameContext, endgameOf, useEndgame } from "../endgames/session";
+import { guessContext, useGuess } from "../guess/session";
+import { peeking } from "../nav";
 import { fromLichess, toLichess } from "../rating";
 import { evalWords, lineReport, materialChange, positionFacts, storedEval, topMoves } from "./insight";
 import { explainCached } from "../analysis/explain";
@@ -48,7 +52,7 @@ const handlers: Record<string, (args: Args) => Promise<ToolResult>> = {
     const state = {
       mode: gameDescription(),
       focus: null,
-      onScreenFen: screenFen(),
+      onScreenFen: boardFen(),
       game: {
         fen: s.game.fens[s.gamePly],
         moves: formatMoves(s.game),
@@ -75,7 +79,7 @@ const handlers: Record<string, (args: Args) => Promise<ToolResult>> = {
   },
 
   async analyze(args) {
-    const fen = typeof args.fen === "string" && args.fen ? args.fen : screenFen();
+    const fen = typeof args.fen === "string" && args.fen ? args.fen : boardFen();
     let chess: Chess;
     try {
       chess = new Chess(fen);
@@ -99,7 +103,7 @@ const handlers: Record<string, (args: Args) => Promise<ToolResult>> = {
   },
 
   async show_line(args) {
-    const start = typeof args.start_fen === "string" && args.start_fen ? args.start_fen : screenFen();
+    const start = typeof args.start_fen === "string" && args.start_fen ? args.start_fen : boardFen();
     const moves = Array.isArray(args.moves) ? args.moves.map(String) : [];
     const notes = Array.isArray(args.notes) ? args.notes.map(String) : [];
     if (moves.length === 0) return { text: "moves is empty.", isError: true };
@@ -145,12 +149,32 @@ const sideArg = (args: Args): Color | null => (args.side === "white" || args.sid
  * student had as Black is shown from Black's side.
  */
 export function screenSide(): Color {
-  const puzzle = usePuzzle.getState();
-  if (puzzle) return puzzle.color;
-  const d = useDrill.getState();
-  const drill = d?.queue[d.index];
-  if (drill) return drill.color;
+  if (!peeking()) {
+    const puzzle = usePuzzle.getState();
+    if (puzzle) return puzzle.color;
+    const d = useDrill.getState();
+    const drill = d?.queue[d.index];
+    if (drill) return drill.color;
+    const opening = useOpening.getState();
+    if (opening) return openingSetOf(opening).color;
+    const endgame = useEndgame.getState();
+    if (endgame) return endgameOf(endgame).side;
+    const guess = useGuess.getState();
+    if (guess) return guess.side;
+  }
   return boardOrientation();
+}
+
+/**
+ * The position the student is looking at: a puzzle's, drill's or trainer's when one is on the
+ * board, else the main board's. The tools' default when the coach gives no FEN.
+ */
+function boardFen(): string {
+  if (!peeking()) {
+    const trainer = puzzleContext() ?? drillContext() ?? openingContext() ?? endgameContext() ?? guessContext();
+    if (trainer) return trainer.fen;
+  }
+  return screenFen();
 }
 
 const linkHint = (key: string) =>
@@ -180,7 +204,7 @@ function parseShapes(args: Args, plies: number): { shapes: Record<number, DrawSh
 
 Object.assign(handlers, {
   async ask_move(args: Args) {
-    const fen = typeof args.fen === "string" && args.fen ? args.fen : screenFen();
+    const fen = typeof args.fen === "string" && args.fen ? args.fen : boardFen();
     let chess: Chess;
     try {
       chess = new Chess(fen);
@@ -346,7 +370,7 @@ function pvEnd(fen: string, pv: string[], plies: number): string {
 
 Object.assign(handlers, {
   async position_facts(args: Args) {
-    const fen = typeof args.fen === "string" && args.fen ? args.fen : screenFen();
+    const fen = typeof args.fen === "string" && args.fen ? args.fen : boardFen();
     try {
       new Chess(fen);
     } catch (e) {
@@ -360,7 +384,7 @@ Object.assign(handlers, {
    * the opponent's best answer played out to where the material settles, with a note per move.
    */
   async evaluate_moves(args: Args) {
-    const fen = typeof args.fen === "string" && args.fen ? args.fen : screenFen();
+    const fen = typeof args.fen === "string" && args.fen ? args.fen : boardFen();
     let chess: Chess;
     try {
       chess = new Chess(fen);

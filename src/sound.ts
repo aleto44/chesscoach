@@ -2,6 +2,7 @@
 import { invoke } from "./backend";
 import { hasBackend } from "./db";
 import { useSettings } from "./settings";
+import { moveTap } from "./haptics";
 import { screen, useStore, type Color } from "./store";
 import { sideToMove, type Line } from "./chess/line";
 import { usePuzzle } from "./puzzles/session";
@@ -10,6 +11,7 @@ import { useDrill } from "./analysis/drillSession";
 import { endgameOf, useEndgame } from "./endgames/session";
 import { openingSetOf, useOpening } from "./openings/session";
 import { useGuess } from "./guess/session";
+import lowTimeUrl from "./assets/low-time.mp3";
 
 /**
  * Each event plays `<name>.mp3` (or .wav/.ogg/...) from the sounds folder. Any file that's missing
@@ -33,12 +35,16 @@ export const SOUND_NAMES = [
   "rating-tick",
   "puzzle-star",
   "puzzle-tier",
+  "low-time",
 ] as const;
 export type SoundName = (typeof SOUND_NAMES)[number];
 
 const RATE = 48000;
 let ctx: AudioContext | null = null;
 const buffers = new Map<SoundName, AudioBuffer>();
+/** Files that ship with the app, used when the sounds folder has none of that name. */
+const BUNDLED: Partial<Record<SoundName, string>> = { "low-time": lowTimeUrl };
+const bundled = new Map<SoundName, AudioBuffer>();
 
 /**
  * Sounds without their own file borrow another (followed until one loads); premove, game-start and
@@ -77,18 +83,27 @@ export async function loadSounds() {
       console.warn(`sound ${name} not loaded`, e);
     }
   }
+  for (const [name, url] of Object.entries(BUNDLED) as [SoundName, string][]) {
+    if (bundled.has(name)) continue;
+    try {
+      bundled.set(name, await ctx.decodeAudioData(await (await fetch(url)).arrayBuffer()));
+    } catch (e) {
+      console.warn(`built-in sound ${name} not loaded`, e);
+    }
+  }
 }
 
 /** The sounds that have their own file. */
 export const customSounds = () => SOUND_NAMES.filter((n) => buffers.has(n));
 /** Sounds that make a noise now: a file of their own, or a built-in one. */
-export const playableSounds = () => SOUND_NAMES.filter((n) => buffers.has(n) || SYNTH[n]);
+export const playableSounds = () => SOUND_NAMES.filter((n) => buffers.has(n) || bundled.has(n) || SYNTH[n]);
 export const soundFailures = () => [...failures].map(([name, why]) => `${name} (${why})`);
 function bufferFor(name: SoundName): AudioBuffer | undefined {
   for (let n: SoundName | undefined = name; n; n = FALLBACK[n]) {
     const buf = buffers.get(n);
     if (buf) return buf;
   }
+  return bundled.get(name);
 }
 
 /**
@@ -204,7 +219,10 @@ function onScreen(): { line: Line; ply: number; key: unknown; student: Color | "
   return { line, ply, key: s.gameId, student: s.meta.studentColor };
 }
 
-/** Plays a sound whenever the board on screen advances by exactly one move (played or stepped). */
+/**
+ * Plays a sound (and taps on phones) whenever the board on screen advances by exactly one move
+ * (played or stepped).
+ */
 export function initSounds() {
   unlockOnTouch();
   loadSounds().catch((e) => console.warn("sounds not loaded", e));
@@ -218,6 +236,7 @@ export function initSounds() {
     if (now.key === prev.key && now.ply > 0 && now.line.fens[now.ply - 1] === prevFen) {
       const mover = sideToMove(now.line.fens[now.ply - 1]);
       play(soundForMove(now.line.sans[now.ply - 1], now.student === "both" || now.student === mover));
+      moveTap();
     }
     prev = now;
     prevFen = fen;

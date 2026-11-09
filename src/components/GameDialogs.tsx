@@ -6,7 +6,10 @@ import { TIME_CONTROLS, timeControlLabel } from "../game/clock";
 import { FREE_PLAY, opponentLabel, opponentName, useStore, type Color, type GameMode, type TimeControl } from "../store";
 import { go } from "../nav";
 import { invoke } from "../backend";
-import { eloChange, signed, type PlayerRating } from "../rating";
+import { eloChange, POOL_LABEL, ratingPool, signed, START_RATING, type PlayerRating, type PoolRating, type RatingPool } from "../rating";
+import { matchOpponent, savedRatedClock, saveRatedClock } from "../game/matchmaking";
+import { settingRating, useSettings } from "../settings";
+import { play } from "../sound";
 import { askConfirm } from "./Confirm";
 import { ModeBadge, SiteBadge } from "./ModeBadge";
 import { OpeningSelect, RepertoireDialog } from "./RepertoireDialog";
@@ -60,6 +63,9 @@ export function NewGameDialog({ onClose, mode: initialMode, withOpponent }: { on
   useEffect(() => {
     if (hasBackend()) invoke<PlayerRating>("db_player_rating").then(setPlayer, () => setPlayer(null));
   }, []);
+
+  const pool = ratingPool(timeControl);
+  const mine = usePoolRating(pool, player);
 
   const start = async () => {
     const studentColor: Color | "both" =
@@ -121,9 +127,9 @@ export function NewGameDialog({ onClose, mode: initialMode, withOpponent }: { on
           </span>
           {player && mode === "rated" && (
             <span className="muted small">
-              Your rating {player.rating}. This game: win {signed(eloChange(player.rating, rating, 1, player.games))}, draw{" "}
-              {signed(eloChange(player.rating, rating, 0.5, player.games))}, loss{" "}
-              {signed(eloChange(player.rating, rating, 0, player.games))}.
+              Your {POOL_LABEL[pool].toLowerCase()} rating {mine.rating}. This game: win {signed(eloChange(mine.rating, rating, 1, mine.games))}, draw{" "}
+              {signed(eloChange(mine.rating, rating, 0.5, mine.games))}, loss{" "}
+              {signed(eloChange(mine.rating, rating, 0, mine.games))}.
             </span>
           )}
         </label>
@@ -143,30 +149,7 @@ export function NewGameDialog({ onClose, mode: initialMode, withOpponent }: { on
       {elo !== null && (
         <div className="field">
           <span>Time control</span>
-          <div className="time-controls">
-            {TIME_CONTROLS.map(({ group, controls }) => (
-              <div key={group} className="time-group">
-                <span className="time-group-name">
-                  <TimeIcon group={group} />
-                  {group}
-                </span>
-                <div className="time-grid">
-                  {controls.map((tc) => (
-                    <button
-                      key={timeControlLabel(tc)}
-                      className={sameTime(tc, timeControl) ? "on" : ""}
-                      onClick={() => setTimeControl(tc)}
-                    >
-                      {timeControlLabel(tc)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <button className={`no-clock ${timeControl ? "" : "on"}`} onClick={() => setTimeControl(null)}>
-              No clock
-            </button>
-          </div>
+          <TimePicker value={timeControl} onChange={setTimeControl} />
         </div>
       )}
       {elo !== null && (
@@ -191,6 +174,134 @@ export function NewGameDialog({ onClose, mode: initialMode, withOpponent }: { on
           Start game
         </button>
       </footer>
+    </Modal>
+  );
+}
+
+/** Bullet, blitz and rapid clocks in a grid, plus no clock at all. */
+function TimePicker({ value, onChange }: { value: TimeControl | null; onChange: (tc: TimeControl | null) => void }) {
+  return (
+    <div className="time-controls">
+      {TIME_CONTROLS.map(({ group, controls }) => (
+        <div key={group} className="time-group">
+          <span className="time-group-name">
+            <TimeIcon group={group} />
+            {group}
+          </span>
+          <div className="time-grid">
+            {controls.map((tc) => (
+              <button key={timeControlLabel(tc)} className={sameTime(tc, value) ? "on" : ""} onClick={() => onChange(tc)}>
+                {timeControlLabel(tc)}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <button className={`no-clock ${value ? "" : "on"}`} onClick={() => onChange(null)}>
+        No clock
+      </button>
+    </div>
+  );
+}
+
+/** How long the pretend queue looks for someone, then how long the pairing shows before the game. */
+const SEARCH_MS = { min: 1200, max: 2600 };
+const FOUND_MS = 1600;
+
+/**
+ * Play Rated: pick a clock, and the "lobby" pairs the student with a Maia near their rating
+ * (matchmaking.ts). Colour is random, the opponent picks its own opening, like a real pairing.
+ */
+export function PlayRatedDialog({ onClose }: { onClose: () => void }) {
+  const [timeControl, setTimeControl] = useState<TimeControl | null>(savedRatedClock);
+  const [player, setPlayer] = useState<PlayerRating | null>(null);
+  const [phase, setPhase] = useState<"pick" | "search" | { opponent: number; color: Color }>("pick");
+  useEffect(() => {
+    if (hasBackend()) invoke<PlayerRating>("db_player_rating").then(setPlayer, () => setPlayer(null));
+  }, []);
+  const pool = ratingPool(timeControl);
+  const { rating: mine, games } = usePoolRating(pool, player);
+
+  // Searching, then the pairing, then the board; closing the dialog calls it all off.
+  useEffect(() => {
+    if (phase === "pick") return;
+    if (phase === "search") {
+      const t = window.setTimeout(
+        () => setPhase({ opponent: matchOpponent(mine), color: Math.random() < 0.5 ? "white" : "black" }),
+        SEARCH_MS.min + Math.random() * (SEARCH_MS.max - SEARCH_MS.min),
+      );
+      return () => clearTimeout(t);
+    }
+    play("puzzle-correct");
+    const { opponent, color } = phase;
+    const t = window.setTimeout(async () => {
+      await newGame({ mode: "rated", studentColor: color, opponentElo: opponent, timeControl, openingFocus: null });
+      onClose();
+      go("board");
+    }, FOUND_MS);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  const find = () => {
+    saveRatedClock(timeControl);
+    setPhase("search");
+  };
+
+  return (
+    <Modal title="Play rated" onClose={onClose} className="play-rated">
+      {phase === "pick" && (
+        <>
+          <div className="field">
+            <span>Time control</span>
+            <TimePicker value={timeControl} onChange={setTimeControl} />
+          </div>
+          <p className="muted small">
+            Your {POOL_LABEL[pool].toLowerCase()} rating {mine}. You'll be paired with Maia, a bot that plays like a person, near your rating: beating a stronger opponent gains more,
+            losing to a weaker one costs more. No engine, no coach, no takebacks.
+          </p>
+          <footer>
+            <button className="primary" onClick={find}>
+              Find opponent
+            </button>
+          </footer>
+        </>
+      )}
+      {phase === "search" && (
+        <div className="matchmaking">
+          <div className="matchmaking-spinner" aria-hidden />
+          <strong>Looking for an opponent…</strong>
+          <span className="muted small">
+            {timeControl ? timeControlLabel(timeControl) : "No clock"} · {POOL_LABEL[pool].toLowerCase()} · around {mine}
+          </span>
+          <footer>
+            <button onClick={() => setPhase("pick")}>Cancel</button>
+          </footer>
+        </div>
+      )}
+      {typeof phase === "object" && (
+        <div className="matchmaking found">
+          <span className="muted small">Opponent found</span>
+          <div className="matchup">
+            <span>
+              <strong>You</strong>
+              <span className="muted">{mine}</span>
+            </span>
+            <span className="muted">vs</span>
+            <span>
+              <strong>Maia</strong>
+              <span className="muted">{phase.opponent}</span>
+            </span>
+          </div>
+          <span className="muted small">
+            You play {phase.color} · {timeControl ? timeControlLabel(timeControl) : "no clock"}
+          </span>
+          <span className="small matchup-stakes">
+            Win <span className="up">{signed(eloChange(mine, phase.opponent, 1, games))}</span> · draw{" "}
+            {signed(eloChange(mine, phase.opponent, 0.5, games))} · loss{" "}
+            <span className="down">{signed(eloChange(mine, phase.opponent, 0, games))}</span>
+          </span>
+        </div>
+      )}
     </Modal>
   );
 }
@@ -241,7 +352,7 @@ export function GamesDialog({ onClose }: { onClose: () => void }) {
               {g.source ? <SiteBadge site={g.source} /> : <ModeBadge mode={g.mode} />}
               <strong>{describeSides(g)}</strong>
               <span className={`result ${outcome(g)}`}>{g.result ?? "in progress"}</span>
-              {g.ratingBefore !== null && g.ratingAfter !== null && <RatingChange before={g.ratingBefore} after={g.ratingAfter} />}
+              {g.ratingBefore !== null && g.ratingAfter !== null && <RatingChange before={g.ratingBefore} after={g.ratingAfter} pool={g.ratingPool} />}
             </div>
             <div className="game-row-sub">
               {formatDate(g.updatedAt)} · {Math.ceil(g.plies / 2)} moves
@@ -261,11 +372,22 @@ export function GamesDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+/**
+ * The student's rating for one clock: the live setting (Settings, or the game that just ended) can
+ * be newer than the read, which still has the games count.
+ */
+export function usePoolRating(pool: RatingPool, read: PlayerRating | null): PoolRating {
+  const live = useSettings((s) => settingRating(s, pool));
+  const r = read?.pools[pool] ?? { rating: START_RATING, games: 0, set: false, history: [] };
+  return live === null ? r : { ...r, rating: live };
+}
+
 /** "1212 (+12)" after a rated game. */
-export function RatingChange({ before, after }: { before: number; after: number }) {
+export function RatingChange({ before, after, pool }: { before: number; after: number; pool?: RatingPool | null }) {
   const d = after - before;
+  const which = pool ? `${POOL_LABEL[pool].toLowerCase()} rating` : "rating";
   return (
-    <span className={`rating-change ${d > 0 ? "up" : d < 0 ? "down" : ""}`} title={`Your rating went from ${before} to ${after}`}>
+    <span className={`rating-change ${d > 0 ? "up" : d < 0 ? "down" : ""}`} title={`Your ${which} went from ${before} to ${after}`}>
       {after} ({signed(d)})
     </span>
   );

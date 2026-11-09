@@ -4,6 +4,7 @@ import { emptyLine, moveLabel, playAt, sideToMove, type Line } from "./chess/lin
 import type { DrawShape } from "chessground/draw";
 import type { MoveAnnotation } from "./analysis/review";
 import { exploreGoto, exploreMove, type Explore } from "./chess/explore";
+import type { RatingPool } from "./rating";
 
 /** A side board. Tangents form a tree: parentId is the tangent it branched from (null = the game). */
 export interface Tangent {
@@ -72,7 +73,7 @@ export interface GameMeta {
   /** Practice games only. */
   takebacks: number;
   /** A finished rated game: the student's rating before and after it (chess.com scale). */
-  rating: { before: number; after: number } | null;
+  rating: { before: number; after: number; pool: RatingPool } | null;
   /** A game imported from chess.com or Lichess (games/import.ts); null for games played here. */
   imported?: ImportedFrom | null;
 }

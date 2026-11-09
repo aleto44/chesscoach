@@ -62,6 +62,25 @@ export function legalNext(remaining: Planned[], color: Color, fen: string): Plan
   );
 }
 
+/**
+ * Whether the rest of `target` can still be played from the board, both sides taking their next
+ * legal line move in turn. Moves taken from another line's order can block one for good (...Nc6
+ * before ...c5 shuts the c-pawn in), and a line that can't finish shouldn't be followed.
+ */
+export function reachable(target: TrainingLine, line: Line): boolean {
+  let { remaining, unmatched } = matchLine(target, line);
+  if (unmatched) return false;
+  const chess = new Chess(line.fens[line.sans.length]);
+  while (remaining.length) {
+    const color: Color = chess.turn() === "w" ? "white" : "black";
+    const next = legalNext(remaining, color, chess.fen())[0];
+    if (!next) return false;
+    chess.move({ from: next.from, to: next.to, promotion: next.promotion });
+    remaining = remaining.filter((p) => p !== next);
+  }
+  return true;
+}
+
 /** The SAN of a planned move in the position it's actually played in (captures and checks can differ). */
 export function sanIn(fen: string, p: Planned): string {
   try {

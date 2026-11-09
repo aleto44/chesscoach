@@ -3,6 +3,7 @@ import { hasBackend, invoke, Unreachable } from "./backend";
 import type { MoveAnnotation } from "./analysis/review";
 import type { Line } from "./chess/line";
 import { fromEngineElo } from "./engine/stockfish";
+import type { RatingPool } from "./rating";
 import { useStore, type ChatItem, type GameMeta, type ImportedFrom, type ImportSite, type Tangent } from "./store";
 
 export { hasBackend };
@@ -53,6 +54,8 @@ export interface GameSummary {
   /** The student's rating before and after this rated game; null = it didn't count. */
   ratingBefore: number | null;
   ratingAfter: number | null;
+  /** Which of the student's ratings it moved (rating.ts ratingPool). */
+  ratingPool: RatingPool | null;
   /** Imported games (games/import.ts): the site, and the players' ratings in chess.com scale. */
   source: ImportSite | null;
   url: string | null;

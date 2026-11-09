@@ -3,21 +3,31 @@ import { useEffect, useState } from "react";
 import { invoke, isRemote, isTauri, openUrl } from "../backend";
 import { useLaunches } from "../perf";
 import { hasBackend } from "../db";
-import { MODEL_CHOICES, saveSetting, useSettings } from "../settings";
-import { START_RATING } from "../rating";
+import { MODEL_CHOICES, RATING_KEYS, saveSetting, useSettings } from "../settings";
+import { POOL_LABEL, RATING_POOLS, START_RATING, type RatingPool } from "../rating";
 import { newId, pushChat, useStore } from "../store";
 import { Modal } from "./GameDialogs";
-import { canVibrate } from "../puzzles/fx";
+import { canVibrate } from "../haptics";
 import { customSounds, loadSounds, play, playableSounds, SOUND_NAMES, soundFailures, type SoundName } from "../sound";
 
 const CHOICES = [...MODEL_CHOICES, { value: "custom", label: "Custom…", hint: "Any model name or ID claude accepts" }];
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const { coachModel, activeModel, sounds, haptics, showEval, theme, nudges, playerRating } = useSettings();
-  const [ratingText, setRatingText] = useState(playerRating === null ? "" : String(playerRating));
-  const typedRating = ratingText.trim() === "" ? null : Math.round(Number(ratingText));
-  const ratingValid = typedRating === null || (Number.isFinite(typedRating) && typedRating >= 100 && typedRating <= 3500);
-  const ratingChanged = ratingValid && typedRating !== playerRating;
+  const settings = useSettings();
+  const { coachModel, activeModel, sounds, haptics, showEval, theme, nudges } = settings;
+  const stored = (p: RatingPool) => settings[RATING_KEYS[p]];
+  const [ratingText, setRatingText] = useState<Record<RatingPool, string>>(() => {
+    const text = (p: RatingPool) => (stored(p) === null ? "" : String(stored(p)));
+    return { bullet: text("bullet"), blitz: text("blitz"), rapid: text("rapid") };
+  });
+  const typed = (p: RatingPool) => (ratingText[p].trim() === "" ? null : Math.round(Number(ratingText[p])));
+  const validRating = (p: RatingPool) => {
+    const t = typed(p);
+    return t === null || (Number.isFinite(t) && t >= 100 && t <= 3500);
+  };
+  const ratingValid = RATING_POOLS.every(validRating);
+  const changedPools = RATING_POOLS.filter((p) => validRating(p) && typed(p) !== stored(p));
+  const ratingChanged = changedPools.length > 0;
   const preset = MODEL_CHOICES.some((c) => c.value === coachModel);
   const [choice, setChoice] = useState(preset ? coachModel : "custom");
   const [custom, setCustom] = useState(preset ? "" : coachModel);
@@ -26,7 +36,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const changed = model !== coachModel || ratingChanged;
 
   const save = async () => {
-    if (ratingChanged) await saveSetting("playerRating", typedRating);
+    for (const p of changedPools) await saveSetting(RATING_KEYS[p], typed(p));
     if (model !== coachModel) {
       await saveSetting("coachModel", model);
       // Restart the coach so the next message starts it on the new model (same conversation).
@@ -64,27 +74,36 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           Models your plan doesn't include will show an error in the chat.
         </span>
       </div>
-      <label className="field">
-        <span>Your rating</span>
-        <input
-          className="text-input rating-input"
-          type="number"
-          inputMode="numeric"
-          min={100}
-          max={3500}
-          step={1}
-          value={ratingText}
-          placeholder={String(START_RATING)}
-          onChange={(e) => setRatingText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && ratingValid && save()}
-        />
+      <div className="field">
+        <span>Your ratings</span>
+        <div className="rating-inputs">
+          {RATING_POOLS.map((p) => (
+            <label key={p} className="rating-input-row">
+              <span className="muted small">{POOL_LABEL[p]}</span>
+              <input
+                className={`text-input rating-input ${validRating(p) ? "" : "invalid"}`}
+                type="number"
+                inputMode="numeric"
+                min={100}
+                max={3500}
+                step={1}
+                value={ratingText[p]}
+                // Unset bullet and blitz start from rapid (the typed one, if any).
+                placeholder={p === "rapid" ? String(START_RATING) : ratingText.rapid.trim() || String(stored("rapid") ?? START_RATING)}
+                onChange={(e) => setRatingText((t) => ({ ...t, [p]: e.target.value }))}
+                onKeyDown={(e) => e.key === "Enter" && ratingValid && save()}
+              />
+            </label>
+          ))}
+        </div>
         <span className={ratingValid ? "muted small" : "error small"}>
           {ratingValid
-            ? `Your chess.com rapid rating, or your best guess${playerRating === null ? ` (until you set it, it starts at ${START_RATING})` : ""}. ` +
-              "Every rated game moves it up or down by Elo against the bot's rating, so it tracks how you play here."
-            : "Enter a rating between 100 and 3500."}
+            ? "Your chess.com bullet, blitz and rapid ratings, or your best guesses. Rated games move the one their clock " +
+              "belongs to by Elo against the bot's rating; games with no clock count as rapid. Left empty, rapid starts at " +
+              `${START_RATING} and bullet and blitz start at your rapid rating.`
+            : "Enter ratings between 100 and 3500."}
         </span>
-      </label>
+      </div>
       <label className="field">
         <span>Appearance</span>
         <select value={theme} onChange={(e) => saveSetting("theme", e.target.value as typeof theme)}>
@@ -103,7 +122,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       {canVibrate() && (
         <label className="toggle">
           <input type="checkbox" checked={haptics} onChange={(e) => saveSetting("haptics", e.target.checked)} />
-          <span>Vibrate on puzzle moves</span>
+          <span>Vibrate on moves</span>
         </label>
       )}
       <label className="toggle">

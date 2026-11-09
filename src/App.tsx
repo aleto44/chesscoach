@@ -12,20 +12,31 @@ import { openingStep, useOpening } from "./openings/session";
 import { GuessPanel } from "./components/Guess";
 import { endgameStep, useEndgame } from "./endgames/session";
 import { guessStep, useGuess } from "./guess/session";
-import { back, useNav } from "./nav";
+import { back, peeking, useNav } from "./nav";
 import { useSettings } from "./settings";
+import { useTapAway } from "./chess/squareRefs";
 import { usePuzzle, viewStep } from "./puzzles/session";
 import { drillStep, useDrill } from "./analysis/drillSession";
 import type { Step } from "./chess/view";
 import { goto, openTangent, screen, step, useStore } from "./store";
+import { AnalysisPanel } from "./components/Analysis";
+import { analysisStep, closeAnalysis, useAnalysis } from "./analysis/layer";
 
 export default function App() {
+  // A square or move tapped in any text stays on the board until a tap elsewhere.
+  useTapAway();
   const drilling = useDrill((d) => d !== null);
   const puzzling = usePuzzle((p) => p !== null);
   const endgame = useEndgame((e) => e !== null);
   const opening = useOpening((o) => o !== null);
   const guessing = useGuess((g) => g !== null);
   const onBoard = useNav((n) => n.view === "board");
+  // A coach scenario opened over a session shows on the main board; the session waits underneath.
+  const peeked = useNav((n) => n.peek);
+  const scenarioOpen = useStore((s) => !!s.active);
+  const peek = peeked && scenarioOpen;
+  // The analysis board sits one level above whatever opened it, which keeps its state underneath.
+  const analyzing = useAnalysis((a) => a !== null);
   // Desktop coach column: its saved width, and 0 while it's tucked into the side tab (styles.css).
   const chatWidth = useSettings((s) => s.chatWidth);
   const chatCollapsed = useSettings((s) => s.chatCollapsed);
@@ -36,7 +47,17 @@ export default function App() {
       if (target.closest("textarea, input, select")) return;
       // An open dialog handles its own Escape.
       if (document.querySelector(".modal-backdrop, .promo-backdrop, .puzzle-settings-pop")) return;
-      const session = usePuzzle.getState()
+      if (useAnalysis.getState()) {
+        const keys: Record<string, Step> = { ArrowLeft: -1, ArrowRight: 1, Home: "start", End: "end" };
+        if (e.key in keys) analysisStep(keys[e.key]);
+        else if (e.key === "Escape") closeAnalysis();
+        else return;
+        e.preventDefault();
+        return;
+      }
+      const session = peeking()
+        ? null
+        : usePuzzle.getState()
         ? viewStep
         : useDrill.getState()
           ? drillStep
@@ -56,7 +77,7 @@ export default function App() {
         e.preventDefault();
         return;
       }
-      if (useNav.getState().view !== "board") {
+      if (useNav.getState().view !== "board" && !peeking()) {
         // A menu: Escape goes up a level; the arrow keys would move a board that isn't showing.
         if (e.key !== "Escape") return;
         back();
@@ -82,7 +103,11 @@ export default function App() {
   return (
     <div className="app" style={layout}>
       <TopBar />
-      {puzzling ? (
+      {analyzing ? (
+        <AnalysisPanel />
+      ) : peek && (puzzling || drilling || endgame || opening || guessing) ? (
+        <BoardPanel />
+      ) : puzzling ? (
         <PuzzlePanel />
       ) : drilling ? (
         <DrillPanel />

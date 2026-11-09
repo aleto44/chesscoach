@@ -392,7 +392,7 @@ mod tests {
         // The same game again is skipped.
         assert_eq!(import_game(&mut conn, game("a"), vec![mv()]).unwrap(), None);
         // Imported games never move the in-app rating.
-        assert_eq!(crate::db::player_rating(&conn).unwrap().1, 0);
+        assert_eq!(crate::db::player_rating(&conn, "rapid").unwrap().1, 0);
         conn.execute(
             "UPDATE moves SET class = 'blunder', cp_loss = 400, phase = 'opening', tags = '[\"hung-piece\"]'", [],
         )

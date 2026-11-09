@@ -12,6 +12,8 @@ import { drillContext } from "../analysis/drillSession";
 import { puzzleContext } from "../puzzles/session";
 import { endgameContext } from "../endgames/session";
 import { openingContext } from "../openings/session";
+import { lastTrainerExchange } from "./trainerChat";
+import { peeking } from "../nav";
 import { guessContext } from "../guess/session";
 import { cancelQuizzes } from "./quiz";
 import { refreshUsageSoon } from "./usage";
@@ -111,6 +113,8 @@ ${text}`;
 }
 
 async function screenLines(): Promise<string[]> {
+  // A coach scenario opened over a session is what's on screen: describe that board instead.
+  if (peeking()) return mainBoardLines();
   const puzzle = puzzleContext();
   if (puzzle)
     return [
@@ -122,12 +126,21 @@ async function screenLines(): Promise<string[]> {
   if (drill)
     return [`Showing: drill "${drill.title}" (not a game)`, `FEN: ${drill.fen}`, ...(await engineLines(drill.fen, " (the drill's answer: don't reveal it unless asked)"))];
   const trainer = endgameContext() ?? openingContext() ?? guessContext();
-  if (trainer)
+  if (trainer) {
+    // The trainer's own explanation is in the chat column too: a follow-up question is usually about it.
+    const said = lastTrainerExchange();
     return [
       `Showing: ${trainer.title} (not a game): ${trainer.detail}`,
       `FEN: ${trainer.fen}`,
       ...(await engineLines(trainer.fen, trainer.detail.includes("don't reveal") ? " (this includes the answer: don't reveal it)" : "")),
+      ...(said ? [`The trainer's last explanation, shown in the chat above:
+${said}`] : []),
     ];
+  }
+  return mainBoardLines();
+}
+
+async function mainBoardLines(): Promise<string[]> {
   const s = useStore.getState();
   const { line, ply, tangent } = screen();
   const from = Math.max(0, ply - 6);

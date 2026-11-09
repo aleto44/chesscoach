@@ -169,6 +169,29 @@ button.link {
   position: relative;
 }
 
+/* Puzzle rush: hearts for lives left, and the score. */
+.rush-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rush-lives .life {
+  color: var(--error);
+  font-size: 1.1em;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.rush-lives .life.lost {
+  opacity: 0.2;
+  transform: scale(0.8);
+}
+
+.rush-over {
+  margin-bottom: 6px;
+}
+
 /* Opens down and to the left of the ⚙, which sits at the column's right edge. */
 .puzzle-settings-pop {
   position: absolute;
@@ -413,6 +436,11 @@ button.link {
   text-align: left;
   border-radius: 10px;
   min-height: 76px;
+}
+
+/* Most tiles are just a title: keep it level with the icon. */
+.menu-tile:not(.big) {
+  align-items: center;
 }
 
 .menu-tile:hover:not(:disabled) {
@@ -984,6 +1012,41 @@ button.link {
 }
 .opening-why-evals .bad strong {
   color: var(--error);
+}
+
+/* Opening trainer, end of a line: the plan for the student's side, one idea at a time. */
+.opening-plan {
+  width: var(--board-w);
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel);
+  line-height: 1.45;
+}
+.opening-plan-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.opening-plan-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.opening-plan-nav button {
+  min-width: 30px;
+  padding: 2px 8px;
+}
+.opening-plan-title {
+  margin-top: 6px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.opening-plan p {
+  margin: 4px 0 0;
 }
 
 /* Puzzle feedback: badges, bursts, rating ticker, auto-next, theme mastery */
@@ -1766,4 +1829,113 @@ button.link {
 /* A puzzle still loading: the board's squares without pieces (PuzzlePanel CueFrame). */
 .board-frame.puzzle.waiting cg-board piece {
   visibility: hidden;
+}
+
+/* Analysis board (components/Analysis.tsx): the top bar's button, the engine's top lines, and the
+   small board a hovered move shows. */
+.analysis-button {
+  display: grid;
+  place-items: center;
+}
+
+.analysis-button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.engine-lines {
+  /* Long lines clip instead of widening the side column. */
+  contain: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pv-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 24px;
+  font-size: 12px;
+}
+
+.pv-score {
+  flex: none;
+  min-width: 48px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.pv-score.for-white {
+  background: #f2f0ec;
+  color: #403d39;
+}
+
+.pv-score.for-black {
+  background: #403d39;
+  color: #f2f0ec;
+}
+
+.pv-row.pending .pv-score {
+  color: var(--muted);
+}
+
+.pv-moves {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 22px;
+}
+
+.pv-row.open .pv-moves {
+  white-space: normal;
+}
+
+.pv-move {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  font-size: 12px;
+  color: var(--text);
+  border-radius: 3px;
+}
+
+.pv-move:hover {
+  background: var(--accent-soft);
+}
+
+.pv-more {
+  flex: none;
+  border: none;
+  background: none;
+  padding: 0 4px;
+  color: var(--muted);
+  line-height: 22px;
+}
+
+.pv-row.open .pv-more {
+  transform: rotate(180deg);
+}
+
+.pv-thumb {
+  position: fixed;
+  z-index: 50;
+  padding: 3px;
+  border-radius: 4px;
+  background: var(--panel);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+
+.pv-thumb-board {
+  width: 100%;
+  height: 100%;
 }

@@ -257,6 +257,13 @@ button:disabled {
   background: var(--tangent);
 }
 
+/* Every board, phones in any orientation: holding a piece mustn't bring up the phone's own
+   long-press callout or drag (either cancels the touch, and the piece drops). */
+.cg-wrap {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
 .cg-board-wrap {
   width: 100%;
   aspect-ratio: 1;
@@ -637,6 +644,23 @@ button.primary {
 
 .rating-input {
   width: 8em;
+}
+
+/* Settings: bullet, blitz and rapid side by side, wrapping on narrow screens. */
+.rating-inputs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rating-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rating-input.invalid {
+  border-color: var(--error);
 }
 
 /* The card over the screen when a rated game ends (RatingResult.tsx). */
@@ -1334,6 +1358,71 @@ button.icon {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+/* Play rated: the pretend lobby while it "searches", then the pairing */
+
+.matchmaking {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0 6px;
+  text-align: center;
+}
+
+.matchmaking-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+.matchmaking footer {
+  align-self: stretch;
+}
+
+.matchup {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin: 4px 0;
+}
+
+.matchup > span:not(.muted) {
+  display: flex;
+  flex-direction: column;
+  font-size: 18px;
+}
+
+.matchmaking.found .matchup {
+  animation: matchup-in 0.35s ease-out;
+}
+
+.matchup-stakes .up {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.matchup-stakes .down {
+  color: var(--error);
+  font-weight: 600;
+}
+
+@keyframes matchup-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .matchmaking-spinner,
+  .matchmaking.found .matchup {
+    animation: none;
+  }
+}
+
 /* Post-game review */
 
 .review-bar {
@@ -1389,6 +1478,14 @@ button.icon {
 .note.moment {
   color: var(--text);
   font-style: normal;
+}
+
+.note.moment .moment-reason {
+  margin: 6px 0 0;
+}
+
+.note.moment .moment-reason:first-child {
+  margin-top: 0;
 }
 
 .label-icon {
@@ -2739,13 +2836,13 @@ button.danger {
   }
 }
 
-/* Squares and moves the coach names: hovering one highlights its square on the board. */
-.msg.coach .sq-ref {
+/* Squares and moves named in text (the coach's, trainers', plans): hovering one shows it on the board. */
+.sq-ref {
   border-bottom: 1px dotted currentColor;
   cursor: default;
 }
 
-.msg.coach .sq-ref.on {
+.sq-ref.on {
   color: var(--tangent);
   border-bottom-style: solid;
 }

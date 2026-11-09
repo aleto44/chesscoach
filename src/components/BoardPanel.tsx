@@ -17,6 +17,7 @@ import {
   type GameMeta,
 } from "../store";
 import { Board } from "./Board";
+import { sessionName, useNav } from "../nav";
 import { BoardSteps } from "./StepButtons";
 import { askConfirm } from "./Confirm";
 import { EvalBar, EvalLine } from "./EvalBar";
@@ -25,6 +26,7 @@ import { ModeBadge } from "./ModeBadge";
 import { PlayerCard } from "./Clock";
 import { GameReportPanel, LabelIcon, listLabel, ReviewBar, useGameReport, useMoment, useVerdict, VerdictLine } from "./Review";
 import { WhyButton } from "./Why";
+import { SquareText } from "./SquareText";
 import { RatingResult } from "./RatingResult";
 import type { MoveLabel } from "../analysis/review";
 import { bestShape, useNudge } from "../coach/nudge";
@@ -53,6 +55,9 @@ export function BoardPanel() {
   const line = tangent ? tangent.line : fork ? fork.line : game;
   const ply = tangent ? tangent.ply : fork ? fork.ply : gamePly;
   const path = tangentPath(active);
+  // A scenario opened over a puzzle, drill or trainer goes back to that, not to the game.
+  const peek = useNav((n) => n.peek) && !!tangent;
+  const under = peek ? sessionName() : null;
   const note = ply > 0 ? line.notes[ply - 1] : "";
   const vsOpponent = meta.studentColor !== "both";
   const inProgress = vsOpponent && !meta.result;
@@ -88,7 +93,7 @@ export function BoardPanel() {
     <main className={`board-panel play ${inProgress && !tangent ? "live" : ""} ${locked ? "locked" : ""}`}>
       <nav className="crumbs">
         <button className={`crumb ${active ? "" : "current"}`} onClick={() => openTangent(null)}>
-          Game
+          {under ? under[0].toUpperCase() + under.slice(1) : "Game"}
         </button>
         {path.map((t) => (
           <span key={t.id}>
@@ -100,7 +105,7 @@ export function BoardPanel() {
         ))}
         {tangent && (
           <button className="return" onClick={() => openTangent(null)}>
-            Return to game
+            {under ? `Back to the ${under}` : "Return to game"}
           </button>
         )}
       </nav>
@@ -175,11 +180,21 @@ export function BoardPanel() {
               {verdict && <VerdictLine v={verdict} />}
               {fork ? null : moment ? (
                 <div className="note moment">
-                  {moment.text}
+                  <SquareText text={moment.text} />
+                  {moment.reason && (
+                    <p className="moment-reason">
+                      <SquareText text={moment.reason} />
+                    </p>
+                  )}
                   <WhyButton i={gamePly} />
                 </div>
-              ) : verdict?.explain ? (
+              ) : verdict?.explain || verdict?.reason ? (
                 <div className="note moment">
+                  {verdict.reason && (
+                    <p className="moment-reason">
+                      <SquareText text={verdict.reason} />
+                    </p>
+                  )}
                   <WhyButton i={gamePly - 1} />
                 </div>
               ) : (
@@ -244,12 +259,13 @@ function gameStatus(meta: GameMeta, thinking: boolean, endFen: string): string {
 }
 
 /** Moves in rows, one per move number, scrolled to keep the current move in view. */
-function MoveList({
+export function MoveList({
   sans,
   fens,
   ply,
   marks,
   forkAt = null,
+  onGoto = goto,
 }: {
   sans: string[];
   fens: string[];
@@ -257,6 +273,8 @@ function MoveList({
   marks?: (MoveLabel | null)[];
   /** Moves from this index on are the student's what-if moves. */
   forkAt?: number | null;
+  /** Clicking a move: the main board's by default. */
+  onGoto?: (ply: number) => void;
 }) {
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -289,7 +307,7 @@ function MoveList({
               <button
                 key={c}
                 className={`mv ${i + 1 === ply ? "current" : ""} ${forkAt !== null && i >= forkAt ? "fork" : ""}`}
-                onClick={() => goto(i + 1)}
+                onClick={() => onGoto(i + 1)}
               >
                 {sans[i]}
                 {marks?.[i] && <LabelIcon label={marks[i]} size={14} />}

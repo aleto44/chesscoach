@@ -9,6 +9,8 @@ import { NewGameDialog } from "./GameDialogs";
 import { isRemote, useConnection } from "../backend";
 import { useOutbox } from "../offline";
 import { SettingsDialog } from "./SettingsDialog";
+import { AnalysisButton } from "./Analysis";
+import { useAnalysis } from "../analysis/layer";
 
 /** App-wide bar: back and home on the left, where you are, then a quick new game and settings. */
 export function TopBar() {
@@ -21,7 +23,8 @@ export function TopBar() {
   const endgame = useEndgame((e) => e !== null);
   const guessing = useGuess((g) => g !== null);
   const opening = useOpening((o) => o !== null);
-  const session = puzzling ? "Solving" : drilling ? "Drilling" : endgame ? "Endgame" : opening ? "Opening" : guessing ? "Guessing" : null;
+  const analyzing = useAnalysis((a) => a !== null);
+  const session = analyzing ? "Analysis" : puzzling ? "Solving" : drilling ? "Drilling" : endgame ? "Endgame" : opening ? "Opening" : guessing ? "Guessing" : null;
   const atHome = view === "home" && !session;
   const close = () => setDialog(null);
   return (
@@ -57,6 +60,7 @@ export function TopBar() {
         </nav>
         <span className="spacer" />
         <OfflineChip />
+        <AnalysisButton />
         <button className="primary" onClick={() => setDialog("new")}>
           New game
         </button>

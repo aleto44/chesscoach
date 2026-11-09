@@ -1,26 +1,38 @@
-import { useEffect, useRef, useState, type ComponentProps, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { formatMoves } from "../chess/line";
-import { hoverSquare, rehypeSquares, useHoverSquare, useTapAway } from "../chess/squareRefs";
+import { rehypeSquares } from "../chess/squareRefs";
 import { logout, useAuth } from "../coach/auth";
 import { restartCoach, sendToCoach } from "../coach/bridge";
 import { skipQuiz } from "../coach/quiz";
 import { bestSan, nudgeQuestion, useNudge } from "../coach/nudge";
-import { useTrainerChat } from "../coach/trainerChat";
+import { useTrainerChat, type TrainerItem } from "../coach/trainerChat";
 import { takeBack } from "../game/session";
 import { hasBackend } from "../db";
 import { saveSetting, useSettings } from "../settings";
 import { goto, isLocked, openTangent, tangentOrientation, useStore, type ChatItem } from "../store";
-import { anySession, go, useNav } from "../nav";
+import { anySession, go, peekScenario, useNav } from "../nav";
 import { useBoardBottom, useChromeHeights, usePhone, useSheet, type Sheet } from "../phone";
 import { Board } from "./Board";
+import { SquareRef } from "./SquareText";
 import { askConfirm } from "./Confirm";
 import { SignIn } from "./SignIn";
 import { UsageMeter } from "./UsageMeter";
 
+/** The game's chat with the trainer's messages slotted in where they came, so a follow-up sits under what it follows. */
+function interleave(chat: ChatItem[], trainer: TrainerItem[]): ChatItem[] {
+  const out: ChatItem[] = [];
+  let t = 0;
+  chat.forEach((c, i) => {
+    while (t < trainer.length && trainer[t].after <= i) out.push(trainer[t++]);
+    out.push(c);
+  });
+  return out.concat(trainer.slice(t));
+}
+
 export function Chat() {
   const { chat, busy, meta } = useStore();
-  // A trainer's own thread (the opening trainer's explanations): shown under the game's chat, never saved into it.
+  // A trainer's own thread (the opening trainer's explanations): shown among the game's chat, never saved into it.
   const trainer = useTrainerChat();
   const locked = isLocked(meta);
   const auth = useAuth();
@@ -33,7 +45,6 @@ export function Chat() {
   const sheet = useSheet((s) => s.sheet);
   useBoardBottom(phone);
   useChromeHeights(phone);
-  useTapAway();
 
   // Minimized on a phone: a question asked from a button (Ask the coach) opens it to show the answer.
   const thinking = busy || trainer.thinkingSince !== null;
@@ -100,13 +111,10 @@ export function Chat() {
             <em>“Why not …Nf6 here?”</em>
           </p>
         )}
-        {chat.map((item) => (
+        {interleave(chat, trainer.items).map((item) => (
           <ChatRow key={item.id} item={item} />
         ))}
         {busy && <Thinking />}
-        {trainer.items.map((item) => (
-          <ChatRow key={item.id} item={item} />
-        ))}
         {trainer.thinkingSince !== null && <Thinking since={trainer.thinkingSince} />}
         {!signedIn && <SignIn />}
         <div ref={bottom} />
@@ -372,25 +380,6 @@ const MARKDOWN: Components = {
   },
 };
 
-/** A square or move in the coach's text. A mouse shows it while over it; a tap shows it until the next tap (useTapAway). */
-function SquareRef({ squareRef, className, ...props }: ComponentProps<"span"> & { squareRef: string }) {
-  const on = useHoverSquare((s) => s.ref === squareRef);
-  return (
-    <span
-      {...props}
-      className={`${className ?? ""} ${on ? "on" : ""}`}
-      onPointerEnter={(e) => e.pointerType === "mouse" && hoverSquare(squareRef)}
-      onPointerLeave={(e) => e.pointerType === "mouse" && hoverSquare(null)}
-      onPointerDown={(e) => {
-        if (e.pointerType === "mouse") return;
-        hoverSquare(on ? null : squareRef);
-        // The board must be in view: a full sheet drops to under it.
-        if (!on && useSheet.getState().sheet === "full") openSheet("half");
-      }}
-    />
-  );
-}
-
 function ScenarioLink({ scenarioKey, children }: { scenarioKey: string; children: ReactNode }) {
   const tangentId = useStore((s) => {
     const card = s.chat.find((c) => c.kind === "tangent" && c.key === scenarioKey);
@@ -408,10 +397,16 @@ function ScenarioLink({ scenarioKey, children }: { scenarioKey: string; children
   );
 }
 
-/** Opens a coach scenario on the main board, leaving a puzzle or drill if one is showing. */
+/**
+ * Opens a coach scenario on the main board. Over a puzzle, drill or trainer it's a peek: the
+ * session keeps running and the scenario's return button goes back to it.
+ */
 function openScenario(tangentId: string) {
-  if (useNav.getState().view !== "board" || anySession()) go("board");
-  openTangent(tangentId);
+  if (anySession()) peekScenario(tangentId);
+  else {
+    if (useNav.getState().view !== "board") go("board");
+    openTangent(tangentId);
+  }
   // On a phone, the board must be in view: the sheet drops to under it.
   if (useSheet.getState().sheet === "full") openSheet("half");
   window.scrollTo({ top: 0, behavior: "smooth" });

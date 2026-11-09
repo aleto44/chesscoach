@@ -2,7 +2,7 @@ import { useMemo, type MouseEvent } from "react";
 import type { DrawShape } from "chessground/draw";
 import type { Key } from "chessground/types";
 import { Chess } from "chess.js";
-import { isStudentMove, keyMoments, labelOf, type MoveAnnotation, type MoveLabel } from "../analysis/review";
+import { isStudentMove, keyMoments, labelOf, type KeyMoment, type MoveAnnotation, type MoveLabel } from "../analysis/review";
 import { gameReport, LABELS, type GameReport } from "../analysis/report";
 import { sendToCoach } from "../coach/bridge";
 import { goto, opponentLabel, useStore, type Color, type GameMeta } from "../store";
@@ -100,21 +100,28 @@ function moment() {
   // Off the game's own moves (a tangent or what-if moves), the review has nothing to say.
   if (active || gameFork || gamePly >= game.sans.length) return null;
   const a = annotations[gamePly];
-  if (!a || !MARKS[a.class] || !isStudentMove(game, meta, gamePly)) return null;
+  if (!a || !isStudentMove(game, meta, gamePly)) return null;
+  const key = keyMoments().find((m) => m.i === gamePly);
+  if (!MARKS[a.class] && !key) return null;
   const fen = game.fens[gamePly];
   const [, turn, , , , full] = fen.split(" ");
+  const move = `${full}${turn === "w" ? "." : "..."}${game.sans[gamePly]}`;
+  const verdict = LABEL_INFO[labelOf(a)].verdict.replace(/^is /, "");
+  const played: DrawShape = { orig: game.lastMoves[gamePly][0], dest: game.lastMoves[gamePly][1], brush: MARKS[a.class] ? "red" : "green" };
+  if (!MARKS[a.class]) return { shapes: [played], text: `Your move here was ${move}${GOOD_MARKS[labelOf(a)] ?? ""}, ${verdict}.`, reason: key?.reason };
   const best = san(fen, a.bestUci);
-  const shapes: DrawShape[] = [{ orig: game.lastMoves[gamePly][0], dest: game.lastMoves[gamePly][1], brush: "red" }];
+  const shapes = [played];
   if (a.bestUci && best !== game.sans[gamePly]) {
     shapes.push({ orig: a.bestUci.slice(0, 2) as Key, dest: a.bestUci.slice(2, 4) as Key, brush: "green" });
   }
   return {
     shapes,
-    text:
-      `Your move here was ${full}${turn === "w" ? "." : "..."}${game.sans[gamePly]}${MARKS[a.class]}, ` +
-      `${LABEL_INFO[labelOf(a)].verdict.replace(/^is /, "")}.${best ? ` Better was ${best}.` : ""}`,
+    text: `Your move here was ${move}${MARKS[a.class]}, ${verdict}.${best ? ` Better was ${best}.` : ""}`,
+    reason: key?.reason,
   };
 }
+
+const GOOD_MARKS: Partial<Record<MoveLabel, string>> = { brilliant: "!!", great: "!" };
 
 /**
  * The review's verdict on the move that led to the position on screen: its label as a badge on
@@ -144,6 +151,8 @@ export function useVerdict() {
       badge,
       /** A bad move of the student's: worth saying why. */
       explain: !!MARKS[a.class] && isStudentMove(game, meta, i),
+      /** Why this move swung the game, when it's one of the key moments. */
+      reason: keyMoments().find((m) => m.i === i)?.reason,
     };
   }, [game, gamePly, annotations, active, meta, gameFork]);
 }
@@ -307,9 +316,10 @@ export function ReviewBar() {
     );
   }
   if (!meta.result || active || !annotations.some(Boolean)) return null;
-  const moments = keyMoments();
-  const next = moments.find((i) => i > gamePly) ?? moments[0];
-  const prev = [...moments].reverse().find((i) => i < gamePly) ?? moments[moments.length - 1];
+  const moments = keyMoments().map((m) => m.i);
+  // No wrapping: past the last moment (or before the first) the arrow does nothing.
+  const next = moments.find((i) => i > gamePly);
+  const prev = [...moments].reverse().find((i) => i < gamePly);
 
   return (
     <div className="review-bar">
@@ -320,11 +330,11 @@ export function ReviewBar() {
       {moments.length > 0 && (
         // One group, so the arrows never wrap away from their label.
         <span className="moments">
-          <button onClick={() => goto(prev)} title="Previous key moment" aria-label="Previous key moment">
+          <button onClick={() => prev !== undefined && goto(prev)} disabled={prev === undefined} title="Previous key moment" aria-label="Previous key moment">
             ◀
           </button>
           <span className="muted small">key moments</span>
-          <button onClick={() => goto(next)} title="Next key moment" aria-label="Next key moment">
+          <button onClick={() => next !== undefined && goto(next)} disabled={next === undefined} title="Next key moment" aria-label="Next key moment">
             ▶
           </button>
         </span>
@@ -342,16 +352,21 @@ export function ReviewBar() {
 function reviewPrompt(): string {
   const { game, annotations, meta } = useStore.getState();
   const report = gameReport(game, annotations, reportAnchor(meta));
-  const lines = keyMoments().map((i) => {
+  const moments = keyMoments();
+  const line = ({ i, reason }: KeyMoment) => {
     const a = annotations[i]!;
     const fen = game.fens[i];
     const [, turn, , , , full] = fen.split(" ");
     const sign = turn === "w" ? 1 : -1;
     const before = a.evalBefore ?? (i > 0 ? annotations[i - 1]?.evalAfter : undefined);
     const swing = before !== undefined ? `${pawns(before * sign)} → ${pawns(a.evalAfter * sign)}` : `lost ${a.cpLoss}cp`;
-    return `- ${full}${turn === "w" ? "." : "..."}${game.sans[i]}${MARKS[a.class]} (${labelOf(a)}) ${swing} (my view), best ${san(fen, a.bestUci) ?? "?"}` +
-      `${a.tags.length ? ` [${a.tags.join(", ")}]` : ""}\n  fen: ${fen}`;
-  });
+    const best = san(fen, a.bestUci);
+    return `- ${full}${turn === "w" ? "." : "..."}${game.sans[i]}${MARKS[a.class] ?? ""} (${labelOf(a)}) ${swing} (my view)` +
+      `${best && best !== game.sans[i] ? `, best ${best}` : ""}${a.tags.length ? ` [${a.tags.join(", ")}]` : ""}` +
+      `\n  why it mattered: ${reason}\n  fen: ${fen}`;
+  };
+  const lines = moments.filter((m) => !m.good).map(line);
+  const goods = moments.filter((m) => m.good).map(line);
   const mine = meta.studentColor === "both" ? null : report?.[meta.studentColor];
   const summary = mine?.accuracy
     ? `My accuracy: ${mine.accuracy.toFixed(1)}%. ` +
@@ -362,6 +377,8 @@ function reviewPrompt(): string {
     "Let's review this game. The app already analyzed it with Stockfish; these numbers are engine output.\n" +
     summary +
     (lines.length ? `My mistakes and blunders:\n${lines.join("\n")}\n` : "I made no mistakes or blunders.\n") +
-    "Go through the most instructive one or two: what I missed and the idea behind the better move."
+    (goods.length ? `Where I swung the game my way:\n${goods.join("\n")}\n` : "") +
+    "Go through the most instructive one or two mistakes: what I missed and the idea behind the better move." +
+    (goods.length ? " Then tell me briefly what made my best move work, so I'd find it again." : "")
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DrawShape } from "chessground/draw";
 import { sendToCoach } from "../coach/bridge";
 import { useAuth } from "../coach/auth";
@@ -8,6 +8,7 @@ import {
   explainOpening,
   openingHint,
   openingMove,
+  openingPlan,
   openingQuestion,
   openingSetOf,
   openingStep,
@@ -23,6 +24,8 @@ import { useTrainerChat } from "../coach/trainerChat";
 import type { OffLineWhy } from "../openings/session";
 import { isLocked, useStore } from "../store";
 import { Board } from "./Board";
+import { SquareText } from "./SquareText";
+import { planShapes, type PlanIdea } from "../openings/plans";
 import { BoardSteps, StepButtons } from "./StepButtons";
 
 /** Replaces the game board while an opening line is being trained. */
@@ -40,6 +43,12 @@ export function OpeningPanel() {
   // Off the line with a move that's about as good: not a mistake, so no ✗ and no explanation unless asked.
   const close = s.status === "off" && !!s.why?.close;
   const explaining = useTrainerChat((t) => t.thinkingSince !== null);
+  // At the end of the line: the plan for the student's side, one idea at a time with its drawings.
+  const plan = openingPlan(s);
+  const [ideaIndex, setIdeaIndex] = useState(0);
+  useEffect(() => setIdeaIndex(0), [s.line, s.target]);
+  const idea = plan?.[Math.min(ideaIndex, plan.length - 1)] ?? null;
+  const ideaShapes = useMemo(() => (idea ? planShapes(idea) : null), [idea]);
 
   return (
     <main className="board-panel drills tall-status">
@@ -62,7 +71,7 @@ export function OpeningPanel() {
           onMove={openingMove}
           canMove={s.status === "playing" && !past}
           premoveColor={!over && !past ? set.color : undefined}
-          shapes={past ? undefined : shapes}
+          shapes={past ? undefined : (ideaShapes ?? shapes)}
         />
         <BoardSteps onStep={openingStep} disabled={s.line.sans.length === 0} />
       </div>
@@ -75,16 +84,24 @@ export function OpeningPanel() {
         ) : over ? (
           <>
             <strong>{close ? "≈ " : s.status === "off" ? "✗ " : "✓ "}</strong>
-            {s.message}
+            <SquareText text={s.message} />
             {s.status === "off" && s.why?.evals && <WhyEvals why={s.why} />}
           </>
         ) : (
           <>
             You play {set.color}. Move {Math.min(s.line.sans.length, s.target.moves.length)} of {s.target.moves.length} in the line.
-            {s.message && <span className="muted"> {s.message}</span>}
+            {s.message && (
+              <span className="muted">
+                {" "}
+                <SquareText text={s.message} />
+              </span>
+            )}
           </>
         )}
       </div>
+      {plan && idea && !past && (
+        <PlanCard plan={plan} index={plan.indexOf(idea)} onIndex={setIdeaIndex} />
+      )}
       <div className="controls">
         {s.status === "off" ? (
           <>
@@ -120,17 +137,55 @@ export function OpeningPanel() {
   );
 }
 
+/** The plan at the end of a line: one idea at a time; the board shows that idea's drawings. */
+function PlanCard({ plan, index, onIndex }: { plan: PlanIdea[]; index: number; onIndex: (i: number) => void }) {
+  const idea = plan[index];
+  return (
+    <section className="opening-plan" aria-label="What you're playing for">
+      <div className="opening-plan-head">
+        <strong>What you're playing for</strong>
+        <span className="spacer" />
+        {plan.length > 1 && (
+          <span className="opening-plan-nav">
+            <button onClick={() => onIndex(index - 1)} disabled={index === 0} aria-label="Previous idea">
+              ‹
+            </button>
+            <span className="muted small">
+              {index + 1} of {plan.length}
+            </span>
+            <button onClick={() => onIndex(index + 1)} disabled={index === plan.length - 1} aria-label="Next idea">
+              ›
+            </button>
+          </span>
+        )}
+      </div>
+      <div className="opening-plan-title">{idea.title}</div>
+      <p>
+        <SquareText text={idea.text} />
+      </p>
+    </section>
+  );
+}
+
 /** Under "leaves the line": the engine on both moves. The coach explains in the chat column. */
 function WhyEvals({ why }: { why: OffLineWhy }) {
   if (!why.evals) return null;
   return (
     <span className="status-extra opening-why-evals">
       <span className="good">
-        Book <strong>{why.book}</strong> {evalText(why.evals.book)}
+        Book{" "}
+        <strong>
+          <SquareText text={why.book} />
+        </strong>{" "}
+        {evalText(why.evals.book)}
       </span>
       <span className="muted"> · </span>
       <span className="bad">
-        Yours <strong>{why.played}</strong> {evalText(why.evals.played)}
+        Yours{" "}
+        <strong>
+          <SquareText text={why.played} />
+        </strong>{" "}
+        {evalText(why.evals.played)}
       </span>
       <span className="muted small"> (engine, for you)</span>
     </span>

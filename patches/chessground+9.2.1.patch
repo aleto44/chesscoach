@@ -1,3 +1,26 @@
+diff --git a/node_modules/chessground/dist/drag.js b/node_modules/chessground/dist/drag.js
+index 2745f75..924932a 100644
+--- a/node_modules/chessground/dist/drag.js
++++ b/node_modules/chessground/dist/drag.js
+@@ -20,11 +20,14 @@ export function start(s, e) {
+         drawClear(s);
+     // Prevent touch scroll and create no corresponding mouse event, if there
+     // is an intent to interact with the board.
+-    if (e.cancelable !== false &&
+-        (!e.touches || s.blockTouchScroll || piece || previouslySelected || pieceCloseTo(s, position)))
+-        e.preventDefault();
+-    else if (e.touches)
++    const claim = !e.touches || s.blockTouchScroll || piece || previouslySelected || pieceCloseTo(s, position);
++    if (e.touches && !claim)
+         return; // Handle only corresponding mouse event https://github.com/lichess-org/chessground/pull/268
++    // Phone Chrome can send the touchstart uncancelable (the board's touch-action: none leaves it
++    // nothing to cancel). Waiting for the mouse event then only works for taps: a held piece never
++    // gets one. Take the touch anyway; drag.end cancels the touchend, so no mouse event follows.
++    if (e.cancelable !== false)
++        e.preventDefault();
+     const hadPremove = !!s.premovable.current;
+     const hadPredrop = !!s.predroppable.current;
+     s.stats.ctrlKey = e.ctrlKey;
 diff --git a/node_modules/chessground/dist/draw.js b/node_modules/chessground/dist/draw.js
 index b0baae6..6f5592b 100644
 --- a/node_modules/chessground/dist/draw.js
@@ -54,10 +77,18 @@ index b0baae6..6f5592b 100644
          if (cur.mouseSq)
              addShape(state.drawable, cur);
 diff --git a/node_modules/chessground/dist/events.js b/node_modules/chessground/dist/events.js
-index 1ea7318..55cface 100644
+index 1ea7318..929da52 100644
 --- a/node_modules/chessground/dist/events.js
 +++ b/node_modules/chessground/dist/events.js
-@@ -20,6 +20,11 @@ export function bindBoard(s, onResize) {
+@@ -2,6 +2,7 @@ import * as drag from './drag.js';
+ import * as draw from './draw.js';
+ import { drop } from './drop.js';
+ import { isRightButton } from './util.js';
++import { setSelected } from './board.js';
+ export function bindBoard(s, onResize) {
+     const boardEl = s.dom.elements.board;
+     if ('ResizeObserver' in window)
+@@ -20,6 +21,11 @@ export function bindBoard(s, onResize) {
      boardEl.addEventListener('mousedown', onStart, {
          passive: false,
      });
@@ -69,7 +100,7 @@ index 1ea7318..55cface 100644
  }
  // returns the unbind function
  export function bindDocument(s, onResize) {
-@@ -35,6 +40,36 @@ export function bindDocument(s, onResize) {
+@@ -35,6 +41,43 @@ export function bindDocument(s, onResize) {
              unbinds.push(unbindable(document, ev, onmove));
          for (const ev of ['touchend', 'mouseup'])
              unbinds.push(unbindable(document, ev, onend));
@@ -91,30 +122,48 @@ index 1ea7318..55cface 100644
 +        // A cancelled touch ends no move: drop the drag or drawing it started, so it can't swallow
 +        // the next touch.
 +        unbinds.push(unbindable(document, 'touchcancel', () => {
-+            if (s.draggable.current)
++            const cur = s.draggable.current;
++            if (cur) {
 +                drag.cancel(s);
++                // The phone took the touch for itself (a long press): leave the piece picked up,
++                // so a tap on a square still plays the move.
++                if (!cur.newPiece && s.pieces.has(cur.orig))
++                    setSelected(s, cur.orig);
++            }
 +            if (s.drawable.current)
 +                draw.cancel(s);
 +        }, { passive: true }));
-+        // Holding a piece still mustn't open the phone's long-press menu or text selection.
++        // Holding a piece still mustn't open the phone's long-press menu, text selection or a
++        // native drag: any of them cancels the touch, and the piece drops.
 +        const whileDragging = e => {
 +            if (s.draggable.current || s.drawable.current)
 +                e.preventDefault();
 +        };
-+        for (const ev of ['contextmenu', 'selectstart'])
++        for (const ev of ['contextmenu', 'selectstart', 'dragstart'])
 +            unbinds.push(unbindable(document, ev, whileDragging, { capture: true }));
          const onScroll = () => s.dom.bounds.clear();
          unbinds.push(unbindable(document, 'scroll', onScroll, { capture: true, passive: true }));
          unbinds.push(unbindable(window, 'resize', onScroll, { passive: true }));
-@@ -46,11 +81,33 @@ function unbindable(el, eventName, callback, options) {
+@@ -45,12 +88,44 @@ function unbindable(el, eventName, callback, options) {
+     el.addEventListener(eventName, callback, options);
      return () => el.removeEventListener(eventName, callback, options);
  }
++// When the last touch began: the mouse events a phone makes up after a tap are ignored for a
++// moment. A touchstart the page couldn't cancel (phone Chrome sends some) doesn't stop them.
++let lastTouchAt = -Infinity;
  const startDragOrDraw = (s) => e => {
 -    if (s.draggable.current)
 -        drag.cancel(s);
 -    else if (s.drawable.current)
 -        draw.cancel(s);
 -    else if (e.shiftKey || isRightButton(e)) {
++    if (e.touches)
++        lastTouchAt = performance.now();
++    else if (performance.now() - lastTouchAt < 1000)
++        return;
++    // The board can move without resizing (a column next to it collapses), which neither the
++    // ResizeObserver nor scroll/resize catches: measure afresh on every press.
++    s.dom.bounds.clear();
 +    // Touch screens, as on lichess: with one finger held anywhere, the next finger draws.
 +    if (e.touches && e.touches.length > 1) {
 +        if (s.drawable.enabled && !s.drawable.current) {

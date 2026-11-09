@@ -2,9 +2,10 @@
 // counting from the old rating to the new one.
 import { useEffect, useState } from "react";
 import { useRatingResult } from "../game/session";
-import { signed } from "../rating";
+import { POOL_LABEL, signed } from "../rating";
 import { opponentLabel, useStore } from "../store";
-import { NewGameDialog } from "./GameDialogs";
+import { play } from "../sound";
+import { PlayRatedDialog } from "./GameDialogs";
 
 const COUNT_MS = 1100;
 
@@ -24,7 +25,8 @@ export function RatingResult() {
     return () => window.removeEventListener("keydown", onKey);
   }, [shownHere]);
 
-  if (newGame) return <NewGameDialog mode="rated" onClose={() => (setNewGame(false), close())} />;
+  // Straight back into the queue with the last clock, like "new game" on a real site.
+  if (newGame) return <PlayRatedDialog onClose={() => (setNewGame(false), close())} />;
   if (!shownHere) return null;
 
   const delta = shownHere.after - shownHere.before;
@@ -55,10 +57,10 @@ export function RatingResult() {
         </div>
         <p className="muted small">
           {delta > 0
-            ? `Rating gained, up from ${shownHere.before}`
+            ? `${POOL_LABEL[shownHere.pool]} rating gained, up from ${shownHere.before}`
             : delta < 0
-              ? `Rating lost, down from ${shownHere.before}`
-              : `Rating unchanged at ${shownHere.before}`}
+              ? `${POOL_LABEL[shownHere.pool]} rating lost, down from ${shownHere.before}`
+              : `${POOL_LABEL[shownHere.pool]} rating unchanged at ${shownHere.before}`}
         </p>
         <div className="rating-result-actions">
           <button
@@ -81,16 +83,30 @@ function close() {
   useRatingResult.setState({ shown: null });
 }
 
-/** Counts from `from` to `to`, easing out, restarting when `key` changes. */
+/**
+ * Counts from `from` to `to`, easing out, restarting when `key` changes. Each number it passes
+ * ticks like the puzzle rating does (PuzzlePanel RatingBurst): climbing in pitch for a gain,
+ * sinking for a loss.
+ */
 function useCountUp(from: number, to: number, key: unknown): number {
   const [value, setValue] = useState(from);
   useEffect(() => {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return setValue(to);
+    const d = to - from;
+    // At most this many ticks, so a big swing doesn't turn into a buzz.
+    const steps = Math.min(Math.abs(d), 24);
     const start = performance.now();
     let frame = 0;
+    let ticked = 0;
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / COUNT_MS);
-      setValue(Math.round(from + (to - from) * (1 - (1 - t) ** 3)));
+      const eased = 1 - (1 - t) ** 3;
+      setValue(Math.round(from + d * eased));
+      const due = Math.floor(eased * steps);
+      if (due > ticked) {
+        ticked = due;
+        play("rating-tick", 1 + (d > 0 ? 0.25 : -0.2) * (ticked / steps));
+      }
       if (t < 1) frame = requestAnimationFrame(tick);
     };
     setValue(from);

@@ -27,11 +27,16 @@ Rules:
   numbers and convert before querying.
 - Rating *changes* are the difference of the converted values, not a converted difference.
 - Add new scales to `src/rating.ts` (or next to the engine they belong to) rather than inlining numbers.
+- The student has three game ratings here, bullet, blitz and rapid (`ratingPool` in `src/rating.ts`,
+  `rating_pool` in `src-tauri/src/db.rs`, split by base + 40 × increment like chess.com); a game with no
+  clock counts as rapid. Each lives in its own setting (`RATING_KEYS` in `src/settings.ts`), set in
+  Settings; unset bullet and blitz start from rapid.
 
 ## Layout and navigation
 
 - The left/middle column shows the **home menu** (`src/components/Home.tsx`) or the screen picked from it:
-  Games (play a rated or practice game, analysis board), School (drills, opening training with the
+  Games (Play rated: pick a clock and get paired with a Maia near your rating, `src/game/matchmaking.ts`;
+  Choose game: every option, rated or practice; analysis board), School (drills, opening training with the
   repertoire, the endgame trainer, guess the move), Puzzles, and Profile (weaknesses, rating history,
   saved games, import from chess.com and Lichess), each with its own sub-menu. The top bar's back button
   returns one level, and the brand / home button returns to the main menu.
@@ -41,7 +46,10 @@ Rules:
   the others.
 - The opening and endgame trainers are not games: they never create a game or show up in saved games, and
   they can start while a game is in progress (a rated game's clock pauses meanwhile, `src/game/clock.ts`).
-  Opening sets live in `src/openings/training.ts`, checked by `node scripts/check-book.mjs`. The trainer
+  Opening sets live in `src/openings/training.ts`, checked by `node scripts/check-book.mjs`. Every
+  built-in line has a plan in `src/openings/plans.ts` (two or three ideas with drawings for the line's
+  final position), shown when the student finishes the line; a new line needs one, and the check fails
+  without it. The trainer
   matches moves by what's left of the line, not by ply (`src/openings/order.ts`): a move the line plays
   later is fine when the engine says the order costs nothing, and an engine-equal move outside the line
   is marked "≈", not wrong.
@@ -66,12 +74,24 @@ drills, puzzles, the why-screen, the coach's scenario boards and any board added
   works. Only a thumbnail inside a button (`preview`, e.g. chat cards) has no drawing.
 - Never pass Chessground's own `viewOnly` or `drawable.enabled: false` to a full-size board.
 - The student's drawings belong to the position: they clear when the position changes, not on re-renders.
+- Any text about a position on screen, not only the coach's chat, makes its squares and moves hoverable
+  (desktop) and tappable (phones) so they show on the board: render it with `SquareText` / `SquareRef`
+  (`src/components/SquareText.tsx`). Trainer messages and the opening plans do.
 
 ## What-if moves
 
 Boards that show a fixed line (a finished game in review, the why-screen's lines) take the student's
 moves for both sides as a fork (`src/chess/explore.ts`): playing something other than the line's next
 move stacks new moves from there, and stepping back to the fork point drops them and brings the line back.
+
+## The analysis board
+
+The top bar's magnifier (`AnalysisButton`, `src/components/Analysis.tsx`) opens a board one level
+above the current screen (`src/analysis/layer.ts`), at the same position with that screen's moves, what-if
+forks for both sides, the eval bar and the engine's top 3 lines (hover a move for a thumbnail, click to
+play up to it). The screen underneath keeps its state; back / Escape returns to it. `analysisSource` decides
+where it's allowed: never during a rated game, and on puzzles, drills, endgames and guess-the-move only
+once the position is answered. A new screen with a board adds its case there.
 
 ## The coach and the board
 

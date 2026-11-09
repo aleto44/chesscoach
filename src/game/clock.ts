@@ -6,8 +6,11 @@ import { useStore, type Color, type TimeControl } from "../store";
 import { finish } from "./session";
 import { useEndgame } from "../endgames/session";
 import { useOpening } from "../openings/session";
+import { play } from "../sound";
 
 const TICK_MS = 100;
+/** Below this on the student's clock the low-time warning plays, once per game. */
+const LOW_TIME_MS = 30_000;
 
 /**
  * When the clock stopped for a trainer (opening or endgame) opened over a game in progress: the
@@ -112,10 +115,20 @@ export function initClock() {
   useEndgame.subscribe(pauseCheck);
   useOpening.subscribe(pauseCheck);
 
+  // The game that already had its low-time warning: an increment that lifts the clock back over
+  // the line doesn't earn a second one.
+  let warned: unknown = null;
   window.setInterval(() => {
     if (pausedAt !== null) return;
     const side = clockRunning();
-    if (side && clockLeft(side) === 0) flag(side);
+    if (!side) return;
+    const left = clockLeft(side)!;
+    if (left === 0) return flag(side);
+    const { gameId, meta } = useStore.getState();
+    if (side === meta.studentColor && left < LOW_TIME_MS && warned !== gameId) {
+      warned = gameId;
+      play("low-time");
+    }
   }, TICK_MS);
 }
 

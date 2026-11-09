@@ -259,6 +259,14 @@ INSERT OR IGNORE INTO import_accounts (site, account)
 DELETE FROM settings WHERE key IN ('chesscomUser', 'lichessUser');
 DROP VIEW rated_games;
 CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
+"#, r#"
+-- Separate bullet, blitz and rapid ratings: which one a rated game moved ('bullet' | 'blitz' |
+-- 'rapid', from its clock; no clock counts as rapid). Before this there was one rating, the one
+-- Settings called rapid, so every game that moved it moved rapid.
+ALTER TABLE games ADD COLUMN rating_pool TEXT;
+UPDATE games SET rating_pool = 'rapid' WHERE rating_after IS NOT NULL;
+DROP VIEW rated_games;
+CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
 "#];
 
 impl Db {
@@ -427,6 +435,8 @@ pub struct GameSummary {
     opponent_rating: Option<i64>,
     student_rating: Option<i64>,
     speed: Option<String>,
+    /// Which rating a rated game moved: 'bullet' | 'blitz' | 'rapid'.
+    rating_pool: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -445,7 +455,8 @@ const SUMMARY_SQL: &str = "
            (SELECT coalesce(group_concat(san, ' '), '')
               FROM (SELECT san FROM moves m WHERE m.game_id = g.id ORDER BY ply LIMIT 10)),
            g.rating_before, g.rating_after,
-           g.source, g.url, g.opponent_name, g.opponent_rating, g.student_rating, g.speed
+           g.source, g.url, g.opponent_name, g.opponent_rating, g.student_rating, g.speed,
+           g.rating_pool
     FROM games g";
 
 fn summary(r: &Row) -> rusqlite::Result<GameSummary> {
@@ -476,6 +487,7 @@ fn summary(r: &Row) -> rusqlite::Result<GameSummary> {
         opponent_rating: r.get(23)?,
         student_rating: r.get(24)?,
         speed: r.get(25)?,
+        rating_pool: r.get(26)?,
     })
 }
 
@@ -541,27 +553,63 @@ fn update_game(conn: &mut Connection, id: i64, patch: GamePatch) -> Result<(), S
 /// Where a player's rating starts until they set their own (Settings), chess.com scale.
 pub const START_RATING: i64 = 1200;
 
-/// The student's game rating (the `playerRating` setting, chess.com scale) and how many rated
-/// games have changed it.
-pub fn player_rating(conn: &Connection) -> Result<(i64, i64), String> {
-    let rating = conn
-        .query_row("SELECT value FROM settings WHERE key = 'playerRating'", [], |r| r.get::<_, String>(0))
+/// The student has a rating per clock, like chess.com: bullet, blitz and rapid.
+pub const RATING_POOLS: [&str; 3] = ["bullet", "blitz", "rapid"];
+
+/// Which rating a game's clock ('seconds+increment') counts toward. chess.com's split, by the
+/// expected length (base + 40 moves of increment): under 3 minutes bullet, under 10 blitz, else
+/// rapid. No clock counts as rapid.
+pub fn rating_pool(time_control: Option<&str>) -> &'static str {
+    let Some((base, inc)) = time_control.and_then(|t| t.split_once('+')) else { return "rapid" };
+    let (Ok(base), Ok(inc)) = (base.parse::<i64>(), inc.parse::<i64>()) else { return "rapid" };
+    match base + 40 * inc {
+        t if t < 180 => "bullet",
+        t if t < 600 => "blitz",
+        _ => "rapid",
+    }
+}
+
+/// The setting each rating lives in (src/settings.ts RATING_KEYS). Rapid keeps the key the one
+/// rating had before there were three.
+fn rating_key(pool: &str) -> &'static str {
+    match pool {
+        "bullet" => "playerRatingBullet",
+        "blitz" => "playerRatingBlitz",
+        _ => "playerRating",
+    }
+}
+
+fn rating_setting(conn: &Connection, pool: &str) -> Result<Option<i64>, String> {
+    Ok(conn
+        .query_row("SELECT value FROM settings WHERE key = ?1", [rating_key(pool)], |r| r.get::<_, String>(0))
         .optional()
         .map_err(err)?
         .and_then(|v| v.parse::<f64>().ok())
-        .map_or(START_RATING, |v| v.round() as i64);
+        .map(|v| v.round() as i64))
+}
+
+/// The student's rating in one pool (chess.com scale) and how many rated games have changed it.
+/// Bullet and blitz start from the rapid rating until they're set or played: one number the
+/// student knows is a better first guess than the default.
+pub fn player_rating(conn: &Connection, pool: &str) -> Result<(i64, i64), String> {
+    let rating = match rating_setting(conn, pool)? {
+        Some(r) => r,
+        None if pool != "rapid" => rating_setting(conn, "rapid")?.unwrap_or(START_RATING),
+        None => START_RATING,
+    };
     let games = conn
-        .query_row("SELECT count(*) FROM games WHERE rating_after IS NOT NULL", [], |r| r.get(0))
+        .query_row("SELECT count(*) FROM games WHERE rating_after IS NOT NULL AND rating_pool = ?1", [pool], |r| r.get(0))
         .map_err(err)?;
     Ok((rating, games))
 }
 
-/// Elo against the opponent's rating (the bot's chess.com-scale strength), stored on the game and
-/// in the setting. Mirrors `eloChange` in src/rating.ts, which previews it before a game.
+/// Elo against the opponent's rating (the bot's chess.com-scale strength), in the pool the game's
+/// clock belongs to, stored on the game and in that pool's setting. Mirrors `eloChange` in
+/// src/rating.ts, which previews it before a game.
 fn rate_game(conn: &Connection, id: i64) -> Result<(), String> {
-    let (mode, color, opponent, result): (String, String, Option<String>, Option<String>) = conn
-        .query_row("SELECT mode, student_color, opponent, result FROM games WHERE id = ?1", [id], |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+    let (mode, color, opponent, result, time_control): (String, String, Option<String>, Option<String>, Option<String>) = conn
+        .query_row("SELECT mode, student_color, opponent, result, time_control FROM games WHERE id = ?1", [id], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
         })
         .map_err(err)?;
     // Only "stockfish-cc:" keys are on the chess.com scale (older "stockfish:" games never get here).
@@ -575,14 +623,18 @@ fn rate_game(conn: &Connection, id: i64) -> Result<(), String> {
         ("1-0", "white") | ("0-1", "black") => 1.0,
         _ => 0.0,
     };
-    let (before, games) = player_rating(conn)?;
+    let pool = rating_pool(time_control.as_deref());
+    let (before, games) = player_rating(conn, pool)?;
     let after = before + elo_change(before, opp, score, games);
-    conn.execute("UPDATE games SET rating_before = ?2, rating_after = ?3 WHERE id = ?1", params![id, before, after])
-        .map_err(err)?;
     conn.execute(
-        "INSERT INTO settings (key, value) VALUES ('playerRating', ?1)
+        "UPDATE games SET rating_before = ?2, rating_after = ?3, rating_pool = ?4 WHERE id = ?1",
+        params![id, before, after, pool],
+    )
+    .map_err(err)?;
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        [after.to_string()],
+        [rating_key(pool), &after.to_string()],
     )
     .map_err(err)?;
     Ok(())
@@ -595,30 +647,41 @@ fn elo_change(player: i64, opponent: i64, score: f64, games_so_far: i64) -> i64 
     (k * (score - expected)).round() as i64
 }
 
-/// For the games menu and the new-game dialog: the rating, how many games it rests on, and the
-/// rating after each of the last 100 rated games (oldest first), each with the one before it.
+/// For the games menu and the new-game dialogs, per pool: the rating, how many games it rests on,
+/// whether the student set it, and the rating after each of its last 100 rated games (oldest
+/// first), each with the one before it. `latest`: the pool of the last rated game, if any.
 #[tauri::command]
 pub fn db_player_rating(db: State<Db>) -> Result<serde_json::Value, String> {
     let conn = db.0.lock().unwrap();
-    let (rating, games) = player_rating(&conn)?;
-    let history = conn
-        .prepare(
-            "SELECT rating_before, rating_after FROM
-                (SELECT rating_before, rating_after, ended_at, id FROM games WHERE rating_after IS NOT NULL
-                 ORDER BY ended_at DESC, id DESC LIMIT 100)
-             ORDER BY ended_at, id",
+    let mut pools = serde_json::Map::new();
+    for pool in RATING_POOLS {
+        let (rating, games) = player_rating(&conn, pool)?;
+        let history = conn
+            .prepare(
+                "SELECT rating_before, rating_after FROM
+                    (SELECT rating_before, rating_after, ended_at, id FROM games
+                     WHERE rating_after IS NOT NULL AND rating_pool = ?1
+                     ORDER BY ended_at DESC, id DESC LIMIT 100)
+                 ORDER BY ended_at, id",
+            )
+            .map_err(err)?
+            .query_map([pool], |r| Ok([r.get::<_, i64>(0)?, r.get::<_, i64>(1)?]))
+            .map_err(err)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(err)?;
+        let set = rating_setting(&conn, pool)?.is_some();
+        pools.insert(pool.into(), serde_json::json!({ "rating": rating, "games": games, "set": set, "history": history }));
+    }
+    let latest: Option<String> = conn
+        .query_row(
+            "SELECT rating_pool FROM games WHERE rating_after IS NOT NULL ORDER BY ended_at DESC, id DESC LIMIT 1",
+            [],
+            |r| r.get(0),
         )
-        .map_err(err)?
-        .query_map([], |r| Ok([r.get::<_, i64>(0)?, r.get::<_, i64>(1)?]))
-        .map_err(err)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(err)?;
-    let set = conn
-        .query_row("SELECT 1 FROM settings WHERE key = 'playerRating'", [], |_| Ok(()))
         .optional()
         .map_err(err)?
-        .is_some();
-    Ok(serde_json::json!({ "rating": rating, "games": games, "set": set, "history": history }))
+        .flatten();
+    Ok(serde_json::json!({ "pools": pools, "latest": latest }))
 }
 
 /// Makes the stored move list match `moves` (takebacks truncate it). A move's analysis survives
@@ -850,26 +913,54 @@ mod tests {
         conn.last_insert_rowid()
     }
 
+    fn game_with_clock(conn: &Connection, color: &str, opponent: &str, clock: Option<&str>) -> i64 {
+        conn.execute(
+            "INSERT INTO games (start_fen, student_color, opponent, mode, time_control) VALUES ('x', ?1, ?2, 'rated', ?3)",
+            params![color, opponent, clock],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    }
+
+    #[test]
+    fn clocks_pick_the_rating() {
+        assert_eq!(rating_pool(None), "rapid");
+        assert_eq!(rating_pool(Some("60+0")), "bullet");
+        assert_eq!(rating_pool(Some("120+1")), "bullet");
+        assert_eq!(rating_pool(Some("180+0")), "blitz");
+        assert_eq!(rating_pool(Some("300+0")), "blitz");
+        assert_eq!(rating_pool(Some("600+0")), "rapid");
+        assert_eq!(rating_pool(Some("900+10")), "rapid");
+    }
+
     #[test]
     fn rated_games_move_the_rating_once() {
         let path = std::env::temp_dir().join(format!("cc-rating-test-{}.db", std::process::id()));
         let _ = std::fs::remove_file(&path);
         let db = Db::open(&path).unwrap();
         let mut conn = db.conn();
-        assert_eq!(player_rating(&conn).unwrap(), (START_RATING, 0));
+        assert_eq!(player_rating(&conn, "rapid").unwrap(), (START_RATING, 0));
 
         // A win against an equal bot: +16 while the rating is new.
         let g = game(&conn, "rated", "white", "stockfish-cc:1200");
         finish(&mut conn, g, "1-0");
-        assert_eq!(player_rating(&conn).unwrap(), (1216, 1));
+        assert_eq!(player_rating(&conn, "rapid").unwrap(), (1216, 1));
         // The same result saved again (a second device) changes nothing.
         finish(&mut conn, g, "1-0");
-        assert_eq!(player_rating(&conn).unwrap(), (1216, 1));
+        assert_eq!(player_rating(&conn, "rapid").unwrap(), (1216, 1));
 
         // Practice games don't count.
         let p = game(&conn, "practice", "black", "stockfish-cc:1800");
         finish(&mut conn, p, "0-1");
-        assert_eq!(player_rating(&conn).unwrap(), (1216, 1));
+        assert_eq!(player_rating(&conn, "rapid").unwrap(), (1216, 1));
+
+        // Blitz hasn't been played or set: it starts from rapid, and a blitz game moves only blitz.
+        assert_eq!(player_rating(&conn, "blitz").unwrap(), (1216, 0));
+        let b = game_with_clock(&conn, "white", "stockfish-cc:1216", Some("180+2"));
+        finish(&mut conn, b, "1-0");
+        assert_eq!(player_rating(&conn, "blitz").unwrap(), (1232, 1));
+        assert_eq!(player_rating(&conn, "rapid").unwrap(), (1216, 1));
+        assert_eq!(player_rating(&conn, "bullet").unwrap(), (1216, 0));
 
         // A set rating is the starting point; a loss as Black to a much weaker bot costs a lot.
         conn.execute("UPDATE settings SET value = '1500' WHERE key = 'playerRating'", []).unwrap();
@@ -878,6 +969,7 @@ mod tests {
         let (before, after): (i64, i64) =
             conn.query_row("SELECT rating_before, rating_after FROM games WHERE id = ?1", [l], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
         assert_eq!((before, after), (1500, 1500 - 29));
+        assert_eq!(player_rating(&conn, "blitz").unwrap(), (1232, 1));
         assert_eq!(elo_change(1500, 1500, 0.5, 20), 0);
         drop(conn);
         drop(db);

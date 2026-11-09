@@ -26,11 +26,15 @@ export async function profileText(): Promise<string> {
     `Rated games (unaided): ${c.rated_finished ?? 0} finished, ${c.rated_analyzed ?? 0} analyzed. ` +
       `Practice games: ${c.practice_games ?? 0} (help was available; not evidence of strength).`,
   ];
-  const gr = p.gameRating;
+  const gr = p.gameRating as Record<string, { rating: number; games: number }> | undefined;
   if (gr) {
     out.push(
-      `Game rating (chess.com scale, Elo from rated games vs the bots' ratings): ${gr.rating}, ` +
-        (gr.games ? `moved by ${gr.games} rated games.` : "set by the student or the default; no rated games have moved it yet."),
+      "Game ratings here (chess.com scale, Elo from rated games vs the bots' ratings; one per clock, no clock counts as rapid): " +
+        ["bullet", "blitz", "rapid"]
+          .filter((k) => gr[k])
+          .map((k) => `${k} ${gr[k].rating} (${gr[k].games ? `${gr[k].games} rated games` : "set or default, no games yet"})`)
+          .join(", ") +
+        ".",
     );
   }
   if (!c.rated_finished) {
@@ -72,7 +76,7 @@ export async function profileText(): Promise<string> {
             (g: Row) =>
               `  #${g.id} ${g.date} ${g.color} vs ${opp(g.opponent)}, ${g.result} ${g.termination}, ${tc(g.time_control)}` +
               `${g.opening_name ? `, ${g.opening_name}` : ""}` +
-              `${g.rating_after !== null && g.rating_after !== undefined ? `, rating ${g.rating_before}→${g.rating_after}` : ""}, avg loss ${g.avg_cp_loss ?? "?"}cp, ${g.blunders} blunders`,
+              `${g.rating_after !== null && g.rating_after !== undefined ? `, ${g.rating_pool ?? "rapid"} rating ${g.rating_before}→${g.rating_after}` : ""}, avg loss ${g.avg_cp_loss ?? "?"}cp, ${g.blunders} blunders`,
           )
           .join("\n"),
     );

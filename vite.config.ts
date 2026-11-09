@@ -21,9 +21,11 @@ function patchedDeps() {
     name: `patched-deps-${hash.digest("hex").slice(0, 8)}`,
     configureServer(server: { watcher: any; restart: () => Promise<void> }) {
       server.watcher.add("patches");
-      server.watcher.on("change", (file: string) => {
-        if (file.replaceAll("\\", "/").includes("/patches/")) server.restart();
-      });
+      // The watcher can report the path relative to the project ("patches\x.patch"), with no
+      // folder in front of "patches/".
+      const isPatch = (file: string) => /(^|\/)patches\//.test(file.replaceAll("\\", "/"));
+      for (const ev of ["add", "change", "unlink"])
+        server.watcher.on(ev, (file: string) => isPatch(file) && server.restart());
     },
   };
 }

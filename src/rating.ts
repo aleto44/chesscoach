@@ -37,15 +37,37 @@ export function eloChange(player: number, opponent: number, score: number, games
   return Math.round(k * (score - expected));
 }
 
-/** db_player_rating: the student's game rating and the games behind it. */
-export interface PlayerRating {
+/** The student has a rating per clock, like chess.com (RATING_POOLS in src-tauri/src/db.rs). */
+export type RatingPool = "bullet" | "blitz" | "rapid";
+export const RATING_POOLS: RatingPool[] = ["bullet", "blitz", "rapid"];
+export const POOL_LABEL: Record<RatingPool, string> = { bullet: "Bullet", blitz: "Blitz", rapid: "Rapid" };
+
+/**
+ * Which rating a clock counts toward: chess.com's split by expected length (base + 40 moves of
+ * increment), under 3 minutes bullet, under 10 blitz, else rapid. No clock counts as rapid.
+ * Mirrors rating_pool in src-tauri/src/db.rs, which does the rating.
+ */
+export function ratingPool(tc: { initial: number; increment: number } | null): RatingPool {
+  if (!tc) return "rapid";
+  const t = tc.initial + 40 * tc.increment;
+  return t < 180 ? "bullet" : t < 600 ? "blitz" : "rapid";
+}
+
+/** One pool of db_player_rating: the rating and the games behind it. */
+export interface PoolRating {
   rating: number;
   /** Rated games that have changed it. */
   games: number;
-  /** False until the student sets it in Settings (it started at START_RATING). */
+  /** False until the student sets it in Settings (rapid started at START_RATING, the others at rapid). */
   set: boolean;
-  /** [before, after] for the last rated games, oldest first. */
+  /** [before, after] for the last rated games in this pool, oldest first. */
   history: [number, number][];
+}
+
+/** db_player_rating: every pool, and which one the last rated game was in. */
+export interface PlayerRating {
+  pools: Record<RatingPool, PoolRating>;
+  latest: RatingPool | null;
 }
 
 /** "+12", "−8", "±0". */

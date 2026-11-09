@@ -2,6 +2,7 @@
 import { invoke } from "./backend";
 import { create } from "zustand";
 import { hasBackend } from "./db";
+import type { RatingPool } from "./rating";
 
 export interface Settings {
   /** Passed to `claude --model`; "" = the CLI's default. */
@@ -13,15 +14,19 @@ export interface Settings {
   /** Practice games: flag the student's mistakes right after they play them (local engine, no AI). */
   nudges: "off" | "blunders" | "mistakes";
   /**
-   * The student's game rating, chess.com scale; null = not set (START_RATING). Rated games move
-   * it by Elo against the bot's rating; the computer updates it as each one ends (db.rs rate_game).
+   * The student's game ratings, chess.com scale, one per clock (RATING_KEYS); null = not set
+   * (rapid starts at START_RATING, bullet and blitz at the rapid rating). Rated games move the
+   * one their clock belongs to by Elo against the bot's rating; the computer updates it as each
+   * one ends (db.rs rate_game). Rapid keeps the key from when there was one rating.
    */
   playerRating: number | null;
+  playerRatingBlitz: number | null;
+  playerRatingBullet: number | null;
   /** Desktop: look for new games on the student's import accounts (games/import.ts) when the app opens (every few hours at most). */
   autoImport: boolean;
   /** Puzzles: go on to the next one by itself shortly after a solve (a miss always waits). */
   puzzleAutoNext: boolean;
-  /** Phones: a short buzz on puzzle moves and solves (where the browser can vibrate). */
+  /** Phones: a short buzz on every move on a board, and on puzzle solves (where the browser can vibrate). */
   haptics: boolean;
   /** Desktop: the coach column's width in px (dragged by its left edge) and whether it's tucked away into a side tab. */
   chatWidth: number;
@@ -35,12 +40,26 @@ const DEFAULTS: Settings = {
   theme: "dark",
   nudges: "blunders",
   playerRating: null,
+  playerRatingBlitz: null,
+  playerRatingBullet: null,
   autoImport: true,
   puzzleAutoNext: true,
   haptics: true,
   chatWidth: 420,
   chatCollapsed: false,
 };
+
+/** The setting each rating pool lives in (rating_key in src-tauri/src/db.rs). */
+export const RATING_KEYS = {
+  bullet: "playerRatingBullet",
+  blitz: "playerRatingBlitz",
+  rapid: "playerRating",
+} as const satisfies Record<RatingPool, keyof Settings>;
+
+/** A pool's rating as the settings have it: bullet and blitz fall back to rapid until set. */
+export function settingRating(s: Settings, pool: RatingPool): number | null {
+  return s[RATING_KEYS[pool]] ?? (pool === "rapid" ? null : s.playerRating);
+}
 
 export const MODEL_CHOICES = [
   { value: "", label: "Default", hint: "Whatever your Claude Code default is" },

@@ -7,15 +7,13 @@ import { newGame } from "../game/session";
 import { timeControlLabel } from "../game/clock";
 import { go, useNav } from "../nav";
 import { refreshPuzzleDb, themeLabel, usePuzzleDb, type ThemeMastery } from "../puzzles/puzzles";
-import { startPuzzles } from "../puzzles/session";
+import { rushBest as bestRush, startPuzzles, startRatedPuzzles, startRush } from "../puzzles/session";
 import { commonness, findSet, pickLine, seenCounts, shortName, TRAINING_SETS, type Commonness, type TrainingLine } from "../openings/training";
 import { startOpening, useOpening } from "../openings/session";
 import { getRepertoire, repertoireSetId, useRepertoire } from "../openings/repertoire";
-import { fromLichess, signed, type PlayerRating } from "../rating";
-import { SettingsDialog } from "./SettingsDialog";
-import { useSettings } from "../settings";
+import { fromLichess, POOL_LABEL, RATING_POOLS, signed, type PlayerRating } from "../rating";
 import { isLocked, opponentLabel, useStore } from "../store";
-import { NewGameDialog } from "./GameDialogs";
+import { NewGameDialog, PlayRatedDialog, usePoolRating } from "./GameDialogs";
 import { ModeBadge } from "./ModeBadge";
 import { RepertoireDialog } from "./RepertoireDialog";
 import { ProfileMenu, RatingHistory, Weaknesses } from "./Profile";
@@ -67,7 +65,8 @@ export function Tile({
 }: {
   icon: string;
   title: string;
-  sub: ReactNode;
+  /** Only for status worth showing (counts, a reason it's off); the title says what it does. */
+  sub?: ReactNode;
   onClick: () => void;
   disabled?: boolean | string;
   badge?: ReactNode;
@@ -88,7 +87,9 @@ export function Tile({
           {title}
           {badge}
         </span>
-        <span className="menu-sub">{typeof disabled === "string" ? disabled : sub}</span>
+        {(typeof disabled === "string" || sub) && (
+          <span className="menu-sub">{typeof disabled === "string" ? disabled : sub}</span>
+        )}
       </span>
     </button>
   );
@@ -147,7 +148,7 @@ function MainMenu() {
 }
 
 function GamesMenu() {
-  const [dialog, setDialog] = useState<"play" | "settings" | null>(null);
+  const [dialog, setDialog] = useState<"rated" | "play" | null>(null);
   const { data: rating } = useRead<PlayerRating>("db_player_rating", {}, "Your rating is kept on the computer.");
   const hasGame = useStore((s) => s.gameId !== null || s.game.sans.length > 0);
   const close = () => setDialog(null);
@@ -155,13 +156,13 @@ function GamesMenu() {
     <>
       <h2 className="section-title">Games</h2>
       <ResumeGame />
-      {rating && <GameRating r={rating} onSet={() => setDialog("settings")} />}
+      {rating && <GameRating r={rating} />}
       <div className="menu-grid">
-        <Tile icon="▶" title="Play a game" sub="Against the computer, rated or practice" onClick={() => setDialog("play")} />
+        <Tile icon="▶" title="Play rated" onClick={() => setDialog("rated")} />
+        <Tile icon="⚙" title="Choose game" onClick={() => setDialog("play")} />
         <Tile
           icon="⊞"
           title="Analysis board"
-          sub="Move both sides freely and ask the coach"
           onClick={async () => {
             await newGame({
               mode: "practice",
@@ -171,10 +172,10 @@ function GamesMenu() {
             go("board");
           }}
         />
-        {hasGame && <Tile icon="◻" title="Current board" sub="Back to the last game you opened" onClick={() => go("board")} />}
+        {hasGame && <Tile icon="◻" title="Current board" onClick={() => go("board")} />}
       </div>
+      {dialog === "rated" && <PlayRatedDialog onClose={close} />}
       {dialog === "play" && <NewGameDialog withOpponent onClose={close} />}
-      {dialog === "settings" && <SettingsDialog onClose={close} />}
     </>
   );
 }
@@ -368,7 +369,8 @@ function OpeningTraining() {
       </h3>
       {mine && !set.lines.length && <p className="muted">No {set.color} lines yet. Add the openings you play with Edit repertoire.</p>}
       <div className="history-list">
-        {set.lines.map((l) => {
+        {/* Most played first; the repertoire keeps the student's own order. Ties keep the file's order. */}
+        {(mine ? set.lines : [...set.lines].sort((a, b) => b.weight - a.weight)).map((l) => {
           const n = seen[l.moves.join(" ")] ?? 0;
           const c = commonness(l);
           return (
@@ -513,6 +515,8 @@ function PuzzlesMenu() {
     if (!pdb.loaded) refreshPuzzleDb().catch(() => undefined);
   }, [pdb.loaded]);
   const weakest = data?.stats?.themes.slice(0, 4) ?? [];
+  const needSet = pdb.installed || !pdb.loaded ? null : "Download the Lichess puzzle set first";
+  const rushBest = bestRush();
   return (
     <>
       <h2 className="section-title">Puzzles</h2>
@@ -538,11 +542,25 @@ function PuzzlesMenu() {
         <Tile
           icon="▶"
           title="Play puzzles"
-          sub={pdb.installed || !pdb.loaded ? "Puzzles at your level, filter by theme or opening" : "Download the Lichess puzzle set first"}
+          sub={needSet}
+          disabled={blocked ? BLOCKED : false}
+          onClick={() => startRatedPuzzles()}
+        />
+        <Tile
+          icon="⚙"
+          title="Choose puzzles"
+          sub={needSet}
           disabled={blocked ? BLOCKED : false}
           onClick={() => startPuzzles()}
         />
-        <Tile icon="☰" title="Puzzle history" sub="Every puzzle you tried, and your rating over time" onClick={() => go("puzzle-history")} />
+        <Tile
+          icon="⚡"
+          title="Puzzle rush"
+          sub={needSet ?? (rushBest ? `Best ${rushBest}` : undefined)}
+          disabled={blocked ? BLOCKED : false}
+          onClick={() => startRush()}
+        />
+        <Tile icon="☰" title="Puzzle history" onClick={() => go("puzzle-history")} />
       </div>
       {weakest.length > 0 && (
         <>
@@ -644,46 +662,41 @@ function PuzzleHistory() {
   );
 }
 
-/** The games menu's headline: the rating rated games move, its last change and its trend. */
-function GameRating({ r: read, onSet }: { r: PlayerRating; onSet: () => void }) {
-  // The setting changes here too (Settings, or a game that just ended); the read may be older.
-  const live = useSettings((s) => s.playerRating);
-  const r = live === null ? read : { ...read, rating: live, set: true };
+/**
+ * The games menu's headline: the bullet, blitz and rapid ratings, the last rated game's change, and
+ * the trend of the rating that game was in.
+ */
+function GameRating({ r: read }: { r: PlayerRating }) {
+  const pools = {
+    bullet: usePoolRating("bullet", read),
+    blitz: usePoolRating("blitz", read),
+    rapid: usePoolRating("rapid", read),
+  };
+  const recent = read.latest ?? "rapid";
+  const r = pools[recent];
   const last = r.history[r.history.length - 1];
   const ratings = r.history.length ? [r.history[0][0], ...r.history.map((h) => h[1])] : [];
   return (
     <>
       <div className="stat-row">
-        <div>
-          <span className="stat-big">{r.rating}</span>
-          <span className="muted small">
-            your rating{" "}
-            <button className="link" onClick={onSet}>
-              {r.set ? "change" : "set it"}
-            </button>
-          </span>
-        </div>
-        <div>
-          <span className="stat-big">{r.games}</span>
-          <span className="muted small">rated games counted</span>
-        </div>
+        {RATING_POOLS.map((p) => (
+          <div key={p} title={`${pools[p].games} rated ${p} game${pools[p].games === 1 ? "" : "s"} counted`}>
+            <span className="stat-big">{pools[p].rating}</span>
+            <span className="muted small">
+              {p} · {pools[p].games} game{pools[p].games === 1 ? "" : "s"}
+            </span>
+          </div>
+        ))}
         {last && (
           <div>
             <span className={`stat-big ${last[1] >= last[0] ? "up" : "down"}`}>{signed(last[1] - last[0])}</span>
-            <span className="muted small">last game</span>
+            <span className="muted small">last game ({recent})</span>
           </div>
         )}
       </div>
-      {!r.set && r.games === 0 && (
-        <p className="muted small">
-          Rated games start you at {r.rating}. If you know your chess.com rapid rating,{" "}
-          <button className="link" onClick={onSet}>
-            set it in Settings
-          </button>{" "}
-          so it's right from the first game.
-        </p>
+      {ratings.length > 2 && (
+        <RatingSpark ratings={ratings} label={`${POOL_LABEL[recent]} rating over your last ${r.history.length} rated ${recent} games`} />
       )}
-      {ratings.length > 2 && <RatingSpark ratings={ratings} label={`Rating over your last ${r.history.length} rated games`} />}
     </>
   );
 }

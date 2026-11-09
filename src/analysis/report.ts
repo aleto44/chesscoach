@@ -1,9 +1,9 @@
-// The game report shown after the analysis: accuracy (lichess's formula), a rough game rating,
+// The game report shown after the analysis: accuracy (lichess's per-move curve, chess.com-like totals), a rough game rating,
 // label counts and a verdict per phase, for each side. Pure functions over the stored annotations.
 import { sideToMove, type Line } from "../chess/line";
 import { whiteWinPercent } from "../engine/live";
 import type { Color } from "../store";
-import { labelOf, lossFromEvals, type MoveAnnotation, type MoveClass, type MoveLabel, type Phase } from "./review";
+import { labelOf, type MoveAnnotation, type MoveClass, type MoveLabel, type Phase } from "./review";
 
 /** Display order, best to worst. */
 export const LABELS: MoveLabel[] = [
@@ -38,6 +38,9 @@ export interface GameReport {
 
 /** White's view, centipawns (mates are ±(10000 − distance), which this maps to ~0 or ~100). */
 const win = (cp: number) => whiteWinPercent({ cp });
+/** Winning chances (points) a move gave away, mover's view, from White's-view evals. */
+const winDrop = (before: number, after: number, mover: Color) =>
+  Math.max(0, mover === "white" ? win(before) - win(after) : win(after) - win(before));
 
 /**
  * lichess's curve from what a move threw away (lossPoints, ≈ winning-chance points) to how much
@@ -67,12 +70,14 @@ function volatility(wins: number[]): number[] {
   return windows.map((w) => Math.max(0.5, Math.min(12, stdDev(w))));
 }
 
-/** lichess: the volatility-weighted mean averaged with the harmonic mean (so one blunder still counts). */
+/**
+ * The volatility-weighted mean (lichess's first half). Lichess also averages in the harmonic mean,
+ * which lets one blunder sink the whole game (a side that played well and then walked into mate
+ * scored ~40 where chess.com says ~74); chess.com's accuracy doesn't, so neither does this.
+ */
 function aggregate(items: { acc: number; weight: number }[]): number | null {
   if (!items.length) return null;
-  const weighted = items.reduce((s, x) => s + x.acc * x.weight, 0) / items.reduce((s, x) => s + x.weight, 0);
-  const harmonic = items.length / items.reduce((s, x) => s + 1 / Math.max(1, x.acc), 0);
-  return (weighted + harmonic) / 2;
+  return items.reduce((s, x) => s + x.acc * x.weight, 0) / items.reduce((s, x) => s + x.weight, 0);
 }
 
 /**
@@ -102,8 +107,9 @@ export function ratingFor(accuracy: number): number {
 }
 
 /**
- * The rating leaves out book moves and moves made while already more than 4 pawns up: when the
- * opponent keeps hanging pieces, taking them is easy and reads as near-perfect play.
+ * The rating leaves out book moves and moves made while more than 4 pawns up that stay so: when
+ * the opponent keeps hanging pieces, taking them is easy and reads as near-perfect play. A move
+ * that throws such a lead away still counts.
  */
 const WON_CP = 400;
 /** Fewer such moves than this and the rating uses all of them instead. */
@@ -169,11 +175,14 @@ export function gameReport(line: Line, annotations: (MoveAnnotation | null)[], a
       if (sideToMove(line.fens[i]) !== color) return;
       const label = labelOf(a);
       counts[label]++;
-      const acc = moveAccuracy(a.class === "best" ? 0 : lossFromEvals(evals[i], evals[i + 1], color));
+      // Winning chances only, as lichess and chess.com: the centipawn part of lossFromEvals is for
+      // naming mistakes in lost positions, not for scoring them.
+      const acc = moveAccuracy(a.class === "best" ? 0 : winDrop(evals[i], evals[i + 1], color));
       const item = { acc, weight: weights[i] ?? 1 };
       all.push(item);
-      const ahead = color === "white" ? evals[i] : -evals[i];
-      if (label !== "book" && ahead <= WON_CP) rated.push(item);
+      const pov = (cp: number) => (color === "white" ? cp : -cp);
+      const easy = pov(evals[i]) > WON_CP && pov(evals[i + 1]) > WON_CP;
+      if (label !== "book" && !easy) rated.push(item);
       byPhase[a.phase].items.push(item);
       byPhase[a.phase].classes.push(a.class);
     });

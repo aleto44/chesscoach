@@ -8,8 +8,8 @@ import { useBacklog } from "../analysis/review";
 import { go } from "../nav";
 import { startPuzzles } from "../puzzles/session";
 import { themeLabel, usePuzzleDb } from "../puzzles/puzzles";
-import { fromLichess, signed } from "../rating";
-import { useSettings } from "../settings";
+import { fromLichess, POOL_LABEL, RATING_POOLS, signed, type RatingPool } from "../rating";
+import { settingRating, useSettings } from "../settings";
 import { SITE_NAME, type ImportSite } from "../store";
 import { BarRows, Meter, StackBar, scoreColor } from "./Bars";
 import { LineChart, Legend, type ChartSeries } from "./Chart";
@@ -26,7 +26,7 @@ export function ProfileMenu() {
   const backlog = useBacklog();
   const accounts = useAccounts((s) => s.list?.filter((a) => a.account).length ?? 0);
   useEffect(() => void loadAccounts().catch(() => undefined), []);
-  const rating = useSettings((s) => s.playerRating);
+  const settings = useSettings();
   const pdb = usePuzzleDb();
   const { data } = useRead<Weakness>("db_weakness", { source: "all", last: 50 }, OFFLINE);
   const leaks = data ? findLeaks(data).slice(0, 2) : [];
@@ -34,10 +34,12 @@ export function ProfileMenu() {
     <>
       <h2 className="section-title">Profile</h2>
       <div className="stat-row">
-        <div>
-          <span className="stat-big">{rating ?? "–"}</span>
-          <span className="muted small">game rating here</span>
-        </div>
+        {RATING_POOLS.map((p) => (
+          <div key={p}>
+            <span className="stat-big">{settingRating(settings, p) ?? "–"}</span>
+            <span className="muted small">{p} here</span>
+          </div>
+        ))}
         {pdb.installed && (
           <div>
             <span className="stat-big">{fromLichess(pdb.rating)}</span>
@@ -58,7 +60,7 @@ export function ProfileMenu() {
           sub={leaks.length ? `Biggest: ${leaks.map((l) => l.title.toLowerCase()).join(", ")}` : "What keeps going wrong in your games"}
           onClick={() => go("weaknesses")}
         />
-        <Tile icon="↗" title="Rating history" sub="Game, puzzle, chess.com and Lichess ratings over time" onClick={() => go("ratings")} />
+        <Tile icon="↗" title="Rating history" sub="Bullet, blitz, rapid, puzzle, chess.com and Lichess ratings over time" onClick={() => go("ratings")} />
         <Tile icon="☰" title="Saved games" sub="Every game: open, review or delete" onClick={() => setDialog("saved")} />
         <Tile
           icon="⇩"
@@ -632,7 +634,7 @@ function NumbersTable({ data }: { data: Weakness }) {
 // ---- Rating history ----
 
 interface RatingHistoryData {
-  game: [string, number][];
+  game: Record<RatingPool, [string, number][]>;
   puzzles: [string, number][];
   imported: { source: ImportSite; speed: string; points: [string, number][] }[];
 }
@@ -656,7 +658,11 @@ export function RatingHistory() {
   const all = useMemo<ChartSeries[]>(() => {
     if (!data) return [];
     const list: Omit<ChartSeries, "slot">[] = [
-      { key: "game", label: "Rated games here", points: data.game.map(([t, r]) => ({ x: toMs(t), y: r })) },
+      ...RATING_POOLS.map((p) => ({
+        key: `game-${p}`,
+        label: `${POOL_LABEL[p]} here`,
+        points: data.game[p].map(([t, r]) => ({ x: toMs(t), y: r })),
+      })),
       // Puzzle ratings are Lichess numbers: shown on the chess.com scale.
       { key: "puzzles", label: "Puzzles", points: data.puzzles.map(([t, r]) => ({ x: toMs(t), y: fromLichess(r) })) },
       ...[...data.imported]
