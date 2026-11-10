@@ -378,7 +378,8 @@ export function GamesDialog({ onClose }: { onClose: () => void }) {
  */
 export function usePoolRating(pool: RatingPool, read: PlayerRating | null): PoolRating {
   const live = useSettings((s) => settingRating(s, pool));
-  const r = read?.pools[pool] ?? { rating: START_RATING, games: 0, set: false, history: [] };
+  // `pools?.`: a phone may still hold a rating read from before ratings were split by clock.
+  const r = read?.pools?.[pool] ?? { rating: START_RATING, games: 0, set: false, history: [] };
   return live === null ? r : { ...r, rating: live };
 }
 

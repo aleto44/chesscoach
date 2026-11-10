@@ -264,6 +264,69 @@ button:disabled {
   -webkit-user-drag: none;
 }
 
+/* Square colors from Settings → Visuals (visuals.ts), in place of chessground.brown.css's image.
+   Two squares per tile, light at the top left (a8, or h1 when flipped). */
+cg-board {
+  background: repeating-conic-gradient(var(--sq-dark, #b58863) 0 25%, var(--sq-light, #f0d9b5) 0 50%) 0 0 / 25% 25%;
+}
+
+/* Chessground's coordinates are 9px and faded; make them readable at a glance, growing with the
+   board, times the size picked in Settings → Visuals (--coord-scale). */
+.cg-wrap coords {
+  opacity: 1;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: calc(clamp(11px, calc(var(--board-w, 480px) / 36), 16px) * var(--coord-scale, 1));
+}
+
+[data-coords="off"] .cg-wrap coords {
+  display: none;
+}
+
+/* Inside the board's edge squares, like chess.com: ranks in each square's top-left corner, files in
+   the bottom-right, so the two never sit on top of each other at a1. */
+.cg-wrap coords.ranks {
+  left: 0;
+  top: 0;
+  width: auto;
+  height: 100%;
+  align-items: flex-start;
+}
+
+.cg-wrap coords.ranks coord {
+  transform: none;
+  padding: 0.15em 0.3em;
+  line-height: 1;
+}
+
+.cg-wrap coords.files {
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: auto;
+  text-transform: none;
+}
+
+.cg-wrap coords.files coord {
+  text-align: right;
+  padding: 0 0.3em 0.15em;
+  line-height: 1;
+}
+
+/* Solid label colours that contrast with the square underneath. With white at the bottom, a1 is
+   dark, so odd ranks and files a/c/e/g sit on dark squares; flipped, it's the other way round. */
+.cg-wrap.orientation-white coords :nth-child(odd),
+.cg-wrap.orientation-black coords :nth-child(even) {
+  color: #fff8ec;
+  /* The brown theme's dark squares are a mid-tan; a soft shadow keeps the light label crisp. */
+  text-shadow: 0 0 2px rgba(60, 35, 15, 0.9), 0 1px 1px rgba(60, 35, 15, 0.6);
+}
+
+.cg-wrap.orientation-white coords :nth-child(even),
+.cg-wrap.orientation-black coords :nth-child(odd) {
+  color: #6e4a2c;
+}
+
 .cg-board-wrap {
   width: 100%;
   aspect-ratio: 1;
@@ -1682,6 +1745,23 @@ button.icon {
 
 .board-frame.drill {
   background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* The board stays put and leaves room under it for a wrong answer's why, the same in every state so
+   it doesn't jump. The why takes what's left and scrolls on its own; Next stays in view under it. */
+@media (min-width: 761px) {
+  .board-panel.drills {
+    --board-w: min(100%, calc(100vh - 420px));
+  }
+  .drill-feedback {
+    flex: 1 1 0;
+    min-height: 3em;
+    overflow-y: auto;
+  }
+}
+
+.drill-feedback {
+  width: var(--board-w);
 }
 
 .board-panel.drills .side-controls {

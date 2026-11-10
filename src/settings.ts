@@ -31,6 +31,12 @@ export interface Settings {
   /** Desktop: the coach column's width in px (dragged by its left edge) and whether it's tucked away into a side tab. */
   chatWidth: number;
   chatCollapsed: boolean;
+  /** Visuals (visuals.ts): a BOARD_COLORS id or "custom" (boardLight / boardDark), a PIECE_SETS id, a COORD_SIZES id. */
+  boardColors: string;
+  boardLight: string;
+  boardDark: string;
+  pieceSet: string;
+  coordSize: "off" | "small" | "medium" | "large";
 }
 
 const DEFAULTS: Settings = {
@@ -47,6 +53,11 @@ const DEFAULTS: Settings = {
   haptics: true,
   chatWidth: 420,
   chatCollapsed: false,
+  boardColors: "brown",
+  boardLight: "#f0d9b5",
+  boardDark: "#b58863",
+  pieceSet: "cburnett",
+  coordSize: "medium",
 };
 
 /** The setting each rating pool lives in (rating_key in src-tauri/src/db.rs). */

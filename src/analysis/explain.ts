@@ -238,6 +238,62 @@ const stored = (l: { cp?: number; mate?: number }) =>
 /** Whether a stored eval is a forced mate for `side`. */
 const matesFor = (cp: number | null, side: Color) => cp !== null && Math.abs(cp) >= 9000 && cp > 0 === (side === "white");
 
+/** `a` with one of each piece in `b` taken out. */
+function without(a: PieceType[], b: PieceType[]): PieceType[] {
+  const rest = [...b];
+  return a.filter((p) => {
+    const i = rest.indexOf(p);
+    if (i < 0) return true;
+    rest.splice(i, 1);
+    return false;
+  });
+}
+
+const NAME: Record<string, string> = { ...PIECE_NAMES, k: "king" };
+const pieceAt = (chess: Chess, sq: Square) => NAME[chess.get(sq)?.type ?? ""] ?? "piece";
+
+/**
+ * What the move played gives up that the better move doesn't, in concrete terms: the square the
+ * opponent's reply goes for, and the piece of ours that guarded it before the move or would guard it
+ * after the better one. "The position gets better" teaches nothing; "after Nxg1 nothing guards f2,
+ * after Kxg1 the king does" does. Null when the reply isn't about a square losing its guard.
+ */
+function lostGuard(fen: string, played: Step, reply: Step | undefined, betterUci: string, mover: Color): { played: string; better: string } | null {
+  if (!reply) return null;
+  const c = mover === "white" ? "w" : "b";
+  const x = reply.to as Square;
+  const afterPlayed = new Chess(played.fen);
+  const afterBetter = new Chess(fen);
+  let betterSan: string;
+  try {
+    betterSan = afterBetter.move({ from: betterUci.slice(0, 2), to: betterUci.slice(2, 4), promotion: betterUci[4] }).san;
+  } catch {
+    return null;
+  }
+  // Only a reply that wins something or checks is about a weak square; a quiet move isn't.
+  let r: Move;
+  try {
+    r = new Chess(played.fen).move(reply.san);
+  } catch {
+    return null;
+  }
+  if (!r.captured && !r.san.includes("+")) return null;
+  const guardsNow = afterPlayed.attackers(x, c);
+  const guardsBetter = afterBetter.attackers(x, c);
+  if (guardsBetter.length <= guardsNow.length) return null;
+  const before = new Chess(fen);
+  const movedGuard = before.attackers(x, c).includes(played.from as Square) && !guardsNow.includes(played.to as Square);
+  const guard = guardsBetter.find((s) => !guardsNow.includes(s)) ?? guardsBetter[0];
+  const guardName = guard === betterUci.slice(2, 4) ? `your ${pieceAt(afterBetter, guard)}` : `your ${pieceAt(afterBetter, guard)} on ${guard}`;
+  const loose = guardsNow.length ? `${x} one guard short` : `${x} unguarded`;
+  return {
+    played: movedGuard
+      ? `${played.san} moves the ${pieceAt(before, played.from as Square)} that guarded ${x}, which leaves ${loose}; after ${betterSan} ${guardName} would guard it.`
+      : `${played.san} leaves ${loose}; after ${betterSan} ${guardName} would guard it.`,
+    better: `${betterSan} keeps ${x} guarded (${guardName.replace(/^your /, "by your ")}), so ${reply.san} isn't there.`,
+  };
+}
+
 /** "a, b and c". */
 const andList = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}` : (xs[0] ?? ""));
 
@@ -248,22 +304,12 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
 
   const p = await followLine(m.fenBefore, m.uci, mover, QUIET_PLIES);
   const [lost, got] = [p.lost[mover], p.lost[opp]];
-  let verdict: string;
-  if (matesFor(p.eval, opp)) verdict = `${sideName(opp)} has a forced mate.`;
-  else if (value(lost) - value(got) >= 1) verdict = `You lose ${listPieces(lost)}${got.length ? ` for ${listPieces(got)}` : ""}.`;
-  else {
-    // No material: say how much worse it gets, in the student's winning chances. The stored
-    // evals, so the numbers agree with the header and the rest of the review.
-    const drop = winBefore - winAfter;
-    const much = drop >= 20 ? "a lot " : drop >= 10 ? "clearly " : "";
-    verdict =
-      `No material goes right away, but ${sideName(opp)}'s position gets ${much}better: ` +
-      `your winning chances drop from ${winBefore}% to ${winAfter}%.`;
-  }
+  const playedNet = value(got) - value(lost);
+  const playedSan = p.steps[0]?.san ?? "";
   const played: ExplainedLine = {
     startFen: m.fenBefore,
     steps: p.steps,
-    verdict,
+    verdict: "",
     evalText: evalFor(p.eval ?? m.evalAfter, mover),
     win: winAfter,
   };
@@ -278,6 +324,7 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
   const alternatives: ExplainedLine[] = [];
   let standout = false;
   let betterSummary = "";
+  const guard = top && winOf(top) > winAfter ? lostGuard(m.fenBefore, p.steps[0], p.steps[1], top.pv[0], mover) : null;
   if (top && winOf(top) > winAfter) {
     const runnerUp = root.find((l) => l !== top && l.pv[0]);
     const topWin = winOf(top);
@@ -288,9 +335,17 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
       const [gave, won] = [b.lost[mover], b.lost[opp]];
       const san = b.steps[0]?.san ?? "";
       const w = winOf(l);
+      // Material the move played also gets isn't a reason to prefer this one: both Nxg1 and Kxg1
+      // take the rook, so "Kxg1 wins a rook" says nothing about why it's the better of the two.
+      const sameTake = b.steps[0] && p.steps[0] && b.steps[0].to === p.steps[0].to && /x/.test(b.steps[0].san) && /x/.test(playedSan);
+      const net = value(won) - value(gave);
+      const both = sameTake ? `Both ${playedSan} and ${san} take on ${b.steps[0].to}. ` : "";
       let v: string;
       if (matesFor(stored(l), mover)) v = `${san} leads to mate.`;
-      else if (value(won) - value(gave) >= 1) v = `${san} wins ${listPieces(won)}${gave.length ? ` for ${listPieces(gave)}` : ""}.`;
+      else if (net >= 1 && net - playedNet >= 1 && !sameTake) v = `${san} wins ${listPieces(won)}${gave.length ? ` for ${listPieces(gave)}` : ""}.`;
+      else if (guard && l === top) v = `${both}${guard.better}`;
+      else if (net - playedNet >= 1)
+        v = `${both}${san} comes out ${listPieces([...without(lost, gave), ...without(won, got)])} better off than ${playedSan}.`;
       else if (standout)
         v = `${san} is the move here: it keeps your winning chances at ${w}%, and every other move gives some away (the next best keeps ${runnerUp ? winOf(runnerUp) : w}%).`;
       else if (w >= winBefore + 3) v = `${san} improves your position: your winning chances go to ${w}%.`;
@@ -301,6 +356,19 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
       betterSummary =
         `No single move stands out: ${andList(alternatives.map((a) => a.steps[0].san))} all keep your winning chances ` +
         `around ${alternatives[0].win}%, against ${winAfter}% after the move you played. Pick one to see the reply.`;
+  }
+
+  const drop = winBefore - winAfter;
+  const chances = `Your winning chances drop from ${winBefore}% to ${winAfter}%.`;
+  if (matesFor(p.eval, opp)) played.verdict = `${sideName(opp)} has a forced mate.`;
+  else if (playedNet <= -1) played.verdict = `You lose ${listPieces(lost)}${got.length ? ` for ${listPieces(got)}` : ""}.`;
+  else if (guard) played.verdict = `${guard.played} ${chances}`;
+  else {
+    // Nothing concrete found: say how much worse it gets, in the student's winning chances. The
+    // stored evals, so the numbers agree with the header and the rest of the review.
+    const much = drop >= 20 ? "a lot " : drop >= 10 ? "clearly " : "";
+    const start = playedNet >= 1 ? `You do win ${listPieces(got)}${lost.length ? ` for ${listPieces(lost)}` : ""}, but` : "No material goes right away, but";
+    played.verdict = `${start} ${sideName(opp)}'s position gets ${much}better: your winning chances drop from ${winBefore}% to ${winAfter}%.`;
   }
 
   return {

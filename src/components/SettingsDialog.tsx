@@ -7,6 +7,7 @@ import { MODEL_CHOICES, RATING_KEYS, saveSetting, useSettings } from "../setting
 import { POOL_LABEL, RATING_POOLS, START_RATING, type RatingPool } from "../rating";
 import { newId, pushChat, useStore } from "../store";
 import { Modal } from "./GameDialogs";
+import { VisualSettings } from "./VisualSettings";
 import { canVibrate } from "../haptics";
 import { customSounds, loadSounds, play, playableSounds, SOUND_NAMES, soundFailures, type SoundName } from "../sound";
 
@@ -47,7 +48,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal title="Settings" onClose={onClose}>
+    <Modal title="Settings" onClose={onClose} className="settings-modal">
       <label className="field">
         <span>Coach model</span>
         <select value={choice} onChange={(e) => setChoice(e.target.value)}>
@@ -112,6 +113,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           <option value="system">Match Windows</option>
         </select>
       </label>
+      <VisualSettings />
       <div className="field">
         <label className="toggle">
           <input type="checkbox" checked={sounds} onChange={(e) => saveSetting("sounds", e.target.checked)} />

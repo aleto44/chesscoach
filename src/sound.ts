@@ -11,6 +11,7 @@ import { useDrill } from "./analysis/drillSession";
 import { endgameOf, useEndgame } from "./endgames/session";
 import { openingSetOf, useOpening } from "./openings/session";
 import { useGuess } from "./guess/session";
+import { useAnalysis } from "./analysis/layer";
 import lowTimeUrl from "./assets/low-time.mp3";
 
 /**
@@ -192,8 +193,11 @@ export function soundForMove(san: string, self: boolean): SoundName {
   return self ? "move-self" : "move-opponent";
 }
 
-/** The board on screen: a puzzle or drill replaces the game while it runs. */
+/** The board on screen: the analysis layer sits over everything, and a puzzle or drill replaces the game while it runs. */
 function onScreen(): { line: Line; ply: number; key: unknown; student: Color | "both" } {
+  // The layer's base line stays the same object through what-if moves, so it marks one sitting.
+  const analysis = useAnalysis.getState();
+  if (analysis) return { line: analysis.x.line, ply: analysis.x.ply, key: analysis.x.base, student: "both" };
   const puzzle = usePuzzle.getState();
   if (puzzle?.line) return { line: puzzle.line, ply: viewedPly(puzzle.line.sans.length, puzzle.view), key: puzzle.queue[puzzle.index], student: puzzle.color };
   const drill = useDrill.getState();
@@ -252,4 +256,5 @@ export function initSounds() {
   useEndgame.subscribe(check);
   useOpening.subscribe(check);
   useGuess.subscribe(check);
+  useAnalysis.subscribe(check);
 }

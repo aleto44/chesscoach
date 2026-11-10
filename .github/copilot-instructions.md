@@ -72,6 +72,8 @@ drills, puzzles, the why-screen, the coach's scenario boards and any board added
 
 - Use `src/components/Board.tsx` for every board. `viewOnly` there only stops piece moves; drawing still
   works. Only a thumbnail inside a button (`preview`, e.g. chat cards) has no drawing.
+- Square colors, piece set and coordinate size (Settings → Visuals) apply page-wide from `src/visuals.ts`
+  (CSS variables plus a piece `<style>`); don't hard-code board colors or piece images in a board's CSS.
 - Never pass Chessground's own `viewOnly` or `drawable.enabled: false` to a full-size board.
 - The student's drawings belong to the position: they clear when the position changes, not on re-renders.
 - Any text about a position on screen, not only the coach's chat, makes its squares and moves hoverable

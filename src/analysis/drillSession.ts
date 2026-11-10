@@ -37,7 +37,14 @@ export interface LeadIn {
   label: string;
 }
 
+/** Which drills a session works through: the due ones or all, optionally one review tag's. */
+export interface DrillSource {
+  all: boolean;
+  tag: string | null;
+}
+
 export interface DrillState {
+  source: DrillSource;
   queue: Drill[];
   index: number;
   /** The moves so far: the lead-in move (if there is one), then the drill's own. */
@@ -90,15 +97,18 @@ export function initDrillSession() {
 
 /** Picks a saved session back up, redoing whatever was in flight when the page went away. */
 function resume(saved: DrillState) {
-  useDrill.setState(saved, true);
-  const drill = saved.queue[saved.index];
+  const source = saved.source ?? { all: false, tag: null };
+  useDrill.setState({ ...saved, source }, true);
   const line = saved.line;
   if (saved.status === "loading" || saved.status === "intro" || !line) {
+    // Loading with a line on the board: on the way to the next drill (this one is graded).
+    const at = saved.status === "loading" && line ? saved.index + 1 : saved.index;
     // Before the drill's position was shown (or while the queue loaded): open it again.
-    if (drill) begin(saved.index);
-    else if (saved.status === "loading") startDrills();
+    if (saved.queue.length) begin(at);
+    else if (saved.status === "loading") startDrills(source.all, source.tag);
     return;
   }
+  const drill = saved.queue[saved.index];
   if (saved.status === "solving") return autoplay();
   if (saved.status === "checking") {
     // The engine was grading the answer and the grade never got saved: take the move back to replay it.
@@ -131,7 +141,56 @@ function emptyAt(fen: string): Line {
   return { startFen: fen, sans: [], fens: [fen], lastMoves: [], notes: [] };
 }
 
-const blank = (queue: Drill[]): DrillState => ({
+/**
+ * Leaving the drills (back, the menu, another trainer) parks the session, one per source, until
+ * its queue is done; starting the same drills again picks it back up where it was.
+ */
+const PARK_KEY = "cc-drill-parked";
+type Parked = Record<string, DrillState & { parkedAt: number }>;
+const sourceKey = (s: DrillSource) => `${s.all ? "all" : "due"}${s.tag ? `:${s.tag}` : ""}`;
+function readParked(): Parked {
+  try {
+    return JSON.parse(localStorage.getItem(PARK_KEY) ?? "{}") ?? {};
+  } catch {
+    return {};
+  }
+}
+export const useParkedDrills = create<Parked>(readParked);
+useParkedDrills.subscribe((p) => {
+  try {
+    if (Object.keys(p).length) localStorage.setItem(PARK_KEY, JSON.stringify(p));
+    else localStorage.removeItem(PARK_KEY);
+  } catch {
+    // Private mode: parked only until a reload.
+  }
+});
+
+/** The parked session for these drills, if any (for the menu). */
+export const parkedFor = (p: Parked, all = false, tag: string | null = null) => p[sourceKey({ all, tag })] ?? null;
+
+function park(s: DrillState | null) {
+  if (!s?.source) return;
+  const next = { ...useParkedDrills.getState() };
+  const key = sourceKey(s.source);
+  if (s.queue.length && s.status !== "done") next[key] = { ...s, parkedAt: Date.now() };
+  else delete next[key];
+  useParkedDrills.setState(next, true);
+}
+
+function unpark(source: DrillSource): DrillState | null {
+  const all = { ...useParkedDrills.getState() };
+  const key = sourceKey(source);
+  const p = all[key];
+  if (!p) return null;
+  delete all[key];
+  useParkedDrills.setState(all, true);
+  const { parkedAt, ...s } = p;
+  // The time away doesn't count as time spent on the drill.
+  return { ...s, startedAt: s.startedAt + Math.max(0, Date.now() - parkedAt) };
+}
+
+const blank = (queue: Drill[], source: DrillSource): DrillState => ({
+  source,
   queue,
   index: 0,
   line: null,
@@ -153,14 +212,20 @@ export async function startDrills(all = false, tag: string | null = null) {
   stopEndgame();
   stopOpening();
   stopGuess();
-  useDrill.setState(blank([]), true);
+  park(useDrill.getState());
+  const source = { all, tag };
+  const parked = unpark(source);
+  if (parked) return resume(parked);
+  useDrill.setState(blank([], source), true);
   const queue = await dueDrills(30, all, tag);
   if (!useDrill.getState()) return;
-  useDrill.setState({ ...blank(queue), status: queue.length ? "loading" : "done" }, true);
+  useDrill.setState({ ...blank(queue, source), status: queue.length ? "loading" : "done" }, true);
   if (queue.length) begin(0);
 }
 
+/** Leaves the drills; an unfinished session is parked for later (see park). */
 export function stopDrills() {
+  park(useDrill.getState());
   useDrill.setState(null, true);
 }
 

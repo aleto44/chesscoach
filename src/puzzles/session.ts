@@ -39,6 +39,8 @@ export type PuzzleMode = "rated" | "custom" | "rush";
 
 export interface Rush {
   lives: number;
+  /** The student ended the run before the lives ran out. */
+  ended?: boolean;
   /** Puzzles solved this run. */
   score: number;
   /** The best run on this device, before this one. */
@@ -112,10 +114,13 @@ function resume(saved: PuzzleSession) {
   // Saved by an older version (a different shape): dropped.
   const mastery = saved.mastery?.every((g) => typeof g.after?.xp === "number") ? saved.mastery : null;
   usePuzzle.setState({ ...saved, rush: saved.rush ?? null, mastery, autoNextAt: null }, true);
-  const puzzle = saved.queue[saved.index];
+  // Loading with a line on the board: on the way to the next puzzle, this one already counted.
+  const at = saved.status === "loading" && saved.line ? saved.index + 1 : saved.index;
+  const puzzle = saved.queue[at];
   if (saved.status === "loading" || saved.status === "intro" || !saved.line) {
     // Mid-refill or before the opponent's first move: start this puzzle over (or reload the set).
-    if (puzzle) begin(saved.index);
+    if (puzzle) begin(at);
+    else if (saved.queue.length && !saved.set.fromCoach) continueAt(at);
     else if (saved.set.mode === "rush") startRush();
     else if (saved.set.mode === "rated") startRatedPuzzles();
     else if (!saved.set.fromCoach) startPuzzles(saved.choice);
@@ -132,9 +137,83 @@ function resume(saved: PuzzleSession) {
       message: saved.message ? `${line.sans[back]} isn't it. Try again, or view the solution.` : "",
     });
   }
+  // A rush miss whose solution was about to play out.
+  if (saved.rush && saved.missed) return void showSolution();
   // The opponent's reply was due: play it.
   const now = get()!.line!;
   if (sideToMove(now.fens[now.sans.length]) !== saved.color && now.sans.length < saved.solution.length) autoplay();
+}
+
+/** Fetches more puzzles, then shows the one at `index` (a resumed session whose next one wasn't loaded yet). */
+async function continueAt(index: number) {
+  set({ status: "loading" });
+  try {
+    await refill();
+  } catch (e) {
+    console.error("could not load puzzles", e);
+    set({ status: "error" });
+    return;
+  }
+  begin(index);
+}
+
+/**
+ * Leaving the puzzles (back, the menu, another trainer) doesn't lose the puzzle on the board: the
+ * session is parked per mode until its puzzle is solved, missed or given up (a rush: until the run
+ * is over), and starting that mode again picks it back up. Coach sets aren't parked.
+ */
+const PARK_KEY = "cc-puzzle-parked";
+type Parked = Partial<Record<PuzzleMode, PuzzleSession & { parkedAt: number }>>;
+function readParked(): Parked {
+  try {
+    return JSON.parse(localStorage.getItem(PARK_KEY) ?? "{}") ?? {};
+  } catch {
+    return {};
+  }
+}
+export const useParkedPuzzles = create<Parked>(readParked);
+useParkedPuzzles.subscribe((p) => {
+  try {
+    if (Object.keys(p).length) localStorage.setItem(PARK_KEY, JSON.stringify(p));
+    else localStorage.removeItem(PARK_KEY);
+  } catch {
+    // Private mode: parked only until a reload.
+  }
+});
+
+/** A puzzle still to answer, or a rush with lives left. */
+function unfinished(s: PuzzleSession): boolean {
+  if (s.rush) return s.rush.lives > 0 && s.queue.length > 0 && s.status !== "error" && s.status !== "empty";
+  return (s.status === "intro" || s.status === "solving") && !!s.queue[s.index];
+}
+
+function park(s: PuzzleSession | null) {
+  const mode = s?.set.mode;
+  if (!s || !mode || s.set.fromCoach) return;
+  const next = { ...useParkedPuzzles.getState() };
+  if (unfinished(s)) next[mode] = { ...s, autoNextAt: null, parkedAt: Date.now() };
+  else delete next[mode];
+  useParkedPuzzles.setState(next, true);
+}
+
+/** Takes a mode's parked session out of the parking (null if there's none). */
+function unpark(mode: PuzzleMode): PuzzleSession | null {
+  const all = { ...useParkedPuzzles.getState() };
+  const p = all[mode];
+  if (!p) return null;
+  delete all[mode];
+  useParkedPuzzles.setState(all, true);
+  const { parkedAt, ...s } = p;
+  // The time away doesn't count as time spent on the puzzle.
+  return { ...s, startedAt: s.startedAt + Math.max(0, Date.now() - parkedAt) };
+}
+
+/** Puts a parked session back on the board. */
+function reopen(saved: PuzzleSession) {
+  park(get());
+  stopDrills();
+  stopTrainers();
+  resume(saved);
 }
 
 const get = () => usePuzzle.getState();
@@ -168,12 +247,23 @@ const defaultChoice = (): Choice => ({ theme: null, opening: null, difficulty: s
 
 /** Opens the trainer with puzzles picked from the student's own filters. */
 export async function startPuzzles(choice: Partial<Choice> = {}) {
-  const prev = get()?.choice ?? defaultChoice();
+  const live = get();
+  const own = live && !live.set.fromCoach && live.set.mode === "custom" ? live : null;
+  const parked = own ? null : (useParkedPuzzles.getState().custom ?? null);
+  const prev = (own ?? parked ?? live)?.choice ?? defaultChoice();
   const next = { ...prev, ...choice };
   try {
     localStorage.setItem(DIFFICULTY_KEY, next.difficulty);
   } catch {
     // Private mode: not remembered.
+  }
+  // A puzzle still to answer stays on the board; new filters apply from the next one.
+  const keep = own ? (unfinished(own) ? own : null) : parked && unpark("custom");
+  if (keep) {
+    const same = keep.choice.theme === next.theme && keep.choice.opening === next.opening && keep.choice.difficulty === next.difficulty;
+    const patch = same ? {} : { choice: next, queue: keep.queue.slice(0, keep.index + 1) };
+    if (keep === own) return set(patch);
+    return reopen({ ...keep, ...patch });
   }
   await open(blank({ title: "Puzzles", fromCoach: false, mode: "custom" }, next));
 }
@@ -182,6 +272,8 @@ const NO_FILTER: Choice = { theme: null, opening: null, difficulty: "normal" };
 
 /** Puzzles at the student's own puzzle rating, a bit above or below; no filters. */
 export function startRatedPuzzles() {
+  const parked = unpark("rated");
+  if (parked) return reopen(parked);
   return open(blank({ title: "Rated puzzles", fromCoach: false, mode: "rated" }, NO_FILTER));
 }
 
@@ -197,6 +289,8 @@ export function rushBest(): number {
 
 /** Puzzle rush: starts dead easy and gets harder with every puzzle, until three misses. */
 export function startRush() {
+  const parked = unpark("rush");
+  if (parked) return reopen(parked);
   const session = blank({ title: "Puzzle rush", fromCoach: false, mode: "rush" }, NO_FILTER);
   return open({ ...session, rush: { lives: RUSH_LIVES, score: 0, best: rushBest() } });
 }
@@ -222,6 +316,7 @@ export function rushRating(n: number): number {
 }
 
 async function open(session: PuzzleSession) {
+  park(get());
   stopDrills();
   stopTrainers();
   usePuzzle.setState(session, true);
@@ -238,12 +333,15 @@ async function open(session: PuzzleSession) {
 
 /** A set the coach picked (find_puzzles). */
 export function startCoachSet(title: string, puzzles: Puzzle[]) {
+  park(get());
   stopDrills();
   usePuzzle.setState({ ...blank({ title, fromCoach: true }, get()?.choice ?? defaultChoice()), queue: puzzles }, true);
   begin(0);
 }
 
+/** Leaves the puzzles; an unfinished one is parked for later (see park). */
 export function stopPuzzles() {
+  park(get());
   stopReplay();
   usePuzzle.setState(null, true);
 }
@@ -491,13 +589,7 @@ async function finish(correct: boolean) {
     results: [...s.results, { id: puzzle.id, correct, themes: puzzle.themes, rating: puzzle.rating }],
     rush,
   });
-  if (rush && rush.lives <= 0 && rush.score > rush.best) {
-    try {
-      localStorage.setItem(RUSH_BEST_KEY, String(rush.score));
-    } catch {
-      // Private mode: not remembered.
-    }
-  }
+  if (rush) keepBest(rush);
   if (correct && (rush || useSettings.getState().puzzleAutoNext)) {
     const wait = rush ? RUSH_NEXT_MS : AUTO_NEXT_MS;
     const at = Date.now() + wait;
@@ -508,6 +600,26 @@ async function finish(correct: boolean) {
     }, wait);
   }
   if (correct) await save(true);
+}
+
+function keepBest(rush: Rush) {
+  if (rush.lives > 0 || rush.score <= rush.best) return;
+  try {
+    localStorage.setItem(RUSH_BEST_KEY, String(rush.score));
+  } catch {
+    // Private mode: not remembered.
+  }
+}
+
+/** Ends a rush run now (otherwise it's kept until the lives run out); the puzzle on the board doesn't count. */
+export function endRush() {
+  const s = get();
+  if (!s?.rush || s.rush.lives <= 0) return;
+  stopReplay();
+  clearCue();
+  const rush = { ...s.rush, lives: 0, ended: true };
+  set({ rush, status: s.status === "solved" ? "solved" : "failed", message: "", view: null, autoNextAt: null });
+  keepBest(rush);
 }
 
 /** Keeps a solved puzzle on screen (the student is looking at it or asking about it). */

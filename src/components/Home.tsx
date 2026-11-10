@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { startDrills } from "../analysis/drillSession";
+import { parkedFor, startDrills, useParkedDrills } from "../analysis/drillSession";
 import { useDrillCounts } from "../analysis/drills";
 import { hasBackend, invoke, openUrl } from "../backend";
 import { cachedRead, keepRead } from "../snapshot";
@@ -7,7 +7,7 @@ import { newGame } from "../game/session";
 import { timeControlLabel } from "../game/clock";
 import { go, useNav } from "../nav";
 import { refreshPuzzleDb, themeLabel, usePuzzleDb, type ThemeMastery } from "../puzzles/puzzles";
-import { rushBest as bestRush, startPuzzles, startRatedPuzzles, startRush } from "../puzzles/session";
+import { rushBest as bestRush, startPuzzles, startRatedPuzzles, startRush, useParkedPuzzles } from "../puzzles/session";
 import { commonness, findSet, pickLine, seenCounts, shortName, TRAINING_SETS, type Commonness, type TrainingLine } from "../openings/training";
 import { startOpening, useOpening } from "../openings/session";
 import { getRepertoire, repertoireSetId, useRepertoire } from "../openings/repertoire";
@@ -400,6 +400,10 @@ function DrillsMenu() {
   const blocked = useSessionsBlocked();
   const [repertoire, setRepertoire] = useState(false);
   const { data } = useDrillOverview(0);
+  const parked = useParkedDrills();
+  const due = parkedFor(parked);
+  const all = parkedFor(parked, true);
+  const inProgress = (d: { index: number; queue: unknown[] }) => `Continue: drill ${Math.min(d.index + 1, d.queue.length)} of ${d.queue.length}`;
   return (
     <>
       <h2 className="section-title">Drills</h2>
@@ -411,16 +415,16 @@ function DrillsMenu() {
         <Tile
           icon="▶"
           title="Due drills"
-          sub={counts.due ? `${counts.due} waiting for review` : "Nothing due right now"}
+          sub={due ? inProgress(due) : counts.due ? `${counts.due} waiting for review` : "Nothing due right now"}
           badge={counts.due ? <span className="count">{counts.due}</span> : null}
-          disabled={blocked ? BLOCKED : !counts.due}
+          disabled={blocked ? BLOCKED : !counts.due && !due}
           onClick={() => startDrills()}
         />
         <Tile
           icon="↻"
           title="Practice all"
-          sub={`Every drill, due or not (${counts.total})`}
-          disabled={blocked ? BLOCKED : !counts.total}
+          sub={all ? inProgress(all) : `Every drill, due or not (${counts.total})`}
+          disabled={blocked ? BLOCKED : !counts.total && !all}
           onClick={() => startDrills(true)}
         />
         <Tile icon="☰" title="Drill history" sub="What you got right and wrong lately" onClick={() => go("drill-history")} />
@@ -517,6 +521,8 @@ function PuzzlesMenu() {
   const weakest = data?.stats?.themes.slice(0, 4) ?? [];
   const needSet = pdb.installed || !pdb.loaded ? null : "Download the Lichess puzzle set first";
   const rushBest = bestRush();
+  const parked = useParkedPuzzles();
+  const rush = parked.rush?.rush;
   return (
     <>
       <h2 className="section-title">Puzzles</h2>
@@ -542,21 +548,25 @@ function PuzzlesMenu() {
         <Tile
           icon="▶"
           title="Play puzzles"
-          sub={needSet}
+          sub={parked.rated ? "Continue your puzzle" : needSet}
           disabled={blocked ? BLOCKED : false}
           onClick={() => startRatedPuzzles()}
         />
         <Tile
           icon="⚙"
           title="Choose puzzles"
-          sub={needSet}
+          sub={parked.custom ? "Continue your puzzle" : needSet}
           disabled={blocked ? BLOCKED : false}
           onClick={() => startPuzzles()}
         />
         <Tile
           icon="⚡"
           title="Puzzle rush"
-          sub={needSet ?? (rushBest ? `Best ${rushBest}` : undefined)}
+          sub={
+            rush
+              ? `Continue: ${rush.score} solved, ${rush.lives} ${rush.lives === 1 ? "life" : "lives"} left`
+              : (needSet ?? (rushBest ? `Best ${rushBest}` : undefined))
+          }
           disabled={blocked ? BLOCKED : false}
           onClick={() => startRush()}
         />

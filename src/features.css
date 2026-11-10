@@ -1939,3 +1939,132 @@ button.link {
   width: 100%;
   height: 100%;
 }
+
+/* CrashScreen (components/Crash.tsx): the error instead of a blank page. */
+.crash {
+  padding: 24px 16px;
+  max-width: 720px;
+  margin: 0 auto;
+  overflow: auto;
+}
+
+.crash pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.crash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Settings → Visuals (VisualSettings.tsx). The dialog grew past a laptop screen: it scrolls. */
+.modal.settings-modal {
+  overflow-y: auto;
+}
+
+.visuals-body {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.visuals-preview {
+  --board-w: 170px;
+  width: 170px;
+  flex: none;
+}
+
+.visuals-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.swatches,
+.piece-sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* A 2×2 corner of the board. */
+.swatch {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: repeating-conic-gradient(var(--d) 0 25%, var(--l) 0 50%) 0 0 / 100% 100%;
+  background-clip: padding-box;
+}
+
+.swatch.custom::after {
+  content: "+";
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 3px #000;
+}
+
+.swatch.on,
+.piece-set.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.custom-colors {
+  display: flex;
+  gap: 12px;
+}
+
+.custom-colors label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.custom-colors input[type="color"] {
+  width: 32px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+}
+
+/* White knight on a light square, black knight on a dark one. */
+.piece-set {
+  display: flex;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.piece-set img {
+  width: 34px;
+  height: 34px;
+  background: var(--l);
+}
+
+.piece-set img + img {
+  background: var(--d);
+}
+
+@media (max-width: 760px) {
+  .visuals-body {
+    flex-direction: column;
+  }
+
+  .visuals-preview {
+    --board-w: min(240px, 100%);
+    width: min(240px, 100%);
+  }
+}

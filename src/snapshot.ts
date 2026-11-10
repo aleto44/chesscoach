@@ -125,11 +125,18 @@ export function initSnapshot() {
 
 // ---- Read-only screens (drill and puzzle history) ----
 
+/**
+ * Bump when a cached answer's shape changes: a phone showed an old copy to new code and the
+ * screen crashed (the player rating before it was split into bullet, blitz and rapid).
+ */
+const READ_VERSION = 2;
+const readKey = (key: string) => `cc-read:v${READ_VERSION}:${key}`;
+
 /** The last answer to a read-only query, kept so the screen fills in at once next time. */
 export function cachedRead<T>(key: string): T | null {
   if (!isRemote) return null;
   try {
-    return JSON.parse(localStorage.getItem(`cc-read:${key}`) ?? "null");
+    return JSON.parse(localStorage.getItem(readKey(key)) ?? "null");
   } catch {
     return null;
   }
@@ -138,7 +145,7 @@ export function cachedRead<T>(key: string): T | null {
 export function keepRead(key: string, value: unknown) {
   if (!isRemote) return;
   try {
-    localStorage.setItem(`cc-read:${key}`, JSON.stringify(value));
+    localStorage.setItem(readKey(key), JSON.stringify(value));
   } catch {
     // Full storage: the screen just waits for the computer.
   }

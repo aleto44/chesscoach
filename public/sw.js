@@ -8,7 +8,7 @@ self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
 // Hashed build output and the engine files never change under the same URL.
-const immutable = (path) => /^\/(assets|stockfish|maia3|icons)\//.test(path);
+const immutable = (path) => /^\/(assets|stockfish|maia3|icons|pieces)\//.test(path);
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);

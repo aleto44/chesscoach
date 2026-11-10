@@ -21,9 +21,15 @@ import { Board } from "./Board";
 import { BoardSteps, StepButtons } from "./StepButtons";
 import { viewedPly } from "../chess/view";
 import { Modal } from "./GameDialogs";
+import { SquareText } from "./SquareText";
 import { WhyLines } from "./Why";
 
-const KIND_LABEL = { mistake: "From your games", opening: "Repertoire", coach: "From the coach", puzzle: "Missed puzzle" } as const;
+const KIND_LABEL = {
+  mistake: "From your games",
+  opening: "Repertoire",
+  coach: "From the coach",
+  puzzle: "Missed puzzle",
+} as const;
 
 /** Replaces the game board while a drill session runs. */
 export function DrillPanel() {
@@ -39,7 +45,12 @@ export function DrillPanel() {
   useEffect(() => setWhyOpen(false), [s.index]);
   const side = drill ? (drill.color === "white" ? "White" : "Black") : "";
   const opponent = drill ? (drill.color === "white" ? "Black" : "White") : "";
-  const lead = s.lead && s.status !== "intro" ? <span className="muted">{opponent} played {s.lead.label}. </span> : null;
+  const lead =
+    s.lead && s.status !== "intro" ? (
+      <span className="muted">
+        {opponent} played {s.lead.label}.{" "}
+      </span>
+    ) : null;
 
   return (
     <main className="board-panel drills">
@@ -58,7 +69,9 @@ export function DrillPanel() {
       </div>
 
       <div className="crumbs">
-        <span className="crumb current">{drill ? drillTitle(drill) : s.status === "loading" ? "Drills" : "No drills due"}</span>
+        <span className="crumb current">
+          {drill ? drillTitle(drill) : s.status === "loading" ? "Drills" : "No drills due"}
+        </span>
       </div>
 
       {drill && line ? (
@@ -76,35 +89,38 @@ export function DrillPanel() {
             <BoardSteps onStep={drillStep} disabled={line.sans.length === 0} />
           </div>
           <StepButtons onStep={drillStep} disabled={line.sans.length === 0} />
-          <div className={`drill-status ${s.status}`}>
-            {s.status === "intro" && s.lead && `${opponent} plays ${s.lead.label}…`}
-            {s.status === "loading" && "Setting up the next drill…"}
-            {s.status === "solving" && past && (
-              <>
-                <strong>Looking back.</strong> Step forward (▶ or ⏭) to play on.
-              </>
-            )}
-            {s.status === "solving" && !past && (
-              <>
-                {lead}
-                {drill.kind === "opening"
-                  ? `Play your ${drill.color} repertoire from memory.`
-                  : drill.kind === "puzzle"
-                    ? `${side} to move. Find the winning line${drill.note ? ` (${drill.note})` : ""}.`
-                    : `${side} to move. Find a good move${drill.note ? ` (last time: ${drill.note})` : ""}.`}
-              </>
-            )}
-            {s.status === "checking" && "Checking with the engine…"}
-            {(s.status === "right" || s.status === "wrong") && (
-              <>
-                <strong>{s.status === "right" ? "✓ Correct." : "✗ Not quite."}</strong> {s.message}
-                {s.nextDue && <span className="muted"> Next review {formatDue(s.nextDue)}.</span>}
-              </>
-            )}
+          <div className="drill-feedback">
+            <div className={`drill-status ${s.status}`}>
+              {s.status === "intro" && s.lead && `${opponent} plays ${s.lead.label}…`}
+              {s.status === "loading" && "Setting up the next drill…"}
+              {s.status === "solving" && past && (
+                <>
+                  <strong>Looking back.</strong> Step forward (▶ or ⏭) to play on.
+                </>
+              )}
+              {s.status === "solving" && !past && (
+                <>
+                  {lead}
+                  {drill.kind === "opening"
+                    ? `Play your ${drill.color} repertoire from memory.`
+                    : drill.kind === "puzzle"
+                      ? `${side} to move. Find the winning line${drill.note ? ` (${drill.note})` : ""}.`
+                      : `${side} to move. Find a good move${drill.note ? ` (last time: ${drill.note})` : ""}.`}
+                </>
+              )}
+              {s.status === "checking" && "Checking with the engine…"}
+              {(s.status === "right" || s.status === "wrong") && (
+                <>
+                  <strong>{s.status === "right" ? "✓ Correct." : "✗ Not quite."}</strong> <SquareText text={s.message} />
+                  {s.nextDue && <span className="muted"> Next review {formatDue(s.nextDue)}.</span>}
+                </>
+              )}
+            </div>
+            {s.status === "wrong" &&
+              (drill.kind === "mistake" || drill.kind === "coach" || drill.kind === "puzzle") && (
+                <WhySummary s={s} onOpen={() => setWhyOpen(true)} />
+              )}
           </div>
-          {s.status === "wrong" && (drill.kind === "mistake" || drill.kind === "coach" || drill.kind === "puzzle") && (
-            <WhySummary s={s} onOpen={() => setWhyOpen(true)} />
-          )}
           {whyOpen && s.why && (
             <Modal title={`Why ${playedLabel(s)} isn't good`} onClose={() => setWhyOpen(false)} className="why-dialog">
               <div className="why-stats">
@@ -170,30 +186,41 @@ const playedLabel = (s: DrillState) => s.why?.played.steps[0]?.label ?? playedSa
  */
 function WhySummary({ s, onOpen }: { s: DrillState; onOpen: () => void }) {
   const ex: Explanation | null = s.why;
-  if (!ex) return <div className="drill-why muted">{s.whyFailed ? "The engine couldn't work out why." : "Working out why…"}</div>;
+  if (!ex)
+    return (
+      <div className="drill-why muted">{s.whyFailed ? "The engine couldn't work out why." : "Working out why…"}</div>
+    );
   const reply = ex.played.steps[1];
   const better = ex.better;
   return (
     <div className="drill-why">
       <p className="bad">
-        <strong>Why {ex.played.steps[0]?.san ?? playedSan(s)} is bad:</strong> {reply ? `${reply.note} ` : ""}
-        {ex.played.verdict}
+        <strong>
+          Why <SquareText text={ex.played.steps[0]?.san ?? playedSan(s)} /> is bad:
+        </strong>{" "}
+        <SquareText text={`${reply ? `${reply.note} ` : ""}${ex.played.verdict}`} />
       </p>
       {ex.alternatives?.length > 1 ? (
         <p className="good">
-          <strong>Better:</strong> {ex.betterSummary.replace(/ Pick one to see the reply\.$/, "")}
+          <strong>Better:</strong>{" "}
+          <SquareText text={ex.betterSummary.replace(/ Pick one to see the reply\.$/, "")} />
         </p>
-      ) : better && (
-        <p className="good">
-          <strong>Why {better.steps[0]?.san} is better:</strong> {better.steps[0]?.note}
-          {better.steps.length > 1 && (
-            <span className="muted">
-              {" "}
-              ({better.steps.map((st) => st.label).join(" ")})
-            </span>
-          )}{" "}
-          {better.verdict}
-        </p>
+      ) : (
+        better && (
+          <p className="good">
+            <strong>
+              Why <SquareText text={better.steps[0]?.san ?? ""} /> is better:
+            </strong>{" "}
+            <SquareText text={better.steps[0]?.note ?? ""} />
+            {better.steps.length > 1 && (
+              <span className="muted">
+                {" "}
+                (<SquareText text={better.steps.map((st) => st.label).join(" ")} />)
+              </span>
+            )}{" "}
+            <SquareText text={better.verdict} />
+          </p>
+        )
       )}
       <button className="why-button" onClick={onOpen}>
         Step through both lines on a board ›

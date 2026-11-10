@@ -8,6 +8,7 @@ import "./features.css";
 import App from "./App";
 import { checkPairing, usePairing } from "./backend";
 import { Pair } from "./components/Pair";
+import { CrashScreen } from "./components/Crash";
 import { registerServiceWorker } from "./pwa";
 import { initAuth } from "./coach/auth";
 import { initBridge } from "./coach/bridge";
@@ -22,6 +23,7 @@ import { initNudges } from "./coach/nudge";
 import { initPuzzles } from "./puzzles/puzzles";
 import { initGameOverWatch } from "./game/session";
 import { initTheme } from "./settings";
+import { initVisuals } from "./visuals";
 import { initSounds } from "./sound";
 import { initNav } from "./nav";
 import { initPuzzleSession } from "./puzzles/session";
@@ -66,13 +68,16 @@ function start() {
 
   root.render(
     <React.StrictMode>
-      <App />
+      <CrashScreen>
+        <App />
+      </CrashScreen>
     </React.StrictMode>,
   );
   requestAnimationFrame(() => mark("first screen"));
 }
 
 initTheme();
+initVisuals();
 registerServiceWorker();
 // On a phone, nothing works until it's paired with the computer. A phone that was paired before
 // starts the app straight away (waiting for the computer to answer first kept a phone that had

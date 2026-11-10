@@ -21,6 +21,7 @@ import { play } from "../sound";
 import { saveSetting, useSettings } from "../settings";
 import {
   AUTO_NEXT_MS,
+  endRush,
   holdPuzzle,
   nextPuzzle,
   puzzleMove,
@@ -161,7 +162,7 @@ export function PuzzlePanel() {
             )}
             {rushOver && (
               <div className="rush-over">
-                <strong>Rush over.</strong> You solved {s.rush!.score} {s.rush!.score === 1 ? "puzzle" : "puzzles"}
+                <strong>{s.rush!.ended ? "Run ended." : "Rush over."}</strong> You solved {s.rush!.score} {s.rush!.score === 1 ? "puzzle" : "puzzles"}
                 {s.rush!.score > s.rush!.best ? (s.rush!.best > 0 ? `, a new best (was ${s.rush!.best}).` : ".") : `. Your best is ${s.rush!.best}.`}
               </div>
             )}
@@ -173,7 +174,7 @@ export function PuzzlePanel() {
                 )}
               </>
             )}
-            {s.status === "failed" && (
+            {s.status === "failed" && !s.rush?.ended && (
               <>
                 <strong>✗ Missed.</strong> {s.message} <span className="muted">Saved as a drill.</span>
               </>
@@ -225,6 +226,11 @@ export function PuzzlePanel() {
           {(s.status === "solving" || s.status === "intro" || s.status === "loading") && (
             <button onClick={showSolution} disabled={s.status === "loading"}>
               View solution
+            </button>
+          )}
+          {s.rush && !rushOver && s.status !== "error" && s.status !== "empty" && (
+            <button onClick={endRush} title="Finish this run now; otherwise it waits for you until the lives run out">
+              End run
             </button>
           )}
           {over && (
