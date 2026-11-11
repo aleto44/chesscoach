@@ -493,6 +493,8 @@ pub struct NewDrill {
     note: Option<String>,
     source_game_id: Option<i64>,
     source_ply: Option<i64>,
+    #[serde(default)]
+    lesson: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -511,6 +513,8 @@ pub struct Drill {
     due_at: String,
     reps: i64,
     lapses: i64,
+    /// What the drill teaches (JSON, see src/analysis/lesson.ts); None until worked out.
+    lesson: Option<String>,
 }
 
 /// Adds drills, skipping ones that already exist. Returns how many were new.
@@ -523,9 +527,9 @@ pub fn db_add_drills(db: State<Db>, drills: Vec<NewDrill>) -> Result<usize, Stri
         let line = if d.line.is_empty() { String::new() } else { serde_json::to_string(&d.line).map_err(err)? };
         added += tx
             .execute(
-                "INSERT OR IGNORE INTO drills (kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                params![d.kind, d.title, d.fen, d.color, d.answer_uci, line, d.note, d.source_game_id, d.source_ply],
+                "INSERT OR IGNORE INTO drills (kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply, lesson)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![d.kind, d.title, d.fen, d.color, d.answer_uci, line, d.note, d.source_game_id, d.source_ply, d.lesson],
             )
             .map_err(err)?;
     }
@@ -540,7 +544,7 @@ pub fn db_due_drills(db: State<Db>, limit: i64, all: Option<bool>, tag: Option<S
     let conn = db.conn();
     let mut stmt = conn
         .prepare(
-            "SELECT id, kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply, due_at, reps, lapses
+            "SELECT id, kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply, due_at, reps, lapses, lesson
              FROM drills WHERE retired = 0
                AND (CASE WHEN ?3 IS NULL THEN ?2 OR due_at <= datetime('now')
                          ELSE kind = 'mistake' AND (', ' || coalesce(note, '') || ',') LIKE '%, ' || ?3 || ',%' END)
@@ -564,6 +568,54 @@ pub fn db_due_drills(db: State<Db>, limit: i64, all: Option<bool>, tag: Option<S
                 due_at: r.get(10)?,
                 reps: r.get(11)?,
                 lapses: r.get(12)?,
+                lesson: r.get(13)?,
+            })
+        })
+        .map_err(err)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(err)?;
+    Ok(drills)
+}
+
+/// Stores what a drill teaches (worked out after the drill was made, for drills from before lessons).
+#[tauri::command]
+pub fn db_set_drill_lesson(db: State<Db>, id: i64, lesson: String) -> Result<(), String> {
+    db.conn()
+        .execute("UPDATE drills SET lesson = ?2 WHERE id = ?1", params![id, lesson])
+        .map_err(err)?;
+    Ok(())
+}
+
+/// Mistake drills whose lesson isn't worked out yet, or was worked out by an older `version` of the
+/// reasoning (src/analysis/lesson.ts LESSON_VERSION), for the computer to (re)do.
+#[tauri::command]
+pub fn db_drills_without_lesson(db: State<Db>, limit: i64, version: Option<i64>) -> Result<Vec<Drill>, String> {
+    let conn = db.conn();
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply, due_at, reps, lapses, lesson
+             FROM drills WHERE retired = 0 AND kind = 'mistake'
+               AND (lesson IS NULL OR coalesce(json_extract(lesson, '$.v'), 0) < ?2) ORDER BY due_at, id LIMIT ?1",
+        )
+        .map_err(err)?;
+    let drills = stmt
+        .query_map(params![limit, version.unwrap_or(1)], |r| {
+            let line: String = r.get(6)?;
+            Ok(Drill {
+                id: r.get(0)?,
+                kind: r.get(1)?,
+                title: r.get(2)?,
+                fen: r.get(3)?,
+                color: r.get(4)?,
+                answer_uci: r.get(5)?,
+                line: serde_json::from_str(&line).unwrap_or_default(),
+                note: r.get(7)?,
+                source_game_id: r.get(8)?,
+                source_ply: r.get(9)?,
+                due_at: r.get(10)?,
+                reps: r.get(11)?,
+                lapses: r.get(12)?,
+                lesson: r.get(13)?,
             })
         })
         .map_err(err)?

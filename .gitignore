@@ -29,3 +29,4 @@ public/maia3
 
 # Claude Code local settings
 .claude/settings.local.json
+crash.log

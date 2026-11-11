@@ -24,5 +24,15 @@ if (-not (Test-Path $installed) -or (Get-Item "package-lock.json").LastWriteTime
 }
 
 Write-Host "Starting Chess Coach. The first start after Rust changes compiles for a minute or two." -ForegroundColor Cyan
-npm run tauri dev
-if ($LASTEXITCODE -ne 0) { Read-Host "Chess Coach stopped with an error (see above). Press Enter to close" }
+# A crash after the app has been up a while (e.g. a native WebView2 crash on a page reload) restarts
+# it; the data is in SQLite, so nothing is lost. A failure right after starting is usually a build
+# error, which restarting won't fix, so that one stops and waits.
+while ($true) {
+    $started = Get-Date
+    npm run tauri dev
+    if ($LASTEXITCODE -eq 0) { break }
+    $ranFor = ((Get-Date) - $started).TotalSeconds
+    if ($ranFor -lt 60) { Read-Host "Chess Coach stopped with an error (see above). Press Enter to close"; break }
+    Write-Host "Chess Coach crashed (exit $LASTEXITCODE) after $([int]$ranFor)s. Restarting..." -ForegroundColor Yellow
+    Add-Content -Path (Join-Path $repo "crash.log") -Value "$(Get-Date -Format s) exit $LASTEXITCODE after $([int]$ranFor)s"
+}

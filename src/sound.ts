@@ -28,6 +28,7 @@ export const SOUND_NAMES = [
   "checkmate",
   "promotion",
   "premove",
+  "illegal",
   "game-start",
   "game-end",
   "puzzle-correct",
@@ -162,6 +163,8 @@ const SYNTH: Partial<Record<SoundName, (ctx: AudioContext, pitch: number) => voi
     notes(c, [[523.25, 0, 0.18], [659.25, 0.1, 0.18], [783.99, 0.2, 0.18], [1046.5, 0.3, 0.2]], "sine", 0.1);
     notes(c, [[1046.5, 0.45, 1.1], [1318.5, 0.45, 1.1], [1568, 0.45, 1.1]], "sine", 0.05);
   },
+  // A typed move that isn't one: a short low buzz.
+  illegal: (c) => notes(c, [[146.83, 0, 0.09], [138.59, 0.08, 0.14]], "triangle", 0.12),
   // Two low falling notes, muted rather than harsh.
   "puzzle-wrong": (c) => notes(c, [[311.13, 0, 0.14], [233.08, 0.11, 0.24]], "sine", 0.1),
 };

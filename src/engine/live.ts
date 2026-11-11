@@ -1,10 +1,19 @@
 // Live analysis for the eval bar: its own Stockfish, always analyzing the position on screen.
 import { create } from "zustand";
 import { useSettings } from "../settings";
-import { isLocked, screenFen, useStore } from "../store";
+import { evalShown, isLocked, screenFen, useStore } from "../store";
 import type { EngineLine } from "./stockfish";
 
 const MAX_DEPTH = 20;
+
+/** How many of the engine's best moves a board shows when its evaluation is on. */
+export const TOP_LINES = 3;
+
+/**
+ * How often found lines reach the screen. Stockfish sends dozens of info lines a second (times MultiPV),
+ * and publishing each re-renders every board and engine-line list watching the eval: choppy on phones.
+ */
+const PUBLISH_MS = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? 350 : 150;
 
 interface EvalState {
   fen: string | null;
@@ -23,6 +32,9 @@ class LiveAnalysis {
   private pending: string | null = null;
   private multipv = 1;
   private pendingMultipv = 1;
+  /** Lines found for `current` since the last publish, best first. */
+  private found: EngineLine[] = [];
+  private timer: ReturnType<typeof setTimeout> | null = null;
 
   private ensure(): Worker {
     if (this.worker) return this.worker;
@@ -51,6 +63,8 @@ class LiveAnalysis {
     this.current = this.pending;
     this.multipv = this.pendingMultipv;
     this.pending = null;
+    this.found = [];
+    this.cancelPublish();
     this.searching = true;
     w.postMessage(`setoption name MultiPV value ${this.multipv}`);
     w.postMessage(`position fen ${this.current}`);
@@ -59,6 +73,8 @@ class LiveAnalysis {
 
   private onLine(line: string) {
     if (line.startsWith("bestmove")) {
+      // The final lines go out now, before a queued position takes over.
+      if (!this.pending) this.publish();
       this.searching = false;
       this.start();
       return;
@@ -77,9 +93,24 @@ class LiveAnalysis {
       mate: m[3] === "mate" ? value : undefined,
       pv: m[5].trim().split(" "),
     };
+    this.found[k] = found;
+    // The first line for a position shows at once; later ones are batched.
+    if (useEval.getState().fen !== this.current || !useEval.getState().line) this.publish();
+    else this.timer ??= setTimeout(() => this.publish(), PUBLISH_MS);
+  }
+
+  private cancelPublish() {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  private publish() {
+    this.cancelPublish();
+    if (!this.current || this.pending) return;
     const prev = useEval.getState();
     const lines = prev.fen === this.current ? prev.lines.slice() : [];
-    lines[k] = found;
+    this.found.forEach((l, k) => l && (lines[k] = l));
+    this.found = [];
     useEval.setState({ fen: this.current, line: lines[0] ?? null, lines: lines.filter(Boolean) });
   }
 }
@@ -102,17 +133,19 @@ export function setEvalFocus(fen: string | null, lines = 1) {
 export function initLiveEval() {
   let last: string | null = null;
   update = () => {
-    if (isLocked() || (!focus && !useSettings.getState().showEval)) {
+    if (isLocked() || (!focus && !evalShown(useSettings.getState().showEval))) {
       live.stop();
       last = null;
       return;
     }
     const fen = focus ?? screenFen();
-    const key = `${focusLines} ${fen}`;
+    // The main board's eval comes with its top lines, like the analysis board's.
+    const lines = focus ? focusLines : TOP_LINES;
+    const key = `${lines} ${fen}`;
     if (key === last) return;
     last = key;
     useEval.setState({ fen, line: null, lines: [] });
-    live.analyze(fen, focusLines);
+    live.analyze(fen, lines);
   };
   useStore.subscribe(update);
   useSettings.subscribe(update);

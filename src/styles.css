@@ -1764,6 +1764,77 @@ button.icon {
   width: var(--board-w);
 }
 
+/* The drill screen's own body. On phones and narrow panels it's just its children (the column
+   above); in a wide panel the feedback and buttons go beside the board instead of under it, so the
+   board gets the panel's height instead of what's left after room for a wrong answer's why. */
+.drill-body {
+  display: contents;
+}
+
+@media (min-width: 761px) {
+  .board-panel.drills:has(> .drill-body) {
+    container-type: inline-size;
+  }
+
+  @container (min-width: 820px) {
+    .drill-body {
+      --board-w: min(calc(100cqw - 340px), calc(100vh - 190px));
+      --side-w: clamp(260px, calc(100cqw - var(--board-w) - 24px), 380px);
+      display: grid;
+      grid-template-columns: var(--board-w) var(--side-w);
+      grid-template-areas:
+        "bar bar"
+        "crumbs crumbs"
+        "board feedback"
+        "steps controls";
+      column-gap: 20px;
+      align-items: start;
+      justify-content: center;
+    }
+
+    .drill-body > .game-bar {
+      grid-area: bar;
+      width: auto;
+    }
+
+    .drill-body > .crumbs {
+      grid-area: crumbs;
+      width: auto;
+    }
+
+    .drill-body > .board-frame {
+      grid-area: board;
+    }
+
+    .drill-body > .side-controls {
+      grid-area: steps;
+    }
+
+    .drill-body > .drill-feedback {
+      grid-area: feedback;
+      width: auto;
+      max-height: var(--board-w);
+    }
+
+    .drill-body .drill-why,
+    .drill-body .drill-quiz,
+    .drill-body .drill-status,
+    .drill-body .drill-done {
+      width: auto;
+    }
+
+    .drill-body > .controls {
+      grid-area: controls;
+      width: auto;
+      flex-wrap: wrap;
+    }
+
+    .drill-body > .drill-done {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
 .board-panel.drills .side-controls {
   width: var(--board-w);
 }
@@ -1783,6 +1854,14 @@ button.icon {
 }
 
 /* Under a wrong drill answer: why it's bad, why the better move is better. */
+.drill-hint {
+  margin-top: 6px;
+}
+
+.drill-hint strong {
+  color: var(--accent);
+}
+
 .drill-why {
   width: var(--board-w);
   line-height: 1.45;
@@ -1802,6 +1881,26 @@ button.icon {
 
 .drill-why .why-button {
   margin: 0 0 4px;
+}
+
+/* What the drill teaches (its lesson's themes), above the reasons. */
+.drill-why .lesson-themes {
+  font-weight: 600;
+}
+
+/* After a wrong drill answer: find the pieces the better move attacks. */
+.drill-quiz {
+  width: var(--board-w);
+  line-height: 1.45;
+  margin: 6px 0;
+}
+
+.drill-quiz p {
+  margin: 0 0 6px;
+}
+
+.drill-quiz strong {
+  color: var(--accent);
 }
 
 .drill-done {
@@ -2927,6 +3026,20 @@ button.danger {
   border-bottom-style: solid;
 }
 
+/* A hovered move from another position: the board shows that position, outlined so it isn't taken for the real one. */
+.board-holder.peeking::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 3px var(--tangent);
+}
+
+.board-holder.peeking cg-board {
+  filter: saturate(0.75);
+}
+
 cg-board square.chat-hover {
   background: color-mix(in srgb, var(--tangent) 60%, transparent);
   box-shadow: inset 0 0 0 4px var(--tangent);
@@ -3115,16 +3228,19 @@ cg-board square.chat-hover {
   }
 
   /* Only the board shrinks on a short screen: the bars and text around it keep the full width. */
-  .board-panel.drills > :not(.board-frame) {
+  .board-panel.drills > :not(.board-frame, .drill-body),
+  .drill-body > :not(.board-frame) {
     width: calc(100vw - 16px);
   }
 
   /* Centred, but never cut off at the top when it's taller than the screen. */
-  .board-panel.drills > :first-child {
+  .board-panel.drills > :first-child:not(.drill-body),
+  .drill-body > :first-child {
     margin-top: auto;
   }
 
-  .board-panel.drills > :last-child {
+  .board-panel.drills > :last-child:not(.drill-body),
+  .drill-body > :last-child {
     margin-bottom: auto;
   }
 

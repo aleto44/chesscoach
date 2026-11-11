@@ -174,6 +174,14 @@ export function isLocked(meta: GameMeta = get().meta): boolean {
   return meta.mode === "rated" && !meta.result;
 }
 
+/**
+ * Whether the main board shows the eval bar and engine lines: always when reviewing a finished game,
+ * otherwise the student's setting (`showEval`), and never during a rated game.
+ */
+export function evalShown(showEval: boolean, meta: GameMeta = get().meta): boolean {
+  return !isLocked(meta) && (showEval || !!meta.result);
+}
+
 /** Whether the student may move on the main board right now. */
 export function canStudentMove(): boolean {
   const s = get();

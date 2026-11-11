@@ -15,7 +15,7 @@ import {
   useAnalysis,
   useCanAnalyze,
 } from "../analysis/layer";
-import { setEvalFocus, useEval } from "../engine/live";
+import { setEvalFocus, TOP_LINES, useEval } from "../engine/live";
 import { formatScore, type EngineLine } from "../engine/stockfish";
 import { Board } from "./Board";
 import { MoveList } from "./BoardPanel";
@@ -23,8 +23,12 @@ import { EvalBar } from "./EvalBar";
 import { MaterialStrip } from "./Material";
 import { BoardSteps } from "./StepButtons";
 
-/** How many of the engine's best moves the analysis board shows. */
-const TOP_LINES = 3;
+/** The live engine's lines for `fen`: empty while it's still on another position. */
+export function useEngineLines(fen: string): EngineLine[] {
+  const evalFen = useEval((s) => s.fen);
+  const lines = useEval((s) => s.lines);
+  return evalFen === fen ? lines : [];
+}
 
 /** The top bar's button: opens the analysis board on the position on screen, or closes it. */
 export function AnalysisButton() {
@@ -63,17 +67,25 @@ export function AnalysisPanel() {
   useEffect(() => setEvalFocus(fen, TOP_LINES), [fen]);
   useEffect(() => () => setEvalFocus(null), []);
 
-  const evalFen = useEval((s) => s.fen);
-  const lines = useEval((s) => s.lines);
-  const current = evalFen === fen ? lines : [];
-  // The engine's first moves as arrows, the best one strongest.
+  const current = useEngineLines(fen);
+  // The engine's first moves as arrows, the best one strongest. Keyed by the moves, so deeper search
+  // that keeps the same first moves doesn't redraw the board.
+  const firsts = current.map((l) => l.pv[0] ?? "").join(" ");
   const shapes = useMemo<DrawShape[]>(
     () =>
-      current
-        .filter((l) => l.pv[0])
-        .map((l, k) => ({ orig: l.pv[0].slice(0, 2) as Key, dest: l.pv[0].slice(2, 4) as Key, brush: k === 0 ? "paleBlue" : "paleGrey" }))
+      firsts
+        .split(" ")
+        .map((uci, k) => ({ uci, k }))
+        .filter(({ uci }) => uci)
+        .map(({ uci, k }) => ({ orig: uci.slice(0, 2) as Key, dest: uci.slice(2, 4) as Key, brush: k === 0 ? "paleBlue" : "paleGrey" }))
         .reverse(),
-    [current],
+    [firsts],
+  );
+
+  // Engine updates re-render this panel several times a second; the move list only changes with the moves.
+  const moveList = useMemo(
+    () => <MoveList sans={x.line.sans} fens={x.line.fens} ply={x.ply} forkAt={x.forkAt} onGoto={analysisGoto} />,
+    [x.line.sans, x.line.fens, x.ply, x.forkAt],
   );
 
   return (
@@ -111,9 +123,9 @@ export function AnalysisPanel() {
           <span className="spacer" />
           <span className="muted small">{current[0] ? `depth ${current[0].depth}` : "Stockfish"}</span>
         </div>
-        <EngineLines fen={fen} lines={current} orientation={orientation} />
+        <EngineLines fen={fen} lines={current} orientation={orientation} onPlay={analysisPlay} />
         <div className="side-body">
-          <MoveList sans={x.line.sans} fens={x.line.fens} ply={x.ply} forkAt={x.forkAt} onGoto={analysisGoto} />
+          {moveList}
           {forked && (
             <div className="note fork-note">
               <span>
@@ -137,8 +149,21 @@ export function AnalysisPanel() {
   );
 }
 
-/** The engine's best lines: score, then the moves, each one showing its position when hovered. */
-function EngineLines({ fen, lines, orientation }: { fen: string; lines: EngineLine[]; orientation: "white" | "black" }) {
+/**
+ * The engine's best lines: score, then the moves, each one showing its position when hovered.
+ * `onPlay` gets the line's moves up to the one clicked (the score: just the first).
+ */
+export function EngineLines({
+  fen,
+  lines,
+  orientation,
+  onPlay,
+}: {
+  fen: string;
+  lines: EngineLine[];
+  orientation: "white" | "black";
+  onPlay: (uci: string[]) => void;
+}) {
   const over = useMemo(() => {
     const c = new Chess(fen);
     return c.isCheckmate() ? "Checkmate" : c.isStalemate() ? "Stalemate" : c.isDraw() ? "Draw" : null;
@@ -148,7 +173,7 @@ function EngineLines({ fen, lines, orientation }: { fen: string; lines: EngineLi
     <div className="engine-lines">
       {Array.from({ length: TOP_LINES }, (_, k) =>
         lines[k] ? (
-          <PvRow key={k} fen={fen} line={lines[k]} orientation={orientation} />
+          <PvRow key={k} fen={fen} line={lines[k]} orientation={orientation} onPlay={onPlay} />
         ) : (
           <div key={k} className="pv-row pending">
             <span className="pv-score">…</span>
@@ -159,15 +184,27 @@ function EngineLines({ fen, lines, orientation }: { fen: string; lines: EngineLi
   );
 }
 
-function PvRow({ fen, line, orientation }: { fen: string; line: EngineLine; orientation: "white" | "black" }) {
+function PvRow({
+  fen,
+  line,
+  orientation,
+  onPlay,
+}: {
+  fen: string;
+  line: EngineLine;
+  orientation: "white" | "black";
+  onPlay: (uci: string[]) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState<{ i: number; rect: DOMRect } | null>(null);
-  const steps = useMemo(() => pvSteps(fen, line.pv), [fen, line.pv]);
+  // Keyed by the moves: a new depth with the same line skips replaying it.
+  const pv = line.pv.slice(0, 20).join(" ");
+  const steps = useMemo(() => pvSteps(fen, pv.split(" ")), [fen, pv]);
   const shown = hover && steps[hover.i];
   const good = line.mate !== undefined ? line.mate > 0 : (line.cp ?? 0) >= 0;
   return (
     <div className={`pv-row ${open ? "open" : ""}`}>
-      <button className={`pv-score ${good ? "for-white" : "for-black"}`} onClick={() => analysisPlay(line.pv.slice(0, 1))} title="Play the first move">
+      <button className={`pv-score ${good ? "for-white" : "for-black"}`} onClick={() => onPlay(line.pv.slice(0, 1))} title="Play the first move">
         {formatScore(line)}
       </button>
       <span className="pv-moves" onMouseLeave={() => setHover(null)}>
@@ -178,7 +215,7 @@ function PvRow({ fen, line, orientation }: { fen: string; line: EngineLine; orie
             onMouseEnter={(e) => setHover({ i, rect: e.currentTarget.getBoundingClientRect() })}
             onClick={() => {
               setHover(null);
-              analysisPlay(line.pv.slice(0, i + 1));
+              onPlay(line.pv.slice(0, i + 1));
             }}
           >
             {s.label}

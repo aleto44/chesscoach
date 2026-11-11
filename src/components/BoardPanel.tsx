@@ -11,6 +11,7 @@ import {
   flip,
   canStudentMove,
   isLocked,
+  evalShown,
   opponentLabel,
   scenarioOf,
   boardOrientation,
@@ -20,7 +21,9 @@ import { Board } from "./Board";
 import { sessionName, useNav } from "../nav";
 import { BoardSteps } from "./StepButtons";
 import { askConfirm } from "./Confirm";
-import { EvalBar, EvalLine } from "./EvalBar";
+import { EvalBar } from "./EvalBar";
+import { EngineLines, useEngineLines } from "./Analysis";
+import { analysisPlay, openAnalysis } from "../analysis/layer";
 import { MaterialStrip } from "./Material";
 import { ModeBadge } from "./ModeBadge";
 import { PlayerCard } from "./Clock";
@@ -45,7 +48,9 @@ export function BoardPanel() {
   const nudge = useNudge();
   const nudgeShapes = useMemo(() => (nudge ? bestShape(nudge) : []), [nudge]);
   const locked = isLocked(meta);
-  const showEval = useSettings((s) => s.showEval) && !locked;
+  // Reviewing a finished game always shows the eval and the engine's lines; no toggle there.
+  const showEval = evalShown(useSettings((s) => s.showEval), meta);
+  const reviewing = !!meta.result;
   const canTakeBack = takebackPly(game, meta) !== null;
   const tangent = active ? tangents[active] : null;
   // A coach scenario keeps the side it was made for (e.g. Black for a position the student had as Black).
@@ -54,6 +59,7 @@ export function BoardPanel() {
   const fork = tangent ? null : gameFork;
   const line = tangent ? tangent.line : fork ? fork.line : game;
   const ply = tangent ? tangent.ply : fork ? fork.ply : gamePly;
+  const engineLines = useEngineLines(line.fens[ply]);
   const path = tangentPath(active);
   // A scenario opened over a puzzle, drill or trainer goes back to that, not to the game.
   const peek = useNav((n) => n.peek) && !!tangent;
@@ -111,7 +117,7 @@ export function BoardPanel() {
       </nav>
 
       <div className={`board-frame ${tangent ? "tangent" : ""} ${showEval ? "with-eval" : ""}`}>
-        {!locked && (
+        {!locked && !reviewing && (
           <button
             className={`eval-toggle ${showEval ? "on" : ""}`}
             onClick={() => saveSetting("showEval", !showEval)}
@@ -155,6 +161,19 @@ export function BoardPanel() {
 
         <PlayerCard side={top} place="top" />
 
+        {/* Clicking a move takes its line onto the analysis board, which has room for what-ifs. */}
+        {showEval && (
+          <EngineLines
+            fen={line.fens[ply]}
+            lines={engineLines}
+            orientation={orientation}
+            onPlay={(uci) => {
+              openAnalysis();
+              analysisPlay(uci);
+            }}
+          />
+        )}
+
         <div className="side-body">
           {reportOpen && report && !tangent ? (
             <GameReportPanel report={report} />
@@ -176,14 +195,13 @@ export function BoardPanel() {
                   <button onClick={() => goto(gamePly)}>Back to the game</button>
                 </div>
               )}
-              {showEval && <EvalLine />}
               {verdict && <VerdictLine v={verdict} />}
               {fork ? null : moment ? (
                 <div className="note moment">
-                  <SquareText text={moment.text} />
+                  <SquareText text={moment.text} at={game.fens[gamePly]} game={game} />
                   {moment.reason && (
                     <p className="moment-reason">
-                      <SquareText text={moment.reason} />
+                      <SquareText text={moment.reason} at={game.fens[gamePly]} game={game} />
                     </p>
                   )}
                   <WhyButton i={gamePly} />
@@ -192,7 +210,7 @@ export function BoardPanel() {
                 <div className="note moment">
                   {verdict.reason && (
                     <p className="moment-reason">
-                      <SquareText text={verdict.reason} />
+                      <SquareText text={verdict.reason} at={game.fens[gamePly - 1]} game={game} />
                     </p>
                   )}
                   <WhyButton i={gamePly - 1} />

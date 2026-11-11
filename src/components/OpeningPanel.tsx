@@ -3,6 +3,7 @@ import type { DrawShape } from "chessground/draw";
 import { sendToCoach } from "../coach/bridge";
 import { useAuth } from "../coach/auth";
 import { viewedPly } from "../chess/view";
+import { lastMoveContext } from "../chess/line";
 import { hasBackend } from "../db";
 import {
   explainOpening,
@@ -49,6 +50,8 @@ export function OpeningPanel() {
   useEffect(() => setIdeaIndex(0), [s.line, s.target]);
   const idea = plan?.[Math.min(ideaIndex, plan.length - 1)] ?? null;
   const ideaShapes = useMemo(() => (idea ? planShapes(idea) : null), [idea]);
+  // Messages speak about the latest moves; a move they name is placed on the position it's played from.
+  const said = lastMoveContext(s.line);
 
   return (
     <main className="board-panel drills tall-status">
@@ -84,8 +87,8 @@ export function OpeningPanel() {
         ) : over ? (
           <>
             <strong>{close ? "≈ " : s.status === "off" ? "✗ " : "✓ "}</strong>
-            <SquareText text={s.message} />
-            {s.status === "off" && s.why?.evals && <WhyEvals why={s.why} />}
+            <SquareText text={s.message} {...said} />
+            {s.status === "off" && s.why?.evals && <WhyEvals why={s.why} at={said.at} />}
           </>
         ) : (
           <>
@@ -93,14 +96,14 @@ export function OpeningPanel() {
             {s.message && (
               <span className="muted">
                 {" "}
-                <SquareText text={s.message} />
+                <SquareText text={s.message} {...said} />
               </span>
             )}
           </>
         )}
       </div>
       {plan && idea && !past && (
-        <PlanCard plan={plan} index={plan.indexOf(idea)} onIndex={setIdeaIndex} />
+        <PlanCard plan={plan} index={plan.indexOf(idea)} onIndex={setIdeaIndex} at={s.line.fens[s.line.sans.length]} />
       )}
       <div className="controls">
         {s.status === "off" ? (
@@ -138,7 +141,7 @@ export function OpeningPanel() {
 }
 
 /** The plan at the end of a line: one idea at a time; the board shows that idea's drawings. */
-function PlanCard({ plan, index, onIndex }: { plan: PlanIdea[]; index: number; onIndex: (i: number) => void }) {
+function PlanCard({ plan, index, onIndex, at }: { plan: PlanIdea[]; index: number; onIndex: (i: number) => void; at: string }) {
   const idea = plan[index];
   return (
     <section className="opening-plan" aria-label="What you're playing for">
@@ -161,21 +164,21 @@ function PlanCard({ plan, index, onIndex }: { plan: PlanIdea[]; index: number; o
       </div>
       <div className="opening-plan-title">{idea.title}</div>
       <p>
-        <SquareText text={idea.text} />
+        <SquareText text={idea.text} at={at} />
       </p>
     </section>
   );
 }
 
 /** Under "leaves the line": the engine on both moves. The coach explains in the chat column. */
-function WhyEvals({ why }: { why: OffLineWhy }) {
+function WhyEvals({ why, at }: { why: OffLineWhy; at?: string }) {
   if (!why.evals) return null;
   return (
     <span className="status-extra opening-why-evals">
       <span className="good">
         Book{" "}
         <strong>
-          <SquareText text={why.book} />
+          <SquareText text={why.book} at={at} />
         </strong>{" "}
         {evalText(why.evals.book)}
       </span>
@@ -183,7 +186,7 @@ function WhyEvals({ why }: { why: OffLineWhy }) {
       <span className="bad">
         Yours{" "}
         <strong>
-          <SquareText text={why.played} />
+          <SquareText text={why.played} at={at} />
         </strong>{" "}
         {evalText(why.evals.played)}
       </span>

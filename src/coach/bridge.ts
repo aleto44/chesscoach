@@ -12,7 +12,7 @@ import { drillContext } from "../analysis/drillSession";
 import { puzzleContext } from "../puzzles/session";
 import { endgameContext } from "../endgames/session";
 import { openingContext } from "../openings/session";
-import { lastTrainerExchange } from "./trainerChat";
+import { clearTrainerChat, lastTrainerExchange } from "./trainerChat";
 import { peeking } from "../nav";
 import { guessContext } from "../guess/session";
 import { cancelQuizzes } from "./quiz";
@@ -123,8 +123,21 @@ async function screenLines(): Promise<string[]> {
       ...(await engineLines(puzzle.fen, puzzle.detail.includes("not solved") ? " (this is the answer: use it for hints, don't reveal it)" : "")),
     ];
   const drill = drillContext();
-  if (drill)
-    return [`Showing: drill "${drill.title}" (not a game)`, `FEN: ${drill.fen}`, ...(await engineLines(drill.fen, " (the drill's answer: don't reveal it unless asked)"))];
+  if (drill) {
+    // The engine looks at the drill's own position, where its moves really are the answer; the
+    // board may be past it, after the student's attempt.
+    const side = drill.color === "white" ? "White" : "Black";
+    const out = [
+      `Showing: drill "${drill.title}" (not a game). The student plays ${side}.`,
+      drill.asks,
+      `Drill position (${side} to move): ${drill.startFen}`,
+      ...(drill.attempt ? [drill.attempt] : []),
+      ...(drill.fen !== drill.startFen ? [`The board now shows a later position: ${drill.fen}`] : []),
+      `When the student asks about "my move" or "if I play X", they mean ${side}'s move from the drill position: check it there (evaluate_moves with that fen).`,
+    ];
+    const note = drill.answered ? " (the drill's answer; the student has already answered)" : " (the drill's answer: don't reveal it unless asked)";
+    return [...out, ...(await engineLines(drill.startFen, note))];
+  }
   const trainer = endgameContext() ?? openingContext() ?? guessContext();
   if (trainer) {
     // The trainer's own explanation is in the chat column too: a follow-up question is usually about it.
@@ -201,4 +214,15 @@ export async function restartCoach() {
   await invoke("coach_reset");
   useStore.setState({ sessionId: null, busy: false });
   pushChat({ kind: "system", id: newId("c"), text: "Coach restarted. It won't remember the conversation above." });
+}
+
+/** The chat's `/clear`: a fresh coach conversation with the chat column emptied, here and in the saved game. */
+export async function clearCoach() {
+  cancelQuizzes();
+  await invoke("coach_reset");
+  streamingId = null;
+  clearTrainerChat();
+  const { gameId } = useStore.getState();
+  useStore.setState({ sessionId: null, busy: false, streaming: false, chat: [] });
+  if (gameId !== null && hasBackend()) await invoke("db_clear_chat", { gameId });
 }

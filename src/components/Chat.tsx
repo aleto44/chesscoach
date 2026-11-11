@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import Markdown, { type Components } from "react-markdown";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import Markdown, { type Components, type Options } from "react-markdown";
 import { formatMoves } from "../chess/line";
-import { rehypeSquares } from "../chess/squareRefs";
+import { placeFromData, rehypeSquares } from "../chess/squareRefs";
 import { logout, useAuth } from "../coach/auth";
-import { restartCoach, sendToCoach } from "../coach/bridge";
+import { clearCoach, restartCoach, sendToCoach } from "../coach/bridge";
 import { skipQuiz } from "../coach/quiz";
 import { bestSan, nudgeQuestion, useNudge } from "../coach/nudge";
 import { useTrainerChat, type TrainerItem } from "../coach/trainerChat";
@@ -60,6 +60,12 @@ export function Chat() {
 
   const send = () => {
     const text = draft.trim();
+    // Like Restart coach, /clear also works while the coach is answering: it stops it.
+    if (text.toLowerCase() === "/clear" && !locked) {
+      setDraft("");
+      clearCoach();
+      return;
+    }
     if (!text || busy || !signedIn || locked) return;
     setDraft("");
     sendToCoach(text);
@@ -127,7 +133,7 @@ export function Chat() {
           value={draft}
           disabled={!signedIn || locked}
           placeholder={
-            locked ? "The coach is off until this rated game ends" : "Ask the coach…  (Enter to send, Shift+Enter for a new line)"
+            locked ? "The coach is off until this rated game ends" : "Ask the coach…  (Enter to send, Shift+Enter for a new line, /clear for a fresh chat)"
           }
           onChange={(e) => setDraft(e.target.value)}
           onFocus={() => phone && sheet === "closed" && openSheet("half")}
@@ -138,7 +144,7 @@ export function Chat() {
             }
           }}
         />
-        <button onClick={send} disabled={busy || !signedIn || locked || !draft.trim()}>
+        <button onClick={send} disabled={(busy && draft.trim().toLowerCase() !== "/clear") || !signedIn || locked || !draft.trim()}>
           Send
         </button>
       </div>
@@ -263,16 +269,27 @@ function Thinking({ since }: { since?: number }) {
   );
 }
 
+/**
+ * A coach message. Moves it numbers ("35...Kf6", "36.Qc3 Qg4+") are found in the game: one the game
+ * played shows where it was played, another is a what-if from there, and the moves after it continue
+ * that line. A trainer's answer is about the trainer's board, not the game, so it isn't matched.
+ */
+function CoachText({ text, trainer }: { text: string; trainer: boolean }) {
+  const game = useStore((s) => s.game);
+  const plugins = useMemo<NonNullable<Options["rehypePlugins"]>>(() => [[rehypeSquares, trainer ? {} : { game }]], [game, trainer]);
+  return (
+    <div className="msg coach">
+      <Markdown components={MARKDOWN} rehypePlugins={plugins}>{text}</Markdown>
+    </div>
+  );
+}
+
 function ChatRow({ item }: { item: ChatItem }) {
   switch (item.kind) {
     case "user":
       return <div className="msg user">{item.text}</div>;
     case "coach":
-      return (
-        <div className="msg coach">
-          <Markdown components={MARKDOWN} rehypePlugins={[rehypeSquares]}>{item.text}</Markdown>
-        </div>
-      );
+      return <CoachText text={item.text} trainer={"after" in item} />;
     case "tangent":
       return <TangentCard tangentId={item.tangentId} />;
     case "tool":
@@ -367,7 +384,7 @@ function QuizCard({ item }: { item: Extract<ChatItem, { kind: "quiz" }> }) {
 const MARKDOWN: Components = {
   span: ({ node: _node, ...props }) => {
     const ref = (props as { "data-ref"?: string })["data-ref"];
-    return ref ? <SquareRef {...props} squareRef={ref} /> : <span {...props} />;
+    return ref ? <SquareRef {...props} squareRef={ref} place={placeFromData(props)} /> : <span {...props} />;
   },
   a: ({ href, children }) => {
     const key = href?.match(/^#(s\d+)$/)?.[1];

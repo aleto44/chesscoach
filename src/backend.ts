@@ -39,7 +39,31 @@ export class Unreachable extends Error {}
 
 /** Phones: whether the computer answered the last call (offline.ts works from its pack when not). */
 export const useConnection = create<{ reachable: boolean }>(() => ({ reachable: true }));
-const reachable = (r: boolean) => useConnection.getState().reachable !== r && useConnection.setState({ reachable: r });
+const reachable = (r: boolean) => {
+  if (useConnection.getState().reachable === r) return;
+  useConnection.setState({ reachable: r });
+  if (!r) probe();
+};
+
+let probing: number | null = null;
+/**
+ * While the computer is away, asks it every few seconds whether it's back (/api/ping, which the
+ * service worker leaves alone), so the status and the outbox catch up without the student acting.
+ */
+function probe() {
+  if (probing !== null) return;
+  probing = window.setInterval(async () => {
+    try {
+      const res = await fetch("/api/ping", { cache: "no-store" });
+      if (res.status >= 500) return;
+    } catch {
+      return;
+    }
+    window.clearInterval(probing!);
+    probing = null;
+    reachable(true);
+  }, 5000);
+}
 
 export async function invoke<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
   if (isTauri) return tauriInvoke<T>(cmd, args);

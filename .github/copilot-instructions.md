@@ -58,6 +58,11 @@ Rules:
   `src/coach/trainerChat.ts`, a thread of their own that is never saved into the game's chat. Hand it computed
   facts (engine evals) the way the chat coach gets them; the opening trainer's "why not" is the example
   (`src/openings/explain.ts`).
+- A mistake drill is a teaching moment, decided when it's captured: `addMistakeDrills` works out its
+  lesson (`src/analysis/lesson.ts`: the game move against the best move, searched deeply, with its
+  themes) and stores it in `drills.lesson`; a position with no concrete theme doesn't become a drill.
+  A drill session only works out why a *different* wrong answer is bad; everything else it shows,
+  right answer or wrong, comes from the lesson. Older drills get theirs from `backfillLessons`.
 - "Real games" are rated games here plus imported ones (`games.source` set, stored as rated, never moving
   the in-app rating). The Profile and the coach's profile judge the student on those, never on practice.
 - Phones keep working offline for puzzles and drills (`src/offline.ts`): calls fall back to a pack kept on
@@ -75,10 +80,18 @@ drills, puzzles, the why-screen, the coach's scenario boards and any board added
 - Square colors, piece set and coordinate size (Settings → Visuals) apply page-wide from `src/visuals.ts`
   (CSS variables plus a piece `<style>`); don't hard-code board colors or piece images in a board's CSS.
 - Never pass Chessground's own `viewOnly` or `drawable.enabled: false` to a full-size board.
+- On desktop the student can type a move (e2e4, Nf3, O-O) when no text field has focus: `Board` shows it
+  green/red over the board, Enter plays it and Escape drops it (`src/chess/typed.ts`). Keys go to the last
+  mounted board that's on screen and takes moves; it types whichever side is to move.
 - The student's drawings belong to the position: they clear when the position changes, not on re-renders.
 - Any text about a position on screen, not only the coach's chat, makes its squares and moves hoverable
   (desktop) and tappable (phones) so they show on the board: render it with `SquareText` / `SquareRef`
   (`src/components/SquareText.tsx`). Trainer messages and the opening plans do.
+- Give `SquareText` the position the text speaks from (`at`, plus `earlier` / `game` when it names
+  older or numbered moves; `lastMoveContext` in `src/chess/line.ts` for trainer messages). Moves are then
+  placed by `splitSquares` (`src/chess/squareRefs.ts`): a written-out line is played move after move, a
+  numbered move is found in the game, and hovering a move from another position shows that position on
+  the board with the line so far as numbered arrows (the student's drawings come back after).
 
 ## What-if moves
 

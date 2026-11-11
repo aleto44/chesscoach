@@ -19,6 +19,38 @@
 
   <body>
     <div id="root"><div id="boot" aria-label="Loading">♞</div></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- If the app's code never runs (the computer is down and the phone lacks some of its files,
+         or a file failed), say so instead of leaving the mark up forever, and reload once the
+         computer answers. main.tsx sets __CC_STARTED__ as soon as it runs. -->
+    <script>
+      (function () {
+        var shown = false;
+        function stuck() {
+          if (window.__CC_STARTED__ || shown) return;
+          shown = true;
+          var root = document.getElementById("root");
+          root.innerHTML =
+            '<div style="position:fixed;inset:0;display:grid;place-content:center;gap:14px;text-align:center;padding:24px;color:#e8e6e3;font:16px/1.4 system-ui,sans-serif">' +
+            '<div style="font-size:56px;color:#6fbf7f">♞</div>' +
+            '<div><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#d9534f;margin-right:6px"></span><b>Can\'t load Chess Coach</b></div>' +
+            '<small style="color:#9a968f">Your computer isn\'t answering, and this phone doesn\'t have all of the app saved yet.<br>It opens by itself once the computer is back.</small>' +
+            '<div><button onclick="location.reload()" style="font:inherit;padding:10px 20px;border-radius:8px;border:0;background:#6fbf7f;color:#1b1a18">Try again</button></div></div>';
+          setInterval(function () {
+            fetch("/api/ping", { cache: "no-store" }).then(function (r) { if (r.status < 500) location.reload(); }).catch(function () {});
+          }, 5000);
+        }
+        window.__ccStuck = stuck;
+        // Still loading after a while: only a problem if the computer isn't answering (a slow
+        // load over the network is fine, keep waiting).
+        function check() {
+          if (window.__CC_STARTED__ || shown) return;
+          fetch("/api/ping", { cache: "no-store" })
+            .then(function (r) { r.status < 500 ? setTimeout(check, 10000) : stuck(); })
+            .catch(stuck);
+        }
+        setTimeout(check, 10000);
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx" onerror="window.__ccStuck && window.__ccStuck()"></script>
   </body>
 </html>

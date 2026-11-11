@@ -172,7 +172,10 @@ function tagsFor(g: GameInput, i: number, before: Eval, after: Eval, cls: MoveCl
   const mine = moveFacts(fen, played);
   const reply = moveFacts(g.line.fens[i + 1], after.best);
   if (reply?.captured && reply.captured !== "p" && cls !== "inaccuracy") tags.push("hung-piece");
-  if (best?.captured && !mine?.captured && best.captured !== "p") tags.push("missed-capture");
+  // Only a capture that wins material: an even trade (Nxd3+ Qxd3, knight for bishop) isn't something
+  // missed, and the tag made such moves into drills whose answer was "trade, the engine likes it".
+  const bestGain = before.best ? (captureGains(fen).get(before.best.slice(2, 4)) ?? 0) : 0;
+  if (best?.captured && !mine?.captured && best.captured !== "p" && bestGain >= 1) tags.push("missed-capture");
   if (best?.check && !mine?.check && !tags.includes("missed-mate")) tags.push("missed-check");
   return tags;
 }

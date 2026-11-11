@@ -6,9 +6,10 @@ import { useStore } from "../store";
 import type { Key } from "chessground/types";
 import { explore, exploreGoto, exploreMove, type Explore } from "../chess/explore";
 import { moveLabel, type Line } from "../chess/line";
-import { setEvalFocus } from "../engine/live";
+import { setEvalFocus, TOP_LINES } from "../engine/live";
 import { Board } from "./Board";
-import { EvalBar, EvalLine } from "./EvalBar";
+import { EvalBar } from "./EvalBar";
+import { EngineLines, useEngineLines } from "./Analysis";
 import { Modal } from "./GameDialogs";
 import { MaterialStrip } from "./Material";
 
@@ -90,9 +91,10 @@ function WhyDialog({ i, onClose }: { i: number; onClose: () => void }) {
 
 /** An explanation's two lines, each on its own board: after the move played, and the better move. */
 export function WhyLines({ ex, playedSan, orientation }: { ex: Explanation; playedSan: string; orientation: "white" | "black" }) {
-  const [tab, setTab] = useState<"played" | "better">("played");
-  const [pick, setPick] = useState(0);
   const alts = ex.alternatives ?? (ex.better ? [ex.better] : []);
+  // A missed chance opens on the move that was missed: that's the lesson, not what came after.
+  const [tab, setTab] = useState<"played" | "better">(ex.focus === "better" && alts.length ? "better" : "played");
+  const [pick, setPick] = useState(0);
   const several = alts.length > 1;
   const line = tab === "better" && alts.length ? alts[Math.min(pick, alts.length - 1)] : ex.played;
   // With several sound moves the board opens before the move, all of them drawn as arrows.
@@ -172,10 +174,14 @@ function LineViewer({
   const fen = x.line.fens[ply];
   const next = forked ? undefined : line.steps[ply];
   const goto = (to: number) => setX((cur) => exploreGoto(cur, to));
+  const engineLines = useEngineLines(fen);
+  // An engine line's moves, played onto this board as what-if moves.
+  const playLine = (uci: string[]) =>
+    setX((cur) => uci.reduce((x, m) => exploreMove(x, m.slice(0, 2) as Key, m.slice(2, 4) as Key, m[4]) ?? x, cur));
 
   // This board has the live engine while it's open; the main board gets it back on close.
   useEffect(() => {
-    setEvalFocus(showEval ? fen : null);
+    setEvalFocus(showEval ? fen : null, TOP_LINES);
   }, [fen, showEval]);
   useEffect(() => () => setEvalFocus(null), []);
 
@@ -200,8 +206,10 @@ function LineViewer({
     // The judged move in its colour on the move itself; the next move faintly, as a hint.
     if (ply === 1 && step) out.push({ orig: step.from, dest: step.to, brush: kind === "played" ? "red" : "green" });
     if (next) out.push({ orig: next.from, dest: next.to, brush: ply === 0 ? (kind === "played" ? "red" : "green") : "paleBlue" });
+    // At the end, what the verdict points at (the bishop its own pawn shuts in, doubled pawns).
+    if (ply === line.steps.length) for (const mk of line.marks ?? []) out.push({ orig: mk.orig, dest: mk.dest, brush: mk.brush });
     return out;
-  }, [ply, step, next, kind, forked, options]);
+  }, [ply, step, next, kind, forked, options, line]);
 
   const top = orientation === "white" ? "black" : "white";
   const lastMove = ply > 0 ? x.line.lastMoves[ply - 1] : undefined;
@@ -234,6 +242,14 @@ function LineViewer({
       </div>
       <div className="why-side">
         <p className={`why-verdict ${kind}`}>{line.verdict}</p>
+        {/* Above everything that changes while stepping (the eval line, the caption), so the buttons
+            stay put under the pointer. */}
+        <div className="nav-buttons">
+          <button onClick={() => goto(0)} disabled={ply === 0} aria-label="Start">⏮</button>
+          <button onClick={() => goto(ply - 1)} disabled={ply === 0} aria-label="Back">◀</button>
+          <button onClick={() => goto(ply + 1)} disabled={ply === n} aria-label="Forward">▶</button>
+          <button onClick={() => goto(n)} disabled={ply === n} aria-label="End">⏭</button>
+        </div>
         <ol className="why-moves">
           {moves.map((m, k) => (
             <li key={k}>
@@ -243,7 +259,7 @@ function LineViewer({
             </li>
           ))}
         </ol>
-        {showEval && <EvalLine />}
+        {showEval && <EngineLines fen={fen} lines={engineLines} orientation={orientation} onPlay={playLine} />}
         <p className="why-caption">
           {forked ? (
             <>
@@ -259,12 +275,6 @@ function LineViewer({
           )}
           {!forked && ply === n && n > 0 && <span className="muted"> Eval for you here: {line.evalText}.</span>}
         </p>
-        <div className="nav-buttons">
-          <button onClick={() => goto(0)} disabled={ply === 0} aria-label="Start">⏮</button>
-          <button onClick={() => goto(ply - 1)} disabled={ply === 0} aria-label="Back">◀</button>
-          <button onClick={() => goto(ply + 1)} disabled={ply === n} aria-label="Forward">▶</button>
-          <button onClick={() => goto(n)} disabled={ply === n} aria-label="End">⏭</button>
-        </div>
       </div>
     </div>
   );

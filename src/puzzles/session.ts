@@ -8,6 +8,7 @@ import { create } from "zustand";
 import { addDrills } from "../analysis/drills";
 import { stopDrills } from "../analysis/drillSession";
 import { emptyLine, playAt, sideToMove, type Line } from "../chess/line";
+import { PIECE_NAMES, type PieceType } from "../chess/material";
 import { stepView, viewedPly, type Step } from "../chess/view";
 import type { Color } from "../store";
 import { findPuzzles, recordAttempt, themeLabel, usePuzzleDb, type Puzzle, type ThemeGain } from "./puzzles";
@@ -21,8 +22,16 @@ import { tierOf } from "../components/Mastery";
 
 const stopTrainers = () => (stopEndgame(), stopOpening(), stopGuess());
 
-export type Difficulty = "easier" | "normal" | "harder";
-const OFFSET: Record<Difficulty, number> = { easier: -250, normal: 0, harder: 250 };
+// Keys kept from the three-level days so a saved choice still loads: "easier" is Easy, "harder" is Hard.
+export type Difficulty = "easiest" | "easier" | "normal" | "harder" | "hardest";
+/** Fixed puzzle-rating bands (chess.com scale), the same for every student whatever their rating. */
+export const BANDS: Record<Difficulty, [min: number, max: number]> = {
+  easiest: [0, 600],
+  easier: [600, 1000],
+  normal: [1000, 1400],
+  harder: [1400, 1900],
+  hardest: [1900, 4000],
+};
 
 export interface Choice {
   theme: string | null;
@@ -66,7 +75,8 @@ export interface PuzzleSession {
   /** A wrong move was played (the puzzle counts as failed, but the student may keep going). */
   missed: boolean;
   message: string;
-  shapes: { orig: Key; dest: Key; brush: string }[];
+  /** Arrows (orig + dest) and circles (orig only: a hint). */
+  shapes: { orig: Key; dest?: Key; brush: string }[];
   startedAt: number;
   /** After the first attempt is saved: the rating change (null when this try wasn't rated). */
   change: { before: number; after: number } | null;
@@ -237,7 +247,7 @@ const DIFFICULTY_KEY = "cc-puzzle-difficulty";
 function savedDifficulty(): Difficulty {
   try {
     const d = localStorage.getItem(DIFFICULTY_KEY);
-    if (d && d in OFFSET) return d as Difficulty;
+    if (d && d in BANDS) return d as Difficulty;
   } catch {
     // Private mode: normal.
   }
@@ -257,12 +267,17 @@ export async function startPuzzles(choice: Partial<Choice> = {}) {
   } catch {
     // Private mode: not remembered.
   }
-  // A puzzle still to answer stays on the board; new filters apply from the next one.
+  // A puzzle still to answer stays on the board; new filters apply from the next one. A new
+  // difficulty is the exception: the student wants a puzzle at that level now, not after this one.
   const keep = own ? (unfinished(own) ? own : null) : parked && unpark("custom");
   if (keep) {
     const same = keep.choice.theme === next.theme && keep.choice.opening === next.opening && keep.choice.difficulty === next.difficulty;
     const patch = same ? {} : { choice: next, queue: keep.queue.slice(0, keep.index + 1) };
-    if (keep === own) return set(patch);
+    if (keep === own) {
+      set(patch);
+      if (next.difficulty !== keep.choice.difficulty) await nextPuzzle();
+      return;
+    }
     return reopen({ ...keep, ...patch });
   }
   await open(blank({ title: "Puzzles", fromCoach: false, mode: "custom" }, next));
@@ -376,15 +391,16 @@ async function refill() {
   if (s.set.mode === "rush") return refillRush();
   const { rating } = usePuzzleDb.getState();
   // Rated: the student's own rating, the window giving a mix of a bit easier and a bit harder.
+  // Practice: the difficulty's fixed band, widened only if the filters leave it empty.
   const rated = s.set.mode === "rated";
-  const center = rating + (rated ? 0 : OFFSET[s.choice.difficulty]);
+  const [lo, hi] = rated ? [rating, rating] : BANDS[s.choice.difficulty].map(toLichess);
   const exclude = s.queue.map((p) => p.id);
-  for (const width of rated ? [150, 300, 600] : [100, 250, 600]) {
+  for (const width of rated ? [150, 300, 600] : [0, 150, 400]) {
     const found = await findPuzzles({
       themes: s.choice.theme ? [s.choice.theme] : [],
       opening: s.choice.opening,
-      minRating: center - width,
-      maxRating: center + width,
+      minRating: lo - width,
+      maxRating: hi + width,
       limit: 10,
       exclude,
     });
@@ -521,6 +537,27 @@ export async function puzzleMove(from: Key, to: Key) {
     // Rush: one try per puzzle; the miss costs a life and the solution plays out.
     if (s.rush) showSolution();
   }, 700);
+}
+
+/**
+ * Circles the piece the solution moves next. Taking a hint counts the puzzle as missed (it's
+ * saved as one at once, as a wrong move is), but the student still finds the move themselves.
+ */
+export async function puzzleHint() {
+  const s = get();
+  if (!s?.line || s.status !== "solving" || s.view !== null || s.rush) return;
+  const ply = s.line.sans.length;
+  const san = s.solution[ply];
+  if (!san || sideToMove(s.line.fens[ply]) !== s.color) return;
+  const m = new Chess(s.line.fens[ply]).move(san);
+  set({
+    shapes: [{ orig: m.from as Key, brush: "green" }],
+    message: `Hint: move your ${m.piece === "k" ? "king" : PIECE_NAMES[m.piece as PieceType]} on ${m.from}. The puzzle counts as missed.`,
+  });
+  if (!s.missed) {
+    set({ missed: true });
+    await save(false);
+  }
 }
 
 /** Plays out the rest of the solution (the puzzle stays failed). */

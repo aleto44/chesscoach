@@ -355,6 +355,16 @@ Object.assign(handlers, {
   },
 } satisfies typeof handlers);
 
+/** A best or good move's result: any material it wins, and that the position holds. */
+function soundVerdict(verdict: string, afterCp: number): string {
+  // Only the generic "gets better / chances drop" verdict is wrong here; a sound sacrifice's
+  // "You lose a knight" stays.
+  if (!/position gets .*better: your winning chances drop/.test(verdict)) return verdict;
+  const won = verdict.match(/^You do win (.+?), but/);
+  const holds = `the position stays about where it was (${evalWords(afterCp)})`;
+  return won ? `a sound move: you win ${won[1]}, and ${holds}.` : `a sound move: ${holds}.`;
+}
+
 /** Where a UCI line ends, at most `plies` moves in. */
 function pvEnd(fen: string, pv: string[], plies: number): string {
   const chess = new Chess(fen);
@@ -419,15 +429,14 @@ Object.assign(handlers, {
       const loss = lossFromEvals(before, afterCp, mover);
       const cls = classify(loss, uci === bestUci);
       const ex = await explainCached({ fenBefore: fen, uci, bestUci, evalBefore: before, evalAfter: afterCp });
+      const sound = cls === "best" || cls === "good";
       out.push(
         `\n${m.san}: ${evalWords(before)} → ${evalWords(afterCp)}, ${cls} (gives away ${loss.toFixed(1)} points of winning chances; winning chances ${ex.winBefore}% → ${ex.winAfter}% for ${mover}).`,
         `What happens (notes say "You" for ${mover}): ${ex.played.steps.map((s) => `${s.label} ${s.note}`).join(" ")}`,
-        // The why-screen's wording assumes a bad move; a sound one just keeps the position.
-        `Result: ${
-          (cls === "best" || cls === "good") && ex.played.verdict.startsWith("No material")
-            ? `a sound move: the position stays about where it was (${evalWords(afterCp)}).`
-            : ex.played.verdict
-        }`,
+        // The why-screen's verdict assumes a bad move ("the position gets better for them, your
+        // chances drop"), which read as nonsense for a sound move that wins material: say what the
+        // move does and that the position holds.
+        `Result: ${sound ? soundVerdict(ex.played.verdict, afterCp) : ex.played.verdict}`,
       );
       if (ex.better && !shownBetter) {
         shownBetter = true;

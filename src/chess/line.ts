@@ -84,7 +84,7 @@ export function moveLabel(fen: string, san: string): string {
 }
 
 /** Numbered move text for plies [from, to) of a line, e.g. "5...e6 6.Nf3 Nd7". */
-export function formatMoves(line: Line, from = 0, to = line.sans.length): string {
+export function formatMoves(line: Pick<Line, "fens" | "sans">, from = 0, to = line.sans.length): string {
   const parts: string[] = [];
   for (let i = from; i < to; i++) {
     const [, turn, , , , full] = line.fens[i].split(" ");
@@ -92,6 +92,15 @@ export function formatMoves(line: Line, from = 0, to = line.sans.length): string
     else parts.push(i === from ? `${full}...${line.sans[i]}` : line.sans[i]);
   }
   return parts.join(" ");
+}
+
+/**
+ * What text about `line` speaks from, for SquareText: the position before its last move, then the
+ * few before that (a message may name the opponent's move before it, or a reply came since).
+ */
+export function lastMoveContext(line: Pick<Line, "fens">, upTo = line.fens.length - 1): { at?: string; earlier: string[] } {
+  const i = Math.max(0, upTo - 1);
+  return { at: line.fens[i], earlier: line.fens.slice(Math.max(0, i - 3), i).reverse() };
 }
 
 export function sideToMove(fen: string): "white" | "black" {

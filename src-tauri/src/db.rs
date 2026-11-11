@@ -267,6 +267,22 @@ ALTER TABLE games ADD COLUMN rating_pool TEXT;
 UPDATE games SET rating_pool = 'rapid' WHERE rating_after IS NOT NULL;
 DROP VIEW rated_games;
 CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
+"#, r#"
+-- Retire mistake drills from positions lost whatever the student played: even the best move left
+-- 15% winning chances or less (-472 cp, mover's view; a mate against counts). The "mistake" only
+-- lost quicker, so there was nothing to find. New ones are no longer made (addMistakeDrills).
+UPDATE drills SET retired = 1
+WHERE kind = 'mistake' AND retired = 0 AND id IN (
+    SELECT d.id FROM drills d
+    JOIN moves m ON m.game_id = d.source_game_id AND m.ply = d.source_ply
+    LEFT JOIN moves p ON p.game_id = m.game_id AND p.ply = m.ply - 1
+    WHERE COALESCE(m.eval_before, p.eval_after) * (CASE d.color WHEN 'white' THEN 1 ELSE -1 END) <= -472
+);
+"#, r#"
+-- What a mistake drill teaches, worked out (deeply) once when the drill is made: why the game move
+-- was bad, what the best move does, the theme. JSON from src/analysis/lesson.ts. NULL = not worked
+-- out yet (drills made before this; the computer fills them in).
+ALTER TABLE drills ADD COLUMN lesson TEXT;
 "#];
 
 impl Db {
@@ -755,6 +771,16 @@ pub fn db_upsert_chat(db: State<Db>, game_id: i64, item: ChatRow) -> Result<(), 
              ON CONFLICT(id) DO UPDATE SET data = excluded.data",
             params![item.id, game_id, item.seq, item.kind, item.data.to_string()],
         )
+        .map(|_| ())
+        .map_err(err)
+}
+
+/// The chat's `/clear`: drops the game's saved messages (its scenarios stay, nothing links to them).
+#[tauri::command]
+pub fn db_clear_chat(db: State<Db>, game_id: i64) -> Result<(), String> {
+    db.0.lock()
+        .unwrap()
+        .execute("DELETE FROM chat_items WHERE game_id = ?1", params![game_id])
         .map(|_| ())
         .map_err(err)
 }

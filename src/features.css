@@ -138,11 +138,27 @@ button.link {
 }
 
 .promo-picker button {
+  position: relative;
   width: 64px;
   height: 64px;
   font-size: 44px;
   line-height: 1;
   padding: 0;
+}
+
+/* The keyboard shortcut for each piece; phones have no keys to press. */
+.promo-key {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+@media (hover: none) {
+  .promo-key {
+    display: none;
+  }
 }
 
 /* Puzzle trainer */
@@ -964,6 +980,24 @@ button.link {
 .offline-chip.syncing {
   color: var(--accent);
   background: var(--accent-soft);
+}
+.offline-chip:not(.syncing)::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
+}
+.online-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .pgn-input {
@@ -2066,5 +2100,80 @@ button.link {
   .visuals-preview {
     --board-w: min(240px, 100%);
     width: min(240px, 100%);
+  }
+}
+
+/* A move typed on the keyboard (Board.tsx): green when it's a legal move, red when it can't be one. */
+
+.typed-move {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  z-index: 4;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.typed-text {
+  font: 600 1.4rem/1.2 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  letter-spacing: 0.04em;
+}
+
+.typed-hint {
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.typed-move.ok {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.typed-move.ok .typed-text {
+  color: var(--accent);
+}
+
+.typed-move.bad {
+  border-color: var(--error);
+}
+
+.typed-move.bad .typed-text {
+  color: var(--error);
+}
+
+.typed-move.waiting .typed-text {
+  color: var(--muted);
+}
+
+.typed-move.shake {
+  animation: typed-shake 0.36s ease-in-out;
+}
+
+@keyframes typed-shake {
+  0%,
+  100% {
+    transform: translateX(-50%);
+  }
+  20% {
+    transform: translateX(calc(-50% - 9px));
+  }
+  40% {
+    transform: translateX(calc(-50% + 8px));
+  }
+  60% {
+    transform: translateX(calc(-50% - 6px));
+  }
+  80% {
+    transform: translateX(calc(-50% + 4px));
   }
 }

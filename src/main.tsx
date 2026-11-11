@@ -34,10 +34,13 @@ import { launchedFrom, mark } from "./perf";
 import { initSnapshot, restoreSnapshot } from "./snapshot";
 import { initOffline } from "./offline";
 import { resumeOpponent } from "./game/opponent";
+import { backfillLessons } from "./analysis/drills";
 
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 
 mark("script running");
+// Tells index.html's watchdog the code loaded, so it doesn't show "can't load".
+(window as { __CC_STARTED__?: boolean }).__CC_STARTED__ = true;
 
 function start() {
   // Phones: the last screen first (from the phone itself), the computer's copy after.
@@ -65,6 +68,8 @@ function start() {
   boot(shown)
     .then(resumeOpponent)
     .catch((e) => console.error("could not open the app", e));
+  // Drills made before lessons get theirs, in the background once the app has settled (computer only).
+  window.setTimeout(() => void backfillLessons(), 30_000);
 
   root.render(
     <React.StrictMode>

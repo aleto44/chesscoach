@@ -75,11 +75,16 @@ export function TopBar() {
   );
 }
 
-/** Phones: says when the computer is out of reach, and how many results wait to sync. */
+/**
+ * Phones: whether the computer is there, always on screen (a green dot while it is), plus how
+ * many results wait to sync.
+ */
 function OfflineChip() {
   const reachable = useConnection((c) => c.reachable);
   const pending = useOutbox((o) => o.pending);
-  if (!isRemote || (reachable && !pending)) return null;
+  if (!isRemote) return null;
+  if (reachable && !pending)
+    return <span className="online-dot" role="status" aria-label="Connected to your computer" title="Connected to your computer." />;
   const label = reachable ? `Syncing ${pending}…` : pending ? `Offline · ${pending} to sync` : "Offline";
   return (
     <span

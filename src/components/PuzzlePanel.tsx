@@ -28,6 +28,7 @@ import {
   puzzleQuestion,
   setChoice,
   setSummary,
+  puzzleHint,
   showSolution,
   RUSH_LIVES,
   startPuzzles,
@@ -37,6 +38,7 @@ import {
   usePuzzle,
   viewStep,
   type Difficulty,
+  BANDS,
 } from "../puzzles/session";
 import { useStore } from "../store";
 import { moveLabel, START_FEN } from "../chess/line";
@@ -223,6 +225,11 @@ export function PuzzlePanel() {
         {line && <StepButtons onStep={viewStep} disabled={line.sans.length === 0} />}
 
         <div className="side-actions">
+          {!s.rush && (s.status === "solving" || s.status === "intro" || s.status === "loading") && (
+            <button onClick={puzzleHint} disabled={s.status !== "solving"} title="Shows which piece to move. The puzzle counts as missed.">
+              Hint
+            </button>
+          )}
           {(s.status === "solving" || s.status === "intro" || s.status === "loading") && (
             <button onClick={showSolution} disabled={s.status === "loading"}>
               View solution
@@ -489,10 +496,18 @@ function AutoNextToggle() {
 }
 
 const DIFFICULTIES: { value: Difficulty; label: string }[] = [
+  { value: "easiest", label: "Easiest" },
   { value: "easier", label: "Easy" },
   { value: "normal", label: "Normal" },
   { value: "harder", label: "Hard" },
+  { value: "hardest", label: "Harder" },
 ];
+
+/** "Puzzles rated 600–1000": the fixed band behind a difficulty, for the button's tooltip. */
+function bandLabel(d: Difficulty): string {
+  const [lo, hi] = BANDS[d];
+  return lo <= 0 ? `Puzzles rated under ${hi}` : hi >= 4000 ? `Puzzles rated ${lo}+` : `Puzzles rated ${lo}–${hi}`;
+}
 
 /** The ⚙ in the puzzle column: theme, position and difficulty (not for a coach's set), and auto-next. */
 function PuzzleSettings({ filters }: { filters: boolean }) {
@@ -606,7 +621,12 @@ function Filters() {
       <span className="field-label">Difficulty</span>
       <div className="segmented">
         {DIFFICULTIES.map((d) => (
-          <button key={d.value} className={choice.difficulty === d.value ? "on" : ""} onClick={() => setChoice({ difficulty: d.value })}>
+          <button
+            key={d.value}
+            className={choice.difficulty === d.value ? "on" : ""}
+            title={bandLabel(d.value)}
+            onClick={() => setChoice({ difficulty: d.value })}
+          >
             {d.label}
           </button>
         ))}

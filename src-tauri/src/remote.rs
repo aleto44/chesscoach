@@ -152,6 +152,8 @@ async fn start(app: &AppHandle) -> Result<(), String> {
         .route("/api/pair", post(pair))
         .route("/api/events", get(events))
         .route("/api/invoke/{cmd}", post(invoke))
+        // "Is the computer there?" for a phone's offline screens; no pairing needed, says nothing.
+        .route("/api/ping", get(|| async { StatusCode::NO_CONTENT }))
         .fallback(get(page))
         .with_state(app.clone());
     remote.log(&format!("listening on port {}", remote.port));
@@ -352,7 +354,8 @@ async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result
         "db_set_moves" => out(db::db_set_moves(st(), arg(a, "gameId")?, arg(a, "moves")?)),
         "db_upsert_tangent" => out(db::db_upsert_tangent(st(), arg(a, "gameId")?, arg(a, "tangent")?)),
         "db_upsert_chat" => out(db::db_upsert_chat(st(), arg(a, "gameId")?, arg(a, "item")?)),
-        "db_list_games" => out(db::db_list_games(st(), arg(a, "limit")?)),
+        "db_clear_chat" => out(db::db_clear_chat(st(), arg(a, "gameId")?)),
+        "db_list_games" =>out(db::db_list_games(st(), arg(a, "limit")?)),
         "db_load_game" => out(db::db_load_game(st(), arg(a, "id")?)),
         "db_delete_game" => out(db::db_delete_game(st(), arg(a, "id")?)),
         "db_prune_empty_games" => out(db::db_prune_empty_games(st(), arg(a, "keep")?)),
@@ -373,6 +376,8 @@ async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result
         "db_add_drills" => out(stats::db_add_drills(st(), arg(a, "drills")?)),
         "db_due_drills" => out(stats::db_due_drills(st(), arg(a, "limit")?, arg(a, "all")?, arg(a, "tag")?)),
         "db_drill_counts" => out(stats::db_drill_counts(st())),
+        "db_set_drill_lesson" => out(stats::db_set_drill_lesson(st(), arg(a, "id")?, arg(a, "lesson")?)),
+        "db_drills_without_lesson" => out(stats::db_drills_without_lesson(st(), arg(a, "limit")?, arg(a, "version")?)),
         "db_grade_drill" => out(stats::db_grade_drill(st(), arg(a, "id")?, arg(a, "correct")?, arg(a, "played")?, arg(a, "ms")?)),
         "db_retire_drill" => out(stats::db_retire_drill(st(), arg(a, "id")?)),
         "db_drill_overview" => out(stats::db_drill_overview(st(), arg(a, "limit")?)),
