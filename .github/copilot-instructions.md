@@ -37,7 +37,7 @@ Rules:
 - The left/middle column shows the **home menu** (`src/components/Home.tsx`) or the screen picked from it:
   Games (Play rated: pick a clock and get paired with a Maia near your rating, `src/game/matchmaking.ts`;
   Choose game: every option, rated or practice), School (drills, opening training with the
-  repertoire, the endgame trainer, guess the move), Puzzles, and Profile (weaknesses, rating history,
+  repertoire, the endgame trainer, guess the move, win it again, find the plan, opening leaks), Puzzles, and Profile (weaknesses, rating history,
   saved games, import from chess.com and Lichess), and Utility (the free analysis board, and a
   two-player chess clock for over-the-board games, `src/utility/timer.ts` + `src/components/Timer.tsx`:
   full-screen on phones, the top half turned to the player across, separate time and increment per
@@ -45,8 +45,16 @@ Rules:
   returns one level, and the brand / home button returns to the main menu.
 - The view lives in `useNav` (`src/nav.ts`). Puzzle, drill, opening, endgame and guess-the-move sessions have
   their own stores (`src/puzzles/session.ts`, `src/analysis/drillSession.ts`, `src/openings/session.ts`,
-  `src/endgames/session.ts`, `src/guess/session.ts`); starting one shows its board, and starting one stops
-  the others.
+  `src/endgames/session.ts`, `src/guess/session.ts`, `src/plans/session.ts`); starting one shows its board, and
+  starting one stops the others.
+- Three School trainers work from the student's own analyzed games, loaded once through
+  `db_training_games` (`src/training/games.ts`): "Win it again" (`src/convert/positions.ts`: positions they
+  were clearly better in and didn't win, or worse but holding and lost, played in the endgame session as a
+  `spec` with its own bars), "Find the plan" (`src/plans/`: quiet, non-tactical middlegame slips; the
+  engine grades the move and `describe.ts` names the plan) and "Opening leaks" (`src/openings/leaks.ts`:
+  real games only; repeated costly positions and where games leave the repertoire, fixed by adding the
+  engine's move to the repertoire). Endgame positions that Stockfish can't score as won without
+  tablebases (bishop and knight mate) don't work in the endgame trainer, which judges by eval.
 - The opening and endgame trainers are not games: they never create a game or show up in saved games, and
   they can start while a game is in progress (a rated game's clock pauses meanwhile, `src/game/clock.ts`).
   Opening sets live in `src/openings/training.ts`, checked by `node scripts/check-book.mjs`. Every

@@ -16,6 +16,7 @@ import { drillContext, useDrill } from "../analysis/drillSession";
 import { openingContext, openingSetOf, useOpening } from "../openings/session";
 import { endgameContext, endgameOf, useEndgame } from "../endgames/session";
 import { guessContext, useGuess } from "../guess/session";
+import { planContext, planOf, usePlan } from "../plans/session";
 import { peeking } from "../nav";
 import { fromLichess, toLichess } from "../rating";
 import { evalWords, lineReport, materialChange, positionFacts, storedEval, topMoves } from "./insight";
@@ -161,6 +162,9 @@ export function screenSide(): Color {
     if (endgame) return endgameOf(endgame).side;
     const guess = useGuess.getState();
     if (guess) return guess.side;
+    const plan = usePlan.getState();
+    const pos = plan && planOf(plan);
+    if (pos) return pos.color;
   }
   return boardOrientation();
 }
@@ -171,7 +175,7 @@ export function screenSide(): Color {
  */
 function boardFen(): string {
   if (!peeking()) {
-    const trainer = puzzleContext() ?? drillContext() ?? openingContext() ?? endgameContext() ?? guessContext();
+    const trainer = puzzleContext() ?? drillContext() ?? openingContext() ?? endgameContext() ?? guessContext() ?? planContext();
     if (trainer) return trainer.fen;
   }
   return screenFen();

@@ -6,6 +6,7 @@ import { stopPuzzles, usePuzzle } from "./puzzles/session";
 import { stopEndgame, useEndgame } from "./endgames/session";
 import { stopOpening, useOpening } from "./openings/session";
 import { stopGuess, useGuess } from "./guess/session";
+import { stopPlans, usePlan } from "./plans/session";
 import { openTangent, useStore } from "./store";
 import { closeAnalysis, useAnalysis } from "./analysis/layer";
 
@@ -23,6 +24,9 @@ export type View =
   | "ratings"
   | "endgames"
   | "guess"
+  | "convert"
+  | "plans"
+  | "leaks"
   | "utility"
   | "timer"
   | "board";
@@ -41,6 +45,9 @@ export const VIEW_TITLE: Record<View, string> = {
   ratings: "Rating history",
   endgames: "Endgame trainer",
   guess: "Guess the move",
+  convert: "Win it again",
+  plans: "Find the plan",
+  leaks: "Opening leaks",
   utility: "Utility",
   timer: "Chess clock",
   board: "Board",
@@ -60,6 +67,9 @@ const PARENT: Partial<Record<View, View>> = {
   ratings: "profile",
   endgames: "school",
   guess: "school",
+  convert: "school",
+  plans: "school",
+  leaks: "school",
   utility: "home",
   timer: "utility",
 };
@@ -79,11 +89,16 @@ function savedView(): View {
   return "home";
 }
 
-/** The board's back button returns to the menu that opened it (Games, or Utility's analysis board). */
+/**
+ * The board's back button returns to the menu that opened it: Games, Utility's analysis board, or
+ * Profile's saved games list (which opens again).
+ */
+type BoardFrom = "games" | "utility" | "profile";
 const BOARD_FROM_KEY = "cc-board-from";
-function savedBoardFrom(): View {
+function savedBoardFrom(): BoardFrom {
   try {
-    if (localStorage.getItem(BOARD_FROM_KEY) === "utility") return "utility";
+    const v = localStorage.getItem(BOARD_FROM_KEY);
+    if (v === "utility" || v === "profile") return v;
   } catch {
     // Private mode: Games.
   }
@@ -92,12 +107,14 @@ function savedBoardFrom(): View {
 
 /**
  * `peek`: a coach scenario is open over a puzzle, drill or trainer session, which keeps running
- * underneath; returning from the scenario goes back to it.
+ * underneath; returning from the scenario goes back to it. `openSaved`: going back from a saved
+ * game lands on Profile with the saved games list open again; Profile clears it once shown.
  */
-export const useNav = create<{ view: View; peek: boolean; boardFrom: View }>(() => ({
+export const useNav = create<{ view: View; peek: boolean; boardFrom: BoardFrom; openSaved: boolean }>(() => ({
   view: savedView(),
   peek: false,
   boardFrom: savedBoardFrom(),
+  openSaved: false,
 }));
 useNav.subscribe(({ view, boardFrom }) => {
   try {
@@ -110,16 +127,21 @@ useNav.subscribe(({ view, boardFrom }) => {
 
 /**
  * Going anywhere leaves a running puzzle or drill session. `from` names the menu the board's
- * back button returns to: Games unless Utility's analysis board opened it.
+ * back button returns to: Games unless Utility or the saved games list opened it. Without one,
+ * a board that's already showing (the coach opening a scenario) keeps where it came from.
  */
-export function go(view: View, from?: "games" | "utility") {
+export function go(view: View, from?: BoardFrom) {
   closeAnalysis();
   stopPuzzles();
   stopDrills();
   stopEndgame();
   stopOpening();
   stopGuess();
-  useNav.setState(view === "board" ? { view, peek: false, boardFrom: from ?? "games" } : { view, peek: false });
+  stopPlans();
+  const cur = useNav.getState();
+  if (view === "board")
+    useNav.setState({ view, peek: false, openSaved: false, boardFrom: from ?? (cur.view === "board" ? cur.boardFrom : "games") });
+  else useNav.setState({ view, peek: false, openSaved: false });
 }
 
 const parentOf = (v: View): View | undefined => (v === "board" ? useNav.getState().boardFrom : PARENT[v]);
@@ -141,12 +163,16 @@ export function back() {
   if (useEndgame.getState()) return stopEndgame();
   if (useOpening.getState()) return stopOpening();
   if (useGuess.getState()) return stopGuess();
-  const parent = parentOf(useNav.getState().view);
-  if (parent) go(parent);
+  if (usePlan.getState()) return stopPlans();
+  const { view, boardFrom } = useNav.getState();
+  const parent = parentOf(view);
+  if (!parent) return;
+  go(parent);
+  if (view === "board" && boardFrom === "profile") useNav.setState({ openSaved: true });
 }
 
 /** A puzzle, drill, endgame or guess-the-move session is on the board. */
-export const anySession = () => !!(usePuzzle.getState() || useDrill.getState() || useEndgame.getState() || useOpening.getState() || useGuess.getState());
+export const anySession = () => !!(usePuzzle.getState() || useDrill.getState() || useEndgame.getState() || useOpening.getState() || useGuess.getState() || usePlan.getState());
 
 /** A coach scenario is on the board over a running session. */
 export const peeking = () => useNav.getState().peek && anySession() && !!useStore.getState().active;
@@ -165,6 +191,7 @@ export function sessionName(): string | null {
   if (useOpening.getState()) return "opening trainer";
   if (useEndgame.getState()) return "endgame trainer";
   if (useGuess.getState()) return "guess the move";
+  if (usePlan.getState()) return "find the plan";
   return null;
 }
 

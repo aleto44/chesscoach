@@ -11,6 +11,7 @@ import { useDrill } from "./analysis/drillSession";
 import { endgameOf, useEndgame } from "./endgames/session";
 import { openingSetOf, useOpening } from "./openings/session";
 import { useGuess } from "./guess/session";
+import { planOf, usePlan } from "./plans/session";
 import { useAnalysis } from "./analysis/layer";
 import lowTimeUrl from "./assets/low-time.mp3";
 
@@ -219,6 +220,8 @@ function onScreen(): { line: Line; ply: number; key: unknown; student: Color | "
       key: opening.setId + opening.line.startFen,
       student: openingSetOf(opening).color,
     };
+  const plan = usePlan.getState();
+  if (plan) return { line: plan.line, ply: viewedPly(plan.line.sans.length, plan.view), key: plan.line.startFen + plan.index, student: planOf(plan)?.color ?? "both" };
   const guess = useGuess.getState();
   if (guess) return { line: guess.line, ply: viewedPly(guess.line.sans.length, guess.view), key: guess.game, student: guess.side };
   const { line, ply } = screen();
@@ -259,5 +262,6 @@ export function initSounds() {
   useEndgame.subscribe(check);
   useOpening.subscribe(check);
   useGuess.subscribe(check);
+  usePlan.subscribe(check);
   useAnalysis.subscribe(check);
 }

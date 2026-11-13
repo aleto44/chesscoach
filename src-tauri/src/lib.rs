@@ -141,6 +141,7 @@ pub fn run() {
             stats::db_unanalyzed_games,
             stats::db_profile,
             stats::db_query_games,
+            stats::db_training_games,
             stats::db_record_observation,
             stats::db_add_drills,
             stats::db_due_drills,

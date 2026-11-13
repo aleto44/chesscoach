@@ -256,6 +256,37 @@ pub fn db_drill_overview(db: State<Db>, limit: i64) -> Result<Value, String> {
     Ok(json!({ "kinds": kinds, "recent": recent }))
 }
 
+/// Analyzed, finished games with their moves and evals, newest first, for the trainers that work
+/// from the student's own positions (convert/defend, find the plan, opening leaks). `real_only`
+/// keeps rated and imported games (the student's unaided play); `max_ply` cuts each game short.
+#[tauri::command]
+pub fn db_training_games(db: State<Db>, real_only: bool, max_ply: Option<i64>, limit: i64) -> Result<Value, String> {
+    let conn = db.conn();
+    let games = rows(
+        &conn,
+        "SELECT g.id, date(g.started_at) AS date, g.mode, g.student_color AS color, g.result, g.opening_name AS openingName,
+                g.source, g.opponent_rating AS opponentRating
+         FROM games g
+         WHERE g.result IS NOT NULL AND g.analyzed_at IS NOT NULL AND g.student_color IN ('white', 'black')
+           AND (?1 = 0 OR g.mode = 'rated')
+         ORDER BY coalesce(g.ended_at, g.started_at) DESC, g.id DESC LIMIT ?2",
+        params![real_only as i64, limit],
+    )?;
+    let mut out = Vec::new();
+    for mut g in games {
+        let id = g["id"].as_i64().unwrap_or_default();
+        g["moves"] = json!(rows(
+            &conn,
+            "SELECT ply, san, uci, fen_before AS fenBefore, by_student AS byStudent, eval_before AS evalBefore,
+                    eval_after AS evalAfter, cp_loss AS cpLoss, best_uci AS bestUci, class, phase, tags
+             FROM moves WHERE game_id = ?1 AND (?2 IS NULL OR ply <= ?2) ORDER BY ply",
+            params![id, max_ply],
+        )?);
+        out.push(g);
+    }
+    Ok(json!(out))
+}
+
 /// Games with their student mistakes, newest first. `mode` is 'rated', 'practice' or 'all'.
 #[tauri::command]
 pub fn db_query_games(db: State<Db>, mode: String, limit: i64, game_id: Option<i64>) -> Result<Value, String> {

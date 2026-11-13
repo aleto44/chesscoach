@@ -19,6 +19,9 @@ import { RepertoireDialog } from "./RepertoireDialog";
 import { ProfileMenu, RatingHistory, Weaknesses } from "./Profile";
 import { EndgameMenu } from "./Endgames";
 import { GuessMenu } from "./Guess";
+import { WinAgainMenu } from "./WinAgain";
+import { PlansMenu } from "./Plans";
+import { LeaksMenu } from "./Leaks";
 import { MasteryRule, StarBadge, XpBar } from "./Mastery";
 import { TimerScreen } from "./Timer";
 import { clockLabel, started as clockStarted, useTimer } from "../utility/timer";
@@ -53,6 +56,9 @@ export function Home() {
         {view === "ratings" && <RatingHistory />}
         {view === "endgames" && <EndgameMenu />}
         {view === "guess" && <GuessMenu />}
+        {view === "convert" && <WinAgainMenu />}
+        {view === "plans" && <PlansMenu />}
+        {view === "leaks" && <LeaksMenu />}
         {view === "utility" && <UtilityMenu />}
       </div>
     </main>
@@ -289,6 +295,9 @@ function SchoolMenu() {
         />
         <Tile icon="♚" title="Endgame trainer" sub="Win the standard endings against Stockfish" onClick={() => go("endgames")} />
         <Tile icon="?" title="Guess the move" sub="Play through master games, move by move" onClick={() => go("guess")} />
+        <Tile icon="★" title="Win it again" sub="Convert your advantages and hold worse positions from your games" onClick={() => go("convert")} />
+        <Tile icon="◎" title="Find the plan" sub="Quiet positions from your games: what's the idea?" onClick={() => go("plans")} />
+        <Tile icon="⚑" title="Opening leaks" sub="Where your real games go wrong in the opening" onClick={() => go("leaks")} />
       </div>
     </>
   );

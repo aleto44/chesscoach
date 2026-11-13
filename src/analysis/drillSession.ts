@@ -18,6 +18,7 @@ import { unpackLesson } from "./lesson";
 import { lossFromEvals } from "./review";
 import { stopEndgame } from "../endgames/session";
 import { stopGuess } from "../guess/session";
+import { stopPlans } from "../plans/session";
 import { stopOpening } from "../openings/session";
 import { PIECE_NAMES, type PieceType } from "../chess/material";
 import type { Color } from "../store";
@@ -298,6 +299,7 @@ export async function startDrills(all = false, tag: string | null = null) {
   stopEndgame();
   stopOpening();
   stopGuess();
+  stopPlans();
   park(useDrill.getState());
   const source = { all, tag };
   const parked = unpark(source);

@@ -15,6 +15,7 @@ import { stopDrills } from "../analysis/drillSession";
 import { stopEndgame } from "../endgames/session";
 import { stopOpening } from "../openings/session";
 import { keepSession } from "../persist";
+import { stopPlans } from "../plans/session";
 
 export interface GuessGame {
   /** Saved best scores are kept per id; pasted games have none. */
@@ -82,6 +83,7 @@ export function startGuess(game: GuessGame, side: Color, skip = 0) {
   stopDrills();
   stopEndgame();
   stopOpening();
+  stopPlans();
   useGuess.setState({ game, side, line: built.line, status: "waiting", message: "", results: [], shapes: [], view: null }, true);
   advance();
 }

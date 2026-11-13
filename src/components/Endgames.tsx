@@ -12,6 +12,7 @@ import {
   endgameQuestion,
   endgameRecords,
   endgameStep,
+  hasNextEndgame,
   nextEndgame,
   retryEndgame,
   startEndgame,
@@ -22,7 +23,7 @@ import { isLocked, useStore } from "../store";
 import { Board } from "./Board";
 import { BoardSteps, StepButtons } from "./StepButtons";
 
-const GOAL: Record<Endgame["goal"], string> = { mate: "Mate", promote: "Win", draw: "Hold the draw" };
+const GOAL: Record<Endgame["goal"], string> = { mate: "Mate", promote: "Win", draw: "Hold the draw", convert: "Convert" };
 const LEVEL = ["", "Basic", "Intermediate", "Hard"];
 
 /** School › Endgame trainer: the positions, grouped, with how the student has done in each. */
@@ -80,20 +81,30 @@ export function EndgamePanel() {
   const past = ply < s.line.sans.length;
   const shapes = useMemo(() => s.shapes as DrawShape[], [s.shapes]);
   const over = s.status === "won" || s.status === "held" || s.status === "failed";
-  const goal = e.goal === "draw" ? `Hold the draw for ${e.moves ?? 15} moves` : e.goal === "mate" ? "Deliver checkmate" : "Promote and keep the win";
+  const goal =
+    e.goal === "draw"
+      ? s.spec
+        ? `Hold on for ${e.moves ?? 15} moves without letting it get lost`
+        : `Hold the draw for ${e.moves ?? 15} moves`
+      : e.goal === "mate"
+        ? "Deliver checkmate"
+        : e.goal === "convert"
+          ? `Turn it into a decisive advantage (+${((e.winAt ?? 600) / 100).toFixed(1)}) or mate`
+          : "Promote and keep the win";
 
   return (
     <main className="board-panel drills tall-status">
       <div className="game-bar">
         <span className="game-status">
-          <strong>Endgame trainer</strong>
+          <strong>{s.spec ? "Win it again" : "Endgame trainer"}</strong>
           <span className="muted"> · {e.group}</span>
         </span>
         <span className="spacer" />
-        <button onClick={stopEndgame}>‹ Endgames</button>
+        <button onClick={stopEndgame}>{s.spec ? "‹ Your positions" : "‹ Endgames"}</button>
       </div>
       <div className="crumbs">
         <span className="crumb current">{e.name}</span>
+        {e.note && <span className="muted small"> · {e.note}</span>}
       </div>
       <div className="board-frame drill">
         <Board
@@ -132,7 +143,7 @@ export function EndgamePanel() {
             <button className="primary" onClick={retryEndgame}>
               Try again
             </button>
-            <button onClick={nextEndgame}>Next ending</button>
+            {hasNextEndgame(s) && <button onClick={nextEndgame}>{s.spec ? "Next position" : "Next ending"}</button>}
           </>
         ) : (
           <button onClick={endgameHint} disabled={s.status !== "playing"}>

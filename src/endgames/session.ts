@@ -12,6 +12,7 @@ import { ENDGAMES, type Endgame } from "./positions";
 import { stopPuzzles } from "../puzzles/session";
 import { stopDrills } from "../analysis/drillSession";
 import { stopGuess } from "../guess/session";
+import { stopPlans } from "../plans/session";
 import { stopOpening } from "../openings/session";
 import { keepSession } from "../persist";
 
@@ -25,16 +26,21 @@ export interface EndgameSession {
   hint: boolean;
   shapes: { orig: Key; dest: Key; brush: string }[];
   view: number | null;
+  /** A position from the student's own games (not in ENDGAMES), and the ones queued after it. */
+  spec?: Endgame;
+  more?: Endgame[];
 }
 
 export const useEndgame = create<EndgameSession | null>(() => null);
 
 const get = () => useEndgame.getState();
 const set = (patch: Partial<EndgameSession>) => useEndgame.setState(patch);
-export const endgameOf = (s: EndgameSession) => ENDGAMES.find((e) => e.id === s.id)!;
+export const endgameOf = (s: EndgameSession) => s.spec ?? ENDGAMES.find((e) => e.id === s.id)!;
 
 /** A mate goal gives up after this many of the student's moves (the 50-move rule is close by). */
 const MOVE_LIMIT = 50;
+/** A convert goal that's still clearly better after this many moves counts as kept. */
+const CONVERT_MOVES = 40;
 /** Below this (student's view, centipawns), a won ending is no longer won. */
 const STILL_WON = 200;
 /** Beyond this against the student, a drawn ending is lost. */
@@ -71,13 +77,30 @@ function record(id: string, won: boolean) {
 
 export function startEndgame(id: string) {
   const e = ENDGAMES.find((x) => x.id === id);
-  if (!e) return;
+  if (e) begin(e);
+}
+
+/** Plays a position from the student's own games; `more` are played next, in order. */
+export const startCustomEndgame = (spec: Endgame, more: Endgame[] = []) => begin(spec, true, more);
+
+function begin(e: Endgame, custom = false, more: Endgame[] = []) {
   stopPuzzles();
   stopDrills();
   stopGuess();
+  stopPlans();
   stopOpening();
   useEndgame.setState(
-    { id, line: emptyLine(e.fen), status: "playing", message: "", moves: 0, hint: false, shapes: [], view: null },
+    {
+      id: e.id,
+      line: emptyLine(e.fen),
+      status: "playing",
+      message: "",
+      moves: 0,
+      hint: false,
+      shapes: [],
+      view: null,
+      ...(custom ? { spec: e, more } : {}),
+    },
     true,
   );
   if (sideToMove(e.fen) !== e.side) reply();
@@ -85,7 +108,7 @@ export function startEndgame(id: string) {
 
 /** Restores the last session (if any) and keeps saving it, for a phone that dropped the page. Call once at startup. */
 export const initEndgameSession = () =>
-  keepSession(useEndgame, "cc-endgame", (s) => !!(ENDGAMES.find((e) => e.id === s.id) && s.line?.fens), resume);
+  keepSession(useEndgame, "cc-endgame", (s) => !!((s.spec?.fen || ENDGAMES.find((e) => e.id === s.id)) && s.line?.fens), resume);
 
 /** Picks a saved session back up, redoing what the engine was in the middle of when the page went away. */
 function resume(saved: EndgameSession) {
@@ -103,11 +126,19 @@ function resume(saved: EndgameSession) {
 export const stopEndgame = () => useEndgame.setState(null, true);
 export const retryEndgame = () => {
   const s = get();
-  if (s) startEndgame(s.id);
+  if (s?.spec) startCustomEndgame(s.spec, s.more);
+  else if (s) startEndgame(s.id);
 };
+/** Whether "Next" has somewhere to go: the built-in list wraps; positions from games run out. */
+export const hasNextEndgame = (s: EndgameSession) => !s.spec || !!s.more?.length;
 export function nextEndgame() {
   const s = get();
   if (!s) return;
+  if (s.spec) {
+    const [next, ...rest] = s.more ?? [];
+    if (next) startCustomEndgame(next, rest);
+    return;
+  }
   const i = ENDGAMES.findIndex((e) => e.id === s.id);
   startEndgame(ENDGAMES[(i + 1) % ENDGAMES.length].id);
 }
@@ -169,15 +200,25 @@ async function check(line: Line, san: string, moves: number) {
   // The student left or started over while the engine was looking.
   if (get()?.line !== line) return;
 
-  if (e.goal !== "draw" && verdict < STILL_WON)
+  if (e.goal === "convert") {
+    if (verdict < (e.failBelow ?? 150))
+      return finish(false, "failed", `${san} lets the advantage slip: with best play it's ${cpText(verdict)} now. Try again, or ask for a hint.`);
+    if (verdict >= (e.winAt ?? 600)) return finish(true, "won", `${cpText(verdict)}: that's decisive. Converted.`);
+    if (moves >= (e.moves ?? CONVERT_MOVES))
+      return finish(true, "won", `${moves} moves and still ${cpText(verdict)}: you kept the advantage, though a faster kill was there.`);
+  } else if (e.goal !== "draw" && verdict < STILL_WON)
     return finish(false, "failed", `${san} lets the win slip: with best play it's no longer won. Try again, or look at the hint.`);
-  if (e.goal === "draw" && verdict <= LOST) return finish(false, "failed", `${san} loses: the engine wins from here. Try again.`);
+  if (e.goal === "draw" && verdict <= (e.lostAt ?? LOST)) return finish(false, "failed", `${san} loses: the engine wins from here. Try again.`);
   if (e.goal === "promote" && san.includes("=")) return finish(true, "won", "Promoted, and the win is safe. Well done.");
   if (e.goal === "draw" && moves >= (e.moves ?? 15)) return finish(true, "held", `${moves} moves and still a draw: you've held it.`);
-  if (e.goal === "mate" && moves >= MOVE_LIMIT) return finish(false, "failed", `${MOVE_LIMIT} moves without mate. Push the king to the edge faster.`);
+  const limit = e.moves ?? MOVE_LIMIT;
+  if (e.goal === "mate" && moves >= limit) return finish(false, "failed", `${limit} moves without mate. Push the king to the edge faster.`);
   set({ status: "playing" });
   reply();
 }
+
+/** "+2.3" for the student, or "a forced mate". */
+const cpText = (cp: number) => (Math.abs(cp) >= 9000 ? (cp > 0 ? "a forced mate" : "mate against you") : `${cp >= 0 ? "+" : "−"}${(Math.abs(cp) / 100).toFixed(1)}`);
 
 function stalemated(line: Line): boolean {
   return new Chess(line.fens[line.fens.length - 1]).isStalemate();
@@ -238,9 +279,10 @@ export function endgameContext(): { title: string; fen: string; detail: string }
   const s = get();
   if (!s) return null;
   const e: Endgame = endgameOf(s);
-  const goal = e.goal === "draw" ? "hold the draw" : e.goal === "mate" ? "deliver mate" : "promote and win";
+  const goal =
+    e.goal === "draw" ? "hold the draw" : e.goal === "mate" ? "deliver mate" : e.goal === "convert" ? "turn the advantage into a win" : "promote and win";
   return {
-    title: `Endgame trainer: ${e.name}`,
+    title: `${s.spec ? "Position from the student's own game" : "Endgame trainer"}: ${e.name}`,
     fen: s.line.fens[viewedPly(s.line.sans.length, s.view)],
     detail: `student plays ${e.side} against full-strength Stockfish and must ${goal}; ${s.moves} moves played, ${s.status}`,
   };

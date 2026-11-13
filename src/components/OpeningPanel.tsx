@@ -179,7 +179,7 @@ export function OpeningPanel() {
 }
 
 /** The plan at the end of a line: one idea at a time; the board shows that idea's drawings. */
-function PlanCard({
+export function PlanCard({
   plan,
   index,
   onIndex,

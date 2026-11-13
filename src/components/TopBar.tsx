@@ -5,6 +5,7 @@ import { usePuzzle } from "../puzzles/session";
 import { useEndgame } from "../endgames/session";
 import { useOpening } from "../openings/session";
 import { useGuess } from "../guess/session";
+import { usePlan } from "../plans/session";
 import { NewGameDialog } from "./GameDialogs";
 import { isRemote, useConnection } from "../backend";
 import { useOutbox } from "../offline";
@@ -23,9 +24,10 @@ export function TopBar() {
   // A running session is one level below the menu it was started from.
   const endgame = useEndgame((e) => e !== null);
   const guessing = useGuess((g) => g !== null);
+  const planning = usePlan((p) => p !== null);
   const opening = useOpening((o) => o !== null);
   const analyzing = useAnalysis((a) => a !== null);
-  const session = analyzing ? "Analysis" : puzzling ? "Solving" : drilling ? "Drilling" : endgame ? "Endgame" : opening ? "Opening" : guessing ? "Guessing" : null;
+  const session = analyzing ? "Analysis" : puzzling ? "Solving" : drilling ? "Drilling" : endgame ? "Endgame" : opening ? "Opening" : guessing ? "Guessing" : planning ? "Planning" : null;
   const atHome = view === "home" && !session;
   const close = () => setDialog(null);
   return (

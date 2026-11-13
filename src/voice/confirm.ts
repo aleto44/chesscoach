@@ -6,6 +6,7 @@ import { useDrill } from "../analysis/drillSession";
 import { useEndgame } from "../endgames/session";
 import { useOpening } from "../openings/session";
 import { useGuess } from "../guess/session";
+import { usePlan } from "../plans/session";
 import { useAnalysis } from "../analysis/layer";
 
 /** Below this the recognizer was guessing at a word, so the move waits for a yes. */
@@ -13,7 +14,7 @@ const SURE_CONF = 0.6;
 
 /** The board on screen is a rated game's: nothing layered over it (a trainer, the analysis board). */
 function ratedOnScreen(): boolean {
-  const over = usePuzzle.getState() || useDrill.getState() || useEndgame.getState() || useOpening.getState() || useGuess.getState() || useAnalysis.getState();
+  const over = usePuzzle.getState() || useDrill.getState() || useEndgame.getState() || useOpening.getState() || useGuess.getState() || usePlan.getState() || useAnalysis.getState();
   return isLocked() && !over && useNav.getState().view === "board";
 }
 

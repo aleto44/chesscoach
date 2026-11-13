@@ -2394,3 +2394,78 @@ button.link {
     display: grid;
   }
 }
+
+/* School › Opening leaks: a thumbnail per position, what happened there and the fix. */
+.leak-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.leak-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.leak-row .mini-board {
+  width: 120px;
+  height: 120px;
+}
+.leak-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.leak-info .controls {
+  margin-top: 4px;
+  justify-content: flex-start;
+}
+.leak-title {
+  font-weight: 600;
+}
+.leak-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 18px;
+}
+.leak-table th,
+.leak-table td {
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.leak-table th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.85em;
+}
+.leak-table .good {
+  color: var(--accent);
+}
+.leak-table .bad {
+  color: var(--error);
+}
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--tangent);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+@media (max-width: 520px) {
+  .leak-row .mini-board {
+    width: 88px;
+    height: 88px;
+  }
+  .leak-table th:nth-child(2),
+  .leak-table td:nth-child(2) {
+    display: none;
+  }
+}

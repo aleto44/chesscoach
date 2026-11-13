@@ -15,6 +15,7 @@ import { useDrill } from "./drillSession";
 import { endgameOf, useEndgame } from "../endgames/session";
 import { openingSetOf, useOpening } from "../openings/session";
 import { useGuess } from "../guess/session";
+import { answered as planAnswered, planOf, usePlan } from "../plans/session";
 
 export interface AnalysisLayer {
   x: Explore;
@@ -62,6 +63,9 @@ export function analysisSource(): Source | null {
   if (o) return { line: o.line, ply: at(o.line, o.view), orientation: openingSetOf(o).color, from: "opening trainer" };
   const g = useGuess.getState();
   if (g) return g.status === "reveal" || g.status === "done" ? { line: g.line, ply: at(g.line, g.view), orientation: g.side, from: "guess the move" } : null;
+  const pl = usePlan.getState();
+  const pos = pl && planOf(pl);
+  if (pl) return pos && planAnswered(pl) ? { line: pl.line, ply: at(pl.line, pl.view), orientation: pos.color, from: "find the plan" } : null;
   if (useNav.getState().view !== "board") return null;
   const { line, ply, tangent } = screen();
   return { line, ply, orientation: boardOrientation(), from: tangent ? "scenario" : "game" };
@@ -79,6 +83,7 @@ export function useCanAnalyze(): boolean {
   useEndgame((e) => e?.status);
   useOpening((o) => !!o);
   useGuess((g) => g?.status);
+  usePlan((p) => p?.status);
   return analysisSource() !== null;
 }
 

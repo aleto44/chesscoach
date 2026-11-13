@@ -15,12 +15,13 @@ import { findPuzzles, recordAttempt, themeLabel, usePuzzleDb, type Puzzle, type 
 import { fromLichess, toLichess } from "../rating";
 import { stopEndgame } from "../endgames/session";
 import { stopGuess } from "../guess/session";
+import { stopPlans } from "../plans/session";
 import { stopOpening } from "../openings/session";
 import { useSettings } from "../settings";
 import { buzz, BUZZ_END, BUZZ_OPPONENT, celebrate, clearCue, cue } from "./fx";
 import { tierOf } from "../components/Mastery";
 
-const stopTrainers = () => (stopEndgame(), stopOpening(), stopGuess());
+const stopTrainers = () => (stopEndgame(), stopOpening(), stopGuess(), stopPlans());
 
 // Keys kept from the three-level days so a saved choice still loads: "easier" is Easy, "harder" is Hard.
 export type Difficulty = "easiest" | "easier" | "normal" | "harder" | "hardest";

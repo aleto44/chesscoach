@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { loadAccounts, useAccounts } from "../games/import";
 import { startDrills } from "../analysis/drillSession";
 import { useBacklog } from "../analysis/review";
-import { go } from "../nav";
+import { go, useNav } from "../nav";
 import { startPuzzles } from "../puzzles/session";
 import { themeLabel, usePuzzleDb } from "../puzzles/puzzles";
 import { fromLichess, POOL_LABEL, RATING_POOLS, signed, type RatingPool } from "../rating";
@@ -22,7 +22,9 @@ const OFFLINE = "Your games are on the computer; open the app there or from the 
 // ---- The menu ----
 
 export function ProfileMenu() {
-  const [dialog, setDialog] = useState<"import" | "saved" | null>(null);
+  // Back from a saved game reopens the list it was picked from.
+  const [dialog, setDialog] = useState<"import" | "saved" | null>(() => (useNav.getState().openSaved ? "saved" : null));
+  useEffect(() => void (useNav.getState().openSaved && useNav.setState({ openSaved: false })), []);
   const backlog = useBacklog();
   const accounts = useAccounts((s) => s.list?.filter((a) => a.account).length ?? 0);
   useEffect(() => void loadAccounts().catch(() => undefined), []);

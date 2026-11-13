@@ -318,7 +318,7 @@ export function GamesDialog({ onClose }: { onClose: () => void }) {
   const open = async (id: number) => {
     await loadGame(id);
     onClose();
-    go("board");
+    go("board", "profile");
   };
 
   const remove = async (g: GameSummary) => {

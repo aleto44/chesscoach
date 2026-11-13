@@ -31,6 +31,7 @@ import { initDrillSession } from "./analysis/drillSession";
 import { initOpeningSession } from "./openings/session";
 import { initEndgameSession } from "./endgames/session";
 import { initGuessSession } from "./guess/session";
+import { initPlanSession } from "./plans/session";
 import { initLiveEval } from "./engine/live";
 import { boot } from "./boot";
 import { launchedFrom, mark } from "./perf";
@@ -66,6 +67,7 @@ function start() {
   initOpeningSession();
   initEndgameSession();
   initGuessSession();
+  initPlanSession();
   initSounds();
   initNav();
   initLiveEval();

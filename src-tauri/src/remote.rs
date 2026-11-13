@@ -366,6 +366,7 @@ async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result
         "db_unanalyzed_games" => out(stats::db_unanalyzed_games(st())),
         "db_profile" => out(stats::db_profile(st())),
         "db_query_games" => out(stats::db_query_games(st(), arg(a, "mode")?, arg(a, "limit")?, arg(a, "gameId")?)),
+        "db_training_games" => out(stats::db_training_games(st(), arg(a, "realOnly")?, arg(a, "maxPly")?, arg(a, "limit")?)),
         "db_record_observation" => out(stats::db_record_observation(
             st(),
             arg(a, "gameId")?,

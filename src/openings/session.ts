@@ -11,6 +11,7 @@ import { findSet, markSeen, type TrainingLine, type TrainingSet } from "./traini
 import { stopPuzzles } from "../puzzles/session";
 import { stopDrills } from "../analysis/drillSession";
 import { stopGuess } from "../guess/session";
+import { stopPlans } from "../plans/session";
 import { stopEndgame } from "../endgames/session";
 import { guideAt } from "./guides";
 import { cachedExplanation, canExplain, CLOSE, compareMoves, evalText, explainOffLine, offLineFacts, parseIdeas, type MoveEvals } from "./explain";
@@ -76,6 +77,7 @@ export function startOpening(setId: string, target: TrainingLine) {
   stopPuzzles();
   stopDrills();
   stopGuess();
+  stopPlans();
   stopEndgame();
   markSeen(target);
   // A line that starts deeper (startNearSplit) has its first moves on the board already.

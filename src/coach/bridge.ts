@@ -15,6 +15,7 @@ import { openingContext } from "../openings/session";
 import { clearTrainerChat, lastTrainerExchange } from "./trainerChat";
 import { peeking } from "../nav";
 import { guessContext } from "../guess/session";
+import { planContext } from "../plans/session";
 import { cancelQuizzes } from "./quiz";
 import { refreshUsageSoon } from "./usage";
 
@@ -138,7 +139,7 @@ async function screenLines(): Promise<string[]> {
     const note = drill.answered ? " (the drill's answer; the student has already answered)" : " (the drill's answer: don't reveal it unless asked)";
     return [...out, ...(await engineLines(drill.startFen, note))];
   }
-  const trainer = endgameContext() ?? openingContext() ?? guessContext();
+  const trainer = endgameContext() ?? openingContext() ?? guessContext() ?? planContext();
   if (trainer) {
     // The trainer's own explanation is in the chat column too: a follow-up question is usually about it.
     const said = lastTrainerExchange();

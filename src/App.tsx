@@ -10,6 +10,8 @@ import { EndgamePanel } from "./components/Endgames";
 import { OpeningPanel } from "./components/OpeningPanel";
 import { openingStep, useOpening } from "./openings/session";
 import { GuessPanel } from "./components/Guess";
+import { PlanPanel } from "./components/Plans";
+import { planStep, usePlan } from "./plans/session";
 import { endgameStep, useEndgame } from "./endgames/session";
 import { guessStep, useGuess } from "./guess/session";
 import { back, peeking, useNav } from "./nav";
@@ -30,6 +32,7 @@ export default function App() {
   const endgame = useEndgame((e) => e !== null);
   const opening = useOpening((o) => o !== null);
   const guessing = useGuess((g) => g !== null);
+  const planning = usePlan((p) => p !== null);
   const onBoard = useNav((n) => n.view === "board");
   // A coach scenario opened over a session shows on the main board; the session waits underneath.
   const peeked = useNav((n) => n.peek);
@@ -67,7 +70,9 @@ export default function App() {
               ? openingStep
             : useGuess.getState()
               ? guessStep
-              : null;
+              : usePlan.getState()
+                ? planStep
+                : null;
       if (session) {
         // A puzzle or drill: the arrow keys step through its moves, Escape leaves it.
         const keys: Record<string, Step> = { ArrowLeft: -1, ArrowRight: 1, Home: "start", End: "end" };
@@ -105,7 +110,7 @@ export default function App() {
       <TopBar />
       {analyzing ? (
         <AnalysisPanel />
-      ) : peek && (puzzling || drilling || endgame || opening || guessing) ? (
+      ) : peek && (puzzling || drilling || endgame || opening || guessing || planning) ? (
         <BoardPanel />
       ) : puzzling ? (
         <PuzzlePanel />
@@ -117,6 +122,8 @@ export default function App() {
         <OpeningPanel />
       ) : guessing ? (
         <GuessPanel />
+      ) : planning ? (
+        <PlanPanel />
       ) : onBoard ? (
         <BoardPanel />
       ) : (
