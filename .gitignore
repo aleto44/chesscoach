@@ -26,7 +26,10 @@ dist-ssr
 # Copied from node_modules on install
 public/stockfish
 public/maia3
+public/vosk
 
 # Claude Code local settings
 .claude/settings.local.json
 crash.log
+dev-console.log
+crash-console.log

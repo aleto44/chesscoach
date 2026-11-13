@@ -14,6 +14,7 @@ import {
   evalShown,
   opponentLabel,
   scenarioOf,
+  quizWaiting,
   boardOrientation,
   type GameMeta,
 } from "../store";
@@ -48,8 +49,10 @@ export function BoardPanel() {
   const nudge = useNudge();
   const nudgeShapes = useMemo(() => (nudge ? bestShape(nudge) : []), [nudge]);
   const locked = isLocked(meta);
-  // Reviewing a finished game always shows the eval and the engine's lines; no toggle there.
-  const showEval = evalShown(useSettings((s) => s.showEval), meta);
+  // Reviewing a finished game always shows the eval and the engine's lines; no toggle there. An open
+  // quiz from the coach hides them (and the toggle) until it's answered.
+  const quiz = useStore((s) => quizWaiting(s.chat, s.active));
+  const showEval = evalShown(useSettings((s) => s.showEval), meta) && !quiz;
   const reviewing = !!meta.result;
   const canTakeBack = takebackPly(game, meta) !== null;
   const tangent = active ? tangents[active] : null;
@@ -117,7 +120,7 @@ export function BoardPanel() {
       </nav>
 
       <div className={`board-frame ${tangent ? "tangent" : ""} ${showEval ? "with-eval" : ""}`}>
-        {!locked && !reviewing && (
+        {!locked && !reviewing && !quiz && (
           <button
             className={`eval-toggle ${showEval ? "on" : ""}`}
             onClick={() => saveSetting("showEval", !showEval)}

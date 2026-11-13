@@ -23,6 +23,8 @@ export type View =
   | "ratings"
   | "endgames"
   | "guess"
+  | "utility"
+  | "timer"
   | "board";
 
 export const VIEW_TITLE: Record<View, string> = {
@@ -39,6 +41,8 @@ export const VIEW_TITLE: Record<View, string> = {
   ratings: "Rating history",
   endgames: "Endgame trainer",
   guess: "Guess the move",
+  utility: "Utility",
+  timer: "Chess clock",
   board: "Board",
 };
 
@@ -49,7 +53,6 @@ const PARENT: Partial<Record<View, View>> = {
   drills: "school",
   openings: "school",
   puzzles: "home",
-  board: "games",
   "drill-history": "drills",
   "puzzle-history": "puzzles",
   profile: "home",
@@ -57,6 +60,8 @@ const PARENT: Partial<Record<View, View>> = {
   ratings: "profile",
   endgames: "school",
   guess: "school",
+  utility: "home",
+  timer: "utility",
 };
 
 /**
@@ -74,35 +79,56 @@ function savedView(): View {
   return "home";
 }
 
+/** The board's back button returns to the menu that opened it (Games, or Utility's analysis board). */
+const BOARD_FROM_KEY = "cc-board-from";
+function savedBoardFrom(): View {
+  try {
+    if (localStorage.getItem(BOARD_FROM_KEY) === "utility") return "utility";
+  } catch {
+    // Private mode: Games.
+  }
+  return "games";
+}
+
 /**
  * `peek`: a coach scenario is open over a puzzle, drill or trainer session, which keeps running
  * underneath; returning from the scenario goes back to it.
  */
-export const useNav = create<{ view: View; peek: boolean }>(() => ({ view: savedView(), peek: false }));
-useNav.subscribe(({ view }) => {
+export const useNav = create<{ view: View; peek: boolean; boardFrom: View }>(() => ({
+  view: savedView(),
+  peek: false,
+  boardFrom: savedBoardFrom(),
+}));
+useNav.subscribe(({ view, boardFrom }) => {
   try {
     localStorage.setItem(VIEW_KEY, view);
+    localStorage.setItem(BOARD_FROM_KEY, boardFrom);
   } catch {
     // Private mode: nothing to keep.
   }
 });
 
-/** Going anywhere leaves a running puzzle or drill session. */
-export function go(view: View) {
+/**
+ * Going anywhere leaves a running puzzle or drill session. `from` names the menu the board's
+ * back button returns to: Games unless Utility's analysis board opened it.
+ */
+export function go(view: View, from?: "games" | "utility") {
   closeAnalysis();
   stopPuzzles();
   stopDrills();
   stopEndgame();
   stopOpening();
   stopGuess();
-  useNav.setState({ view, peek: false });
+  useNav.setState(view === "board" ? { view, peek: false, boardFrom: from ?? "games" } : { view, peek: false });
 }
+
+const parentOf = (v: View): View | undefined => (v === "board" ? useNav.getState().boardFrom : PARENT[v]);
 export const goHome = () => go("home");
 
 /** Home first, the current screen last. */
 export function trail(view: View): View[] {
   const out: View[] = [];
-  for (let v: View | undefined = view; v; v = PARENT[v]) out.unshift(v);
+  for (let v: View | undefined = view; v; v = parentOf(v)) out.unshift(v);
   return out;
 }
 
@@ -115,7 +141,7 @@ export function back() {
   if (useEndgame.getState()) return stopEndgame();
   if (useOpening.getState()) return stopOpening();
   if (useGuess.getState()) return stopGuess();
-  const parent = PARENT[useNav.getState().view];
+  const parent = parentOf(useNav.getState().view);
   if (parent) go(parent);
 }
 

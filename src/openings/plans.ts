@@ -960,6 +960,294 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
   ],
 
+  // ---- King's Indian: punishing White (Black) ----
+  "King's Indian Defense: Mar del Plata, 10.f3 and the ...g5 storm": [
+    I(
+      "The race is on",
+      "The centre is locked, so each side attacks where its pawns point. White has c5 in and will open the c-file with cxd6 and Nb5 against c7. Your attack on the kingside is usually faster: don't spend moves on the queenside unless c7 really falls.",
+      "r:c5d6 r:c3b5 r:c7",
+    ),
+    I(
+      "...h5 and ...g4",
+      "...h5 then ...g4 opens lines at White's king. The knights on f6 and g6 are already in place, and ...Rf7 helps twice: it guards c7 along the seventh rank and can swing to g7 once the g-file opens.",
+      "g:h7h5 g:g5g4 r:f3 b:f8f7",
+    ),
+    I(
+      "When Nb5 comes",
+      "After cxd6 cxd6, Nb5 hits d6 and eyes c7. ...Ne8 or ...Rf7 holds both; then go straight back to ...g4.",
+      "r:c3b5 b:f6e8 y:c7",
+    ),
+  ],
+  "King's Indian Defense: Bayonet, 9.b4 Nh5": [
+    I(
+      "Kick the knight with ...h6",
+      "Ng5 eyes e6 and f7. ...h6 sends it away; if it jumps to e6, take it: ...Bxe6 dxe6, and the e6 pawn is cut off from White's chain and becomes a target.",
+      "g:h7h6 r:g5e6 b:c8e6",
+    ),
+    I(
+      "Then ...fxe4 and ...d5",
+      "With the knight gone, trade on e4 (...fxe4) and push ...d5 once the square is free. Your centre rolls forward and the g7 bishop's diagonal opens toward c3 and a1.",
+      "g:f5e4 g:d6d5 y:g7a1",
+    ),
+    I(
+      "White's queenside: c5 and b5",
+      "White's plan is c5 and b5 to open lines on your queenside. ...c6 already asked d5 the question; take back toward the centre (...cxd5) so the c-file opens for you too.",
+      "r:c4c5 r:b4b5 g:c6d5",
+    ),
+  ],
+  "King's Indian Defense: Orthodox, 8.Be3 Ng4 main line": [
+    I(
+      "Play where your pawns point",
+      "d5 closed the centre. Your f5 and g5 pawns point at White's king, so that's where you play; White's play is c5 on the queenside.",
+      "y:f5 y:g5 r:c4c5",
+    ),
+    I(
+      "A knight to f4",
+      "Bring the e7 knight to g6 and on to f4, where it hits e2, g2 and d3. It's so strong there that White often gives the g3 bishop for it.",
+      "b:e7g6 b:g6f4 y:f4",
+    ),
+    I(
+      "If exf5, take with the bishop",
+      "exf5 Bxf5 gives your light bishop a fine diagonal, and Nde4 is met by ...Ng6, heading for f4 again.",
+      "r:e4f5 b:c8f5",
+    ),
+  ],
+  "King's Indian Defense: Orthodox, 8.Be3 Ng4 9.Qd2?": [
+    I(
+      "Qd2 gave you the bishop pair",
+      "Qd2 left the e3 bishop to be taken: ...Nxe3 fxe3 won you the bishop pair, and after ...exd4 exd4 the d4 pawn has no e3 pawn behind it. Now everything hits d4: the g7 bishop, the c6 knight, and ...Bg4, which threatens to take its defender on f3.",
+      "y:g7d4 r:d4 b:c6d4 r:g4f3",
+    ),
+    I(
+      "If d5, ...Bxf3 and ...Nd4",
+      "d5 is White's best, kicking the knight. Answer ...Bxf3 and ...Nd4: the knight sits on d4 for good, and ...Qh4 and ...f5 go after White's loosened king.",
+      "g:g4f3 b:c6d4 b:d8h4 g:f7f5",
+    ),
+  ],
+  "King's Indian Defense: Orthodox, 8.Be3 Ng4 9.Bc1?": [
+    I(
+      "The rook on f2 is pinned",
+      "Retreating the bishop let ...exd4 and ...Nxf2 through, and now the d4 bishop pins the f2 rook to White's king. Pile up on it: ...fxe4 opens the f-file for your f8 rook.",
+      "y:d4g1 r:f2 g:f5e4 y:f8f2",
+    ),
+    I(
+      "Keep the pin until it pays",
+      "You're a pawn up and the pin costs White time. Develop with ...Be6; don't trade the d4 bishop for a minor piece, which just lets the rook go.",
+      "b:c8e6 y:d4",
+    ),
+  ],
+  "King's Indian Defense: Orthodox, 8.Bg5 and 10.Bg3?": [
+    I(
+      "The g7 bishop won the pawn",
+      "Bg3 took the pin off your f6 knight, and ...exd4 and ...Nxe4 worked because the g7 bishop x-rays d4 and c3: White couldn't take back on e4 without dropping the d4 knight. You're a clean pawn up, White's c-pawns are doubled, and the bishop already hits c3.",
+      "y:g7c3 r:c3 r:c4",
+    ),
+    I(
+      "Go after c4",
+      "...Be6 and ...Rb8 gang up on the queenside pawns; the b-file is half-open for your rook.",
+      "b:c8e6 r:c4 b:a8b8",
+    ),
+    I(
+      "White's only play: f4",
+      "White wants f4 to open lines at your king, aiming at the g5 pawn. f4 also loosens c3: ...Bxc3 often just takes another pawn.",
+      "r:f2f4 r:g5 g:g7c3",
+    ),
+  ],
+  "King's Indian Defense: Gligoric, 7.Be3 Ng4 8.Bd2?": [
+    I(
+      "You're a piece up",
+      "...exd4 Nxd4 Bxd4 Bxg4 Qh4 forked the g4 bishop and f2, so you've won a piece. The g4 bishop now hits White's queen, which has to move.",
+      "r:g4d1 y:d4f2",
+    ),
+    I(
+      "Trade down, keep it simple",
+      "Develop the last pieces (...Nc6 or ...Nd7, ...Be6) and trade when you can: every trade makes the extra piece count more. Nb5 hits your d4 bishop and c7; ...Bb6 is the retreat.",
+      "b:b8c6 r:c3b5 b:d4b6",
+    ),
+  ],
+  "King's Indian Defense: Classical, ...exd4 and ...d5": [
+    I(
+      "...d5 opens the centre for your pieces",
+      "f3 held e4, so you hit it again with ...d5. Now the e-file and the long diagonal are open: the g7 bishop and e8 rook aim at White's centre, and ...dxe4 can open them further.",
+      "y:g7d4 y:e8e4 g:d5e4",
+    ),
+    I(
+      "Develop with ...Nc6",
+      "...Nc6 hits d4 a second time and makes ...Nxd4 a threat. Then ...Be6 and a rook to the open c-file.",
+      "b:b8c6 r:d4 b:c8e6",
+    ),
+    I(
+      "Watch the pins",
+      "Bg5 pins your f6 knight and Bb5 hits the e8 rook. ...h6 and ...Bd7 deal with them; keep an eye on d5 while you do.",
+      "r:c1g5 r:e2b5 g:h7h6",
+    ),
+  ],
+  "King's Indian Defense: Classical, ...exd4 9.Qc2?": [
+    I(
+      "The e4 knight is pinned",
+      "Your f5 bishop pins the e4 knight to White's queen, and the e8 rook hits it too. White has to spend moves holding it (Bd3), and you're already a pawn up.",
+      "y:f5c2 r:e4 y:e8e4",
+    ),
+    I(
+      "The d4 bishop runs the board",
+      "After Nxe4 Bxd4 the g7 bishop landed on d4 with a pawn in hand, and it's your best piece: it hits b2 and f2. Keep it there; ...c5 supports it.",
+      "y:d4b2 y:d4f2 g:c7c5",
+    ),
+    I(
+      "Bring the last knight",
+      "...Nc6 and ...Ne5 put the knight on a fine central square, eyeing c4, d3 and f3.",
+      "b:b8c6 b:c6e5",
+    ),
+  ],
+  "King's Indian Defense: Classical, ...exd4 9.Bf4?": [
+    I(
+      "A pawn up, and d4 is tied down",
+      "...Nxe4 worked because after Nxe4 Rxe4 your rook and the g7 bishop both hit d4, and the f4 bishop was loose too. Now you're a clean pawn up; keep the pressure on d4.",
+      "y:g7d4 y:e4d4 r:d4",
+    ),
+    I(
+      "Develop and target c4",
+      "...Nc6 adds to d4 and ...Be6 hits c4. Your queen on e7 backs up the rook on the e-file.",
+      "b:b8c6 b:c8e6 r:c4",
+    ),
+    I(
+      "Watch Nb5",
+      "Nb5 hits c7. But the knight leaves d4, so your bishop sees b2: ...Bxb2 is often there, or ...Na6 simply covers c7.",
+      "r:d4b5 r:c7 y:g7b2",
+    ),
+  ],
+  "King's Indian Defense: Glek, 8.Be3 Ng4": [
+    I(
+      "The Glek knight's journey",
+      "The point of ...Na6 is the route ...Nc5-e6-d4. With the d-file open, d4 is a hole in White's camp, and a knight there is the best piece on the board.",
+      "b:a6c5 b:c5e6 b:e6d4 y:d4",
+    ),
+    I(
+      "...Nh5-f4 too",
+      "The other knight can head for f4, another hole, by ...Nh5. If White covers both squares with Be3, ...Ne6 and ...Nd4 still come.",
+      "b:f6h5 b:h5f4 y:f4",
+    ),
+    I(
+      "White's play",
+      "White pushes the queenside (a3, b4, c5) and uses the d-file. ...c6 keeps a White knight off d5.",
+      "r:b2b4 r:c4c5 g:c7c6",
+    ),
+  ],
+  "King's Indian Defense: Glek, 8.d5 Nc5": [
+    I(
+      "d5 gave your knight c5",
+      "Closing the centre handed the a6 knight c5, where it hits e4. ...a5 and ...b6 make sure b4 can't kick it, so White has to trade it (Nd2-b3, or Bxc5).",
+      "y:c5 r:e4 r:b2b4",
+    ),
+    I(
+      "Then ...Nh5 and ...f5",
+      "As in every closed King's Indian, your break is ...f5. ...Nh5 (or ...Nh7) clears the f-pawn's path first.",
+      "b:f6h5 g:f7f5",
+    ),
+    I(
+      "If Bxc5",
+      "Recapture with the b-pawn (...bxc5): your pawns then hold b4 and d4, and the b-file opens for your rook.",
+      "r:e3c5 g:b6c5",
+    ),
+  ],
+  "King's Indian Defense: Glek, queens off and 11.Nd5?": [
+    I(
+      "A pawn up, with the centre",
+      "11.Nd5 left e4 without a guard: ...Nxe4 won the pawn, and Ne7+ and Nxc8 only traded a knight for your bishop. Your knight on e4 and the e5 and f5 pawns own the centre.",
+      "y:e4 y:e5 y:f5",
+    ),
+    I(
+      "Roll forward: ...f4 and ...e4",
+      "...f4 kicks the e3 bishop, then ...e4 kicks the f3 knight and opens the long diagonal for your g7 bishop.",
+      "g:f5f4 g:e5e4 y:g7b2",
+    ),
+    I(
+      "A knight for d3",
+      "...Nac5 heads for d3 once ...e4 is in, a knight White can hardly remove.",
+      "b:a6c5 b:c5d3",
+    ),
+  ],
+  "King's Indian Defense: Four Pawns, 10.e5 main line": [
+    I(
+      "...c4+ uncovers the queen",
+      "Your queen on b6 and White's king on g1 share a diagonal, blocked only by your c5 pawn. ...c4+ gives check, gains a tempo and frees c5 for a knight.",
+      "y:b6g1 g:c5c4",
+    ),
+    I(
+      "Blockade the d-pawn",
+      "You're a pawn up, but White's d5 pawn is passed. Put pieces in front of it: ...Bf5, ...Nd7 and a knight to c5 or d6 hold it, and the e5 bishop guards d6.",
+      "b:c8f5 b:b8d7 r:d5",
+    ),
+    I(
+      "White's play: the f-file and Bc4",
+      "White has the open f-file against f7 and quick development (Bc4, Qd2). ...Bf5 and ...Nd7 cover the light squares; ...h6 asks the g5 bishop.",
+      "r:f1f7 r:e2c4",
+    ),
+  ],
+  "King's Indian Defense: Four Pawns, early 9.e5? and 10.Nxd5": [
+    I(
+      "e5 came too soon",
+      "White pushed e5 before taking on d5, so ...Ne4 hit c3 at once and White had to give up the centre. Now e5 is attacked by your c6 knight and g7 bishop.",
+      "y:c6e5 y:g7e5 r:e5",
+    ),
+    I(
+      "Take on d5",
+      "...Bxd5 cxd5 Qxd5 removes the knight and wins the d5 pawn with a centralised queen.",
+      "g:e6d5 b:d8d5",
+    ),
+    I(
+      "If Bxe4",
+      "Bxe4 fxe4 opens the f-file for your rook, and the e4 pawn cramps White's kingside.",
+      "r:d3e4 y:f8f3",
+    ),
+  ],
+  "King's Indian Defense: Four Pawns, early 9.e5? and 10.cxd5": [
+    I(
+      "White's king and pawns are a mess",
+      "Pushing e5 too early cost White the centre: the king is still on e1, c3 is weak, and the e6 pawn is cut off from the rest.",
+      "r:e1 r:c3 r:e6",
+    ),
+    I(
+      "Win the e6 pawn",
+      "...Bxe6 takes it at once; ...Qe7 first also hits it and lines up on the e-file against the king.",
+      "b:c8e6 b:d8e7",
+    ),
+    I(
+      "Aim at e1 and c3",
+      "...Re8 opens the e-file at the uncastled king, and once the f6 knight moves, the g7 bishop hits c3.",
+      "y:e8e1 y:g7c3",
+    ),
+  ],
+  "London System: King's Indian, 7.c4 Nh5": [
+    I(
+      "You took the London bishop",
+      "The London's whole idea is the f4 bishop. Without h3 it had no safe retreat, so ...Nh5 hunted it down: you have the bishop pair and White has doubled g-pawns. Open the position for the bishops with ...c5 or ...e5.",
+      "y:g7a1 g:c7c5 g:e7e5",
+    ),
+    I(
+      "Mind your kingside",
+      "...h6 and ...g5 loosened your king, and with White's h-pawn gone the h-file is half-open toward h6. Keep the g7 bishop and a knight (...Nf6) near the king, and don't rush ...f5.",
+      "y:h1h6 b:d7f6",
+    ),
+  ],
+  "London System: King's Indian, ...Qb6 and ...Be6": [
+    I(
+      "The a-file is yours",
+      "Qb3 offered a queen trade, and ...Be6 made White take on your terms: after axb6 your rook owns the a-file, and a2 is attacked twice (rook and e6 bishop) and defended once. If White doesn't deal with it (a3), ...Rxa2.",
+      "y:a8a2 y:e6a2 r:a2",
+    ),
+    I(
+      "...Nd5 hits the London bishop",
+      "After a3, ...cxd4 and ...Nd5: the knight hits the f4 bishop and c3, and ...Nc6 follows.",
+      "b:f6d5 r:f4 b:b8c6",
+    ),
+    I(
+      "The doubled b-pawns are fine",
+      "The b6 pawn covers c5 and a5 and isn't easy to attack. The half-open a-file is worth far more.",
+      "y:b6",
+    ),
+  ],
+
   // ---- Queen's Gambit Declined (Black) ----
   "Queen's Gambit Declined: Tartakower": [
     I(

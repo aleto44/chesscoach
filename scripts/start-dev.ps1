@@ -27,12 +27,18 @@ Write-Host "Starting Chess Coach. The first start after Rust changes compiles fo
 # A crash after the app has been up a while (e.g. a native WebView2 crash on a page reload) restarts
 # it; the data is in SQLite, so nothing is lost. A failure right after starting is usually a build
 # error, which restarting won't fix, so that one stops and waits.
+# The console is also kept in dev-console.log, and a crashed run's in crash-console.log, so a crash
+# can be looked into afterwards: the exit code alone doesn't say what died. cmd does the 2>&1, since
+# PowerShell 5.1 turns a native command's stderr into errors, which would stop this script.
+$log = Join-Path $repo "dev-console.log"
 while ($true) {
     $started = Get-Date
-    npm run tauri dev
-    if ($LASTEXITCODE -eq 0) { break }
+    cmd /c "npm run tauri dev 2>&1" | Tee-Object -FilePath $log
+    $code = $LASTEXITCODE
+    if ($code -eq 0) { break }
     $ranFor = ((Get-Date) - $started).TotalSeconds
     if ($ranFor -lt 60) { Read-Host "Chess Coach stopped with an error (see above). Press Enter to close"; break }
-    Write-Host "Chess Coach crashed (exit $LASTEXITCODE) after $([int]$ranFor)s. Restarting..." -ForegroundColor Yellow
-    Add-Content -Path (Join-Path $repo "crash.log") -Value "$(Get-Date -Format s) exit $LASTEXITCODE after $([int]$ranFor)s"
+    Write-Host "Chess Coach crashed (exit $code) after $([int]$ranFor)s. Restarting..." -ForegroundColor Yellow
+    Copy-Item $log (Join-Path $repo "crash-console.log") -Force
+    Add-Content -Path (Join-Path $repo "crash.log") -Value "$(Get-Date -Format s) exit $code after $([int]$ranFor)s (console: crash-console.log)"
 }

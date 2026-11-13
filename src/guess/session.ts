@@ -14,6 +14,7 @@ import { stopPuzzles } from "../puzzles/session";
 import { stopDrills } from "../analysis/drillSession";
 import { stopEndgame } from "../endgames/session";
 import { stopOpening } from "../openings/session";
+import { keepSession } from "../persist";
 
 export interface GuessGame {
   /** Saved best scores are kept per id; pasted games have none. */
@@ -83,6 +84,22 @@ export function startGuess(game: GuessGame, side: Color, skip = 0) {
   stopOpening();
   useGuess.setState({ game, side, line: built.line, status: "waiting", message: "", results: [], shapes: [], view: null }, true);
   advance();
+}
+
+/** Restores the last session (if any) and keeps saving it, for a phone that dropped the page. Call once at startup. */
+export const initGuessSession = () =>
+  keepSession(useGuess, "cc-guess", (s) => !!(s.game?.sans && s.line?.fens && Array.isArray(s.results)), resume);
+
+/** Picks a saved session back up, redoing what was in progress when the page went away. */
+function resume(saved: GuessSession) {
+  useGuess.setState(saved, true);
+  // The other side's move was on its way.
+  if (saved.status === "waiting") return advance();
+  // The engine was still scoring a guess: the guess is taken back, to make again.
+  if (saved.status === "checking") {
+    const built = buildLine(saved.line.startFen, saved.game.sans.slice(0, saved.line.sans.length - 1));
+    if ("line" in built) set({ line: built.line, status: "guessing", message: "", shapes: [], view: null });
+  }
 }
 
 export const stopGuess = () => useGuess.setState(null, true);

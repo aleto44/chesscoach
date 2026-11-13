@@ -8,6 +8,7 @@ import { POOL_LABEL, RATING_POOLS, START_RATING, type RatingPool } from "../rati
 import { newId, pushChat, useStore } from "../store";
 import { Modal } from "./GameDialogs";
 import { VisualSettings } from "./VisualSettings";
+import { VoiceSettings } from "./VoiceSettings";
 import { canVibrate } from "../haptics";
 import { customSounds, loadSounds, play, playableSounds, SOUND_NAMES, soundFailures, type SoundName } from "../sound";
 
@@ -127,6 +128,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           <span>Vibrate on moves</span>
         </label>
       )}
+      <VoiceSettings />
       <label className="toggle">
         <input type="checkbox" checked={showEval} onChange={(e) => saveSetting("showEval", e.target.checked)} />
         <span>Show engine evaluation</span>

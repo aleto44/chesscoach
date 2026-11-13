@@ -10,6 +10,7 @@ import { isRemote, useConnection } from "../backend";
 import { useOutbox } from "../offline";
 import { SettingsDialog } from "./SettingsDialog";
 import { AnalysisButton } from "./Analysis";
+import { VoiceButton } from "./Voice";
 import { useAnalysis } from "../analysis/layer";
 
 /** App-wide bar: back and home on the left, where you are, then a quick new game and settings. */
@@ -60,6 +61,7 @@ export function TopBar() {
         </nav>
         <span className="spacer" />
         <OfflineChip />
+        <VoiceButton />
         <AnalysisButton />
         <button className="primary" onClick={() => setDialog("new")}>
           New game

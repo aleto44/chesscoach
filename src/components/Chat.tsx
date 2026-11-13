@@ -46,11 +46,9 @@ export function Chat() {
   useBoardBottom(phone);
   useChromeHeights(phone);
 
-  // Minimized on a phone: a question asked from a button (Ask the coach) opens it to show the answer.
+  // Minimized on a phone stays minimized until the student opens it: the tab shows the coach is
+  // busy and how many messages there are (it used to pop open whenever the coach started thinking).
   const thinking = busy || trainer.thinkingSince !== null;
-  useEffect(() => {
-    if (phone && thinking && useSheet.getState().sheet === "tab") openSheet("half");
-  }, [thinking]);
 
   useEffect(() => {
     // Scrolls the messages list only; scrollIntoView would also scroll the phone's page.
@@ -155,10 +153,6 @@ export function Chat() {
   );
 }
 
-/**
- * Desktop: the hidden coach's tab on the right edge. A dot shows while it's thinking, and another
- * when something new came in since it was hidden.
- */
 /** Phones: the coach minimized to a tab in the bottom corner; a tap opens it under the board. */
 function PhoneCoachTab({ busy, count }: { busy: boolean; count: number }) {
   const [seen] = useState(count);
@@ -172,6 +166,10 @@ function PhoneCoachTab({ busy, count }: { busy: boolean; count: number }) {
   );
 }
 
+/**
+ * Desktop: the hidden coach's tab on the right edge. A dot shows while it's thinking, and another
+ * when something new came in since it was hidden.
+ */
 function CoachTab({ busy, count }: { busy: boolean; count: number }) {
   const [seen] = useState(count);
   return (

@@ -1022,6 +1022,17 @@ button.link {
 .opening-pick .segmented {
   flex-wrap: wrap;
 }
+/* The ways to train the picked opening sit under it, indented and smaller, so they read as its sub-choice. */
+.opening-pick .opening-modes {
+  align-items: center;
+  margin-left: 14px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+}
+.opening-pick .opening-modes button {
+  font-size: 0.9em;
+  padding: 4px 10px;
+}
 
 /* Trainers whose status can run to more lines under the board (the opening trainer's engine numbers,
    the endgame hint): the board leaves room for them, the same in every state so it doesn't jump. If
@@ -1030,6 +1041,16 @@ button.link {
   .board-panel.tall-status {
     --board-w: min(100%, calc(100vh - 345px));
     overflow-y: auto;
+    /* Room for the scrollbar kept either way: a longer message that made it appear used to narrow
+       the panel and shift the centred board sideways. */
+    scrollbar-gutter: stable both-edges;
+  }
+}
+/* Phones: these trainers' status changes length move to move, so the board sits at the top instead
+   of centred (centred, every longer message pushed the board up). */
+@media (max-width: 760px) {
+  .board-panel.drills.tall-status > :first-child:not(.drill-body) {
+    margin-top: 0;
   }
 }
 .status-extra {
@@ -2175,5 +2196,201 @@ button.link {
   }
   80% {
     transform: translateX(calc(-50% + 4px));
+  }
+}
+
+/* The opening trainer's note before the student's move in a deeper line (openings/guides.ts). */
+.drill-status .opening-note {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+/* ---- Utility → Chess clock: two halves to tap, a control bar between them ---- */
+
+.timer-screen {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+  background: var(--bg);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.timer-half {
+  display: grid;
+  place-items: center;
+  margin: 10px;
+  border-radius: 18px;
+  border: 2px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  touch-action: manipulation;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.timer-half.facing .timer-face {
+  transform: rotate(180deg);
+}
+
+.timer-half.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.timer-half.active.low {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+
+.timer-half.flagged {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
+}
+
+.timer-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.timer-time {
+  font-size: clamp(56px, 16vmin, 140px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--text);
+}
+
+.timer-half.active .timer-time,
+.timer-half.flagged .timer-time {
+  color: #fff;
+}
+
+.timer-info {
+  font-size: 15px;
+  text-align: center;
+  padding: 0 16px;
+}
+
+.timer-bar {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.timer-bar button {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  font-size: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.timer-bar .timer-main {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* The top bar has a back button on desktop. */
+.timer-bar .timer-exit {
+  display: none;
+}
+
+.timer-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.timer-presets .on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.modal.timer-setup {
+  overflow-y: auto;
+}
+
+.timer-split {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timer-swap {
+  align-self: center;
+}
+
+.timer-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px 12px;
+  margin: 0;
+}
+
+.timer-fields legend {
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+.timer-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.timer-stepper-row {
+  display: flex;
+  gap: 4px;
+}
+
+.timer-stepper-row button {
+  width: 36px;
+  padding: 0;
+}
+
+.timer-stepper-row input {
+  width: 52px;
+  text-align: center;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+@media (max-width: 760px) {
+  /* The whole phone: over the top bar and the coach's sheet, under dialogs (z-index 30). */
+  .timer-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    height: 100dvh;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+
+  .timer-half {
+    margin: 8px;
+  }
+
+  .timer-bar .timer-exit {
+    display: grid;
   }
 }

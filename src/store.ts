@@ -279,6 +279,14 @@ export function scenarioOf(chat: ChatItem[], tangentId: string | null): Scenario
   return chat.find((c): c is ScenarioItem => c.kind === "tangent" && c.tangentId === tangentId);
 }
 
+/**
+ * The coach's quiz on this board still waits for the student's move (coach/quiz.ts). The engine's
+ * eval and lines would give the answer away, so they stay hidden until it's answered or skipped.
+ */
+export function quizWaiting(chat: ChatItem[], tangentId: string | null): boolean {
+  return !!tangentId && chat.some((c) => c.kind === "quiz" && c.tangentId === tangentId && c.status === "waiting");
+}
+
 type PovItem = Extract<ChatItem, { kind: "tangent" | "quiz" }>;
 
 /**

@@ -27,6 +27,7 @@ import { isLocked, useStore } from "../store";
 import { Board } from "./Board";
 import { SquareText } from "./SquareText";
 import { planShapes, type PlanIdea } from "../openings/plans";
+import { guideAt } from "../openings/guides";
 import { BoardSteps, StepButtons } from "./StepButtons";
 
 /** Replaces the game board while an opening line is being trained. */
@@ -46,12 +47,27 @@ export function OpeningPanel() {
   const explaining = useTrainerChat((t) => t.thinkingSince !== null);
   // At the end of the line: the plan for the student's side, one idea at a time with its drawings.
   const plan = openingPlan(s);
+  // Off the line, once asked: the coach's "why" in the same shape, drawn on the position before the move.
+  const whyIdeas = !past && s.status === "off" ? (s.why?.ideas ?? null) : null;
+  const cards = plan ?? whyIdeas;
   const [ideaIndex, setIdeaIndex] = useState(0);
-  useEffect(() => setIdeaIndex(0), [s.line, s.target]);
-  const idea = plan?.[Math.min(ideaIndex, plan.length - 1)] ?? null;
+  useEffect(() => setIdeaIndex(0), [s.line, s.target, whyIdeas]);
+  const idea = cards?.[Math.min(ideaIndex, cards.length - 1)] ?? null;
   const ideaShapes = useMemo(() => (idea ? planShapes(idea) : null), [idea]);
   // Messages speak about the latest moves; a move they name is placed on the position it's played from.
   const said = lastMoveContext(s.line);
+  // Deeper lines have a note on what to think about before each of the student's moves (guides.ts),
+  // shown when asked for (Hint) or after a wrong move, never up front: finding the idea is the exercise.
+  const len = s.line.sans.length;
+  const note = past || whyIdeas
+    ? null
+    : s.status === "playing" && s.noteAt === len
+      ? guideAt(s.target, len)
+      : s.status === "off" && s.why
+        ? guideAt(s.target, len - 1)
+        : null;
+  const noteShapes = useMemo(() => (note ? planShapes({ title: "", text: note.text, draw: note.draw }) : []), [note?.text]);
+  const boardShapes = useMemo(() => [...shapes, ...noteShapes], [shapes, noteShapes]);
 
   return (
     <main className="board-panel drills tall-status">
@@ -68,13 +84,13 @@ export function OpeningPanel() {
       </div>
       <div className="board-frame drill">
         <Board
-          fen={s.line.fens[ply]}
-          lastMove={ply > 0 ? s.line.lastMoves[ply - 1] : undefined}
+          fen={s.line.fens[whyIdeas ? len - 1 : ply]}
+          lastMove={whyIdeas ? s.line.lastMoves[len - 2] : ply > 0 ? s.line.lastMoves[ply - 1] : undefined}
           orientation={set.color}
           onMove={openingMove}
           canMove={s.status === "playing" && !past}
           premoveColor={!over && !past ? set.color : undefined}
-          shapes={past ? undefined : (ideaShapes ?? shapes)}
+          shapes={past ? undefined : (ideaShapes ?? boardShapes)}
         />
         <BoardSteps onStep={openingStep} disabled={s.line.sans.length === 0} />
       </div>
@@ -89,6 +105,13 @@ export function OpeningPanel() {
             <strong>{close ? "≈ " : s.status === "off" ? "✗ " : "✓ "}</strong>
             <SquareText text={s.message} {...said} />
             {s.status === "off" && s.why?.evals && <WhyEvals why={s.why} at={said.at} />}
+            {note && (
+              <span className="opening-note">
+                <strong>Think: </strong>
+                <SquareText text={note.text} {...said} />
+              </span>
+            )}
+
           </>
         ) : (
           <>
@@ -99,11 +122,26 @@ export function OpeningPanel() {
                 <SquareText text={s.message} {...said} />
               </span>
             )}
+            {note && (
+              <span className="opening-note">
+                <strong>Think: </strong>
+                <SquareText text={note.text} {...said} />
+              </span>
+            )}
           </>
         )}
       </div>
       {plan && idea && !past && (
-        <PlanCard plan={plan} index={plan.indexOf(idea)} onIndex={setIdeaIndex} at={s.line.fens[s.line.sans.length]} />
+        <PlanCard plan={plan} index={plan.indexOf(idea)} onIndex={setIdeaIndex} at={s.line.fens[s.line.sans.length]} played={s.line} />
+      )}
+      {whyIdeas && idea && s.why && (
+        <PlanCard
+          heading={`Why ${s.why.book}, not ${s.why.played}`}
+          plan={whyIdeas}
+          index={whyIdeas.indexOf(idea)}
+          onIndex={setIdeaIndex}
+          at={s.line.fens[len - 1]}
+        />
       )}
       <div className="controls">
         {s.status === "off" ? (
@@ -112,22 +150,22 @@ export function OpeningPanel() {
               Take back
             </button>
             <button onClick={retryOpening}>Start over</button>
-            {close && canExplain() && (
-              <button onClick={explainOpening} disabled={explaining} title="The coach explains in the chat">
-                Why the book move?
+            {s.why && (!s.why.asked || s.why.loading) && canExplain() && (
+              <button onClick={explainOpening} disabled={explaining || s.why.loading} title="The coach explains, with drawings on the board">
+                {s.why.loading ? "Thinking…" : close ? "Why the book move?" : `Why not ${s.why.played}?`}
               </button>
             )}
           </>
         ) : s.status === "done" ? (
           <>
-            <button className="primary" onClick={() => startOpening(set.id, pickLine(set))}>
+            <button className="primary" onClick={() => startOpening(set.id, pickLine(set, s.target))}>
               Another line
             </button>
             <button onClick={retryOpening}>Again</button>
           </>
         ) : (
           <button onClick={openingHint} disabled={s.status !== "playing" || past}>
-            Hint
+            {note ? "Show the move" : "Hint"}
           </button>
         )}
         {signedIn && !locked && (
@@ -141,12 +179,29 @@ export function OpeningPanel() {
 }
 
 /** The plan at the end of a line: one idea at a time; the board shows that idea's drawings. */
-function PlanCard({ plan, index, onIndex, at }: { plan: PlanIdea[]; index: number; onIndex: (i: number) => void; at: string }) {
+function PlanCard({
+  plan,
+  index,
+  onIndex,
+  at,
+  heading = "What you're playing for",
+  played,
+}: {
+  plan: PlanIdea[];
+  index: number;
+  onIndex: (i: number) => void;
+  at: string;
+  heading?: string;
+  /** The line the plan looks back on: the moves it names show where they were played. */
+  played?: { fens: string[]; sans: string[] };
+}) {
   const idea = plan[index];
   return (
-    <section className="opening-plan" aria-label="What you're playing for">
+    <section className="opening-plan" aria-label={heading}>
       <div className="opening-plan-head">
-        <strong>What you're playing for</strong>
+        <strong>
+          <SquareText text={heading} at={at} />
+        </strong>
         <span className="spacer" />
         {plan.length > 1 && (
           <span className="opening-plan-nav">
@@ -164,7 +219,7 @@ function PlanCard({ plan, index, onIndex, at }: { plan: PlanIdea[]; index: numbe
       </div>
       <div className="opening-plan-title">{idea.title}</div>
       <p>
-        <SquareText text={idea.text} at={at} />
+        <SquareText text={idea.text} at={at} game={played} played={played} />
       </p>
     </section>
   );

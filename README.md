@@ -22,6 +22,92 @@ drill your own mistakes until they stick, and ask an AI coach *why*. It answers 
 
 ---
 
+## What makes it different
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/screenshots/coach-trainer.png" alt="The coach explaining an Italian Game line, with a scenario card and hoverable squares" />
+
+### 🗣️ A coach that draws on the board
+Ask anything about your game. The coach answers with **scenarios**: lines it sets up with its
+own arrows and circles at every step, linked right in its reply. Click one and it plays out on the
+main board. It only reports what Stockfish actually found, so it doesn't invent tactics. It can also
+**quiz you** on a position, and it remembers what you struggle with.
+</td>
+<td width="50%" valign="top">
+<img src="docs/screenshots/why.png" alt="Why a move was a blunder, step by step" />
+
+### 💥 Blunders explained, not just flagged
+**"Why is it a blunder?"** tells you in plain English what your move allowed, with the refutation
+as arrows you step through. Quiet mistakes get concrete reasons too: *"your pawn on e5 now blocks
+your bishop on g7"*, not *"White's position improves"*.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/screenshots/drill.png" alt="A drill captured from one of your games" />
+
+### 🔁 Your mistakes come back as drills
+Every real mistake you make is **captured automatically** as a drill, with its lesson worked out
+on the spot: what you played, what was best, and the theme behind it (fork, trapped piece,
+unguarded square, ...). Drills return on a spaced-repetition schedule until you get them right.
+</td>
+<td width="50%" valign="top">
+<img src="docs/screenshots/opening-blunder.png" alt="The opening trainer: the opponent blundered with Ba3 and Nxa3 punished it" />
+
+### 📖 An opening trainer that knows the ideas
+Learn a repertoire against a book opponent that plays real-world move frequencies. Harmless
+transpositions count, engine-equal moves get `≈` instead of a red X, and **"why not?"** has the coach
+explain the theory. Now and then the opponent **blunders on purpose** to check you're looking at
+the board. Every line ends with **the plan**, drawn on the board.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/screenshots/weaknesses.png" alt="Weakness report across your real games" />
+
+### 🎯 It finds your leaks
+Import your **chess.com and Lichess** games and the Profile ranks what's actually costing you
+points: hanging pieces, moving too fast, missed free material. Each leak links straight to drills
+of those exact positions.
+</td>
+<td width="50%" valign="top">
+<img src="docs/screenshots/games.png" alt="Rated games with bullet, blitz and rapid ratings" />
+
+### 🧠 Opponents that play like people
+Rated games pair you with **Maia**, a neural network trained on human games, near your rating, so
+it makes human mistakes. Separate bullet, blitz and rapid ratings, all on the **chess.com scale**.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/screenshots/voice-quiz.png" alt="The coach's quiz, answered by saying knight f one" />
+
+### 🎙️ It quizzes you, and you can just say the answer
+The coach puts a position on the board and waits for your move, then grades it against the engine.
+A miss becomes a drill. Here the answer was spoken: *"knight f one"*, recognized **offline** on your
+own machine.
+</td>
+<td width="50%" valign="top">
+<img src="docs/screenshots/hover-move.png" alt="Hovering a move in the trainer's text shows it on the board" />
+
+### 👆 Hover any move to see it
+Every square and move in any text (the coach's, a trainer's, a lesson's) is live. Hover it and the
+board shows it, even from an earlier position: here *Ba3* from the message below the board.
+</td>
+</tr>
+</table>
+
+**And everywhere:**
+
+- ✏️ **Draw on every board.** Right-click drag on desktop, two fingers on a phone.
+- ⌨️ **Type your moves** (`e4`, `Nf3`, `O-O`, then Enter) or say them.
+- 🔍 **An analysis board on top of anything**, with what-if branches for both sides.
+- 📱 **Your phone becomes a client.** Puzzles and drills keep working offline.
+
+---
+
 ## Contents
 
 - [Features](#features)
@@ -49,22 +135,25 @@ scenarios with arrows and circles and links them in its answer, and one click op
 the main board. It's grounded in what the engine actually computed, so it can't make up tactics.
 Every square and move it mentions highlights on the board when you hover over it.
 
+It can also put a position on a side board and **ask for your move**. It's graded against the
+engine, and a miss becomes a drill. It keeps notes on what you keep getting wrong, so later
+advice builds on earlier games.
+
 ### Play opponents that play like people
 
-<table>
-<tr>
-<td width="50%"><img src="docs/screenshots/menu.png" alt="Home menu" /></td>
-<td width="50%"><img src="docs/screenshots/games.png" alt="Games menu with ratings and rating graph" /></td>
-</tr>
-</table>
+<img src="docs/screenshots/menu.png" alt="Home menu" width="100%" />
 
 - **Play rated:** pick a clock and get paired with a [Maia](https://www.maiachess.com/) opponent
   near your rating. Maia is trained on human games, so it makes human mistakes rather than playing
   like an engine.
 - **Separate bullet, blitz and rapid ratings**, all on the **chess.com scale**, so the numbers
   mean what you're used to.
-- **Practice games** against Maia or Stockfish at any strength, with takebacks.
-- Type moves on the keyboard (`e4`, `Nf3`, `O-O`), and draw arrows on **any** board with a right-click drag.
+- **Practice games** against Maia or Stockfish at any strength, with takebacks. After a clear
+  mistake, a quick local check offers you a takeback, the better move, or the coach.
+- **Type moves** on the keyboard (`e4`, `Nf3`, `O-O`) or **say them** with the top bar's mic. Speech
+  recognition runs offline on your device ([Vosk](https://alphacephei.com/vosk/)), and in rated games
+  it asks you to confirm each move first.
+- Draw arrows on **any** board with a right-click drag.
 
 ### Every game reviewed
 
@@ -79,14 +168,10 @@ Each game ends with a full report: accuracy, an eval graph, and every move class
 *brilliant* to *blunder*. Jump between key moments, try your own what-if moves from any position,
 or hand the game to the coach for a guided review.
 
-<img src="docs/screenshots/why.png" alt="Why a move was a blunder, shown step by step" width="100%" />
-
 **"Why is it a blunder?"** gives a plain-English explanation of what the move allowed, with the
 refutation as arrows you can step through and the better moves next to it.
 
 ### Find your weaknesses
-
-<img src="docs/screenshots/weaknesses.png" alt="Weakness report: biggest leaks across your games" width="100%" />
 
 The Profile looks across your **real games** (rated games here plus games **imported from chess.com
 and Lichess**) and ranks your biggest leaks: hanging pieces, moving too fast, missed free
@@ -94,8 +179,6 @@ material, walking into mate, weak phases of the game. Each leak links straight t
 exact positions, or to puzzles on that theme. Rating history tracks everything over time.
 
 ### Drills built from your own mistakes
-
-<img src="docs/screenshots/drill.png" alt="A drill from one of your games, with its lesson" width="100%" />
 
 Positions you got wrong come back on a **spaced-repetition** schedule until they stick. Every drill
 is a lesson worked out when the mistake was made: the move you played against the best one,
@@ -117,7 +200,9 @@ Millions of rated puzzles from the [Lichess puzzle database](https://database.li
 - **Opening trainer:** build a repertoire (London, Italian, Queen's Gambit, and defences as Black)
   and play it against the book. The opponent picks replies weighted by how often they're played.
   Transpositions that cost nothing are accepted, and engine-equal alternatives are marked `≈`
-  instead of wrong. At the end of every line you get **the plan**: what you're playing for, drawn on the board.
+  instead of wrong. Ask **"why not?"** after leaving the line and the coach explains the theory.
+  Sometimes the opponent leaves the book with a real blunder, and you have to punish it. At the end
+  of every line you get **the plan**: what you're playing for, drawn on the board.
 - **Endgame trainer:** convert the standard endings against Stockfish.
 - **Guess the move:** play through master games and predict each move.
 
@@ -223,5 +308,6 @@ checked with `node scripts/check-book.mjs`. Contributor and AI-assistant convent
 - [Stockfish](https://stockfishchess.org/) (GPL-3.0): engine analysis
 - [Maia](https://github.com/CSSLab/maia3) (AGPL-3.0), by the CSSLab at the University of Toronto: human-like opponents
 - [Lichess open database](https://database.lichess.org/) (CC0): puzzles
+- [Vosk](https://alphacephei.com/vosk/) (Apache-2.0): offline speech recognition for voice moves
 - [Chessground](https://github.com/lichess-org/chessground) and [chess.js](https://github.com/jhlywa/chess.js): the board and the rules
 - [Claude](https://claude.com/): the coach

@@ -8,7 +8,7 @@ import { timeControlLabel } from "../game/clock";
 import { go, useNav } from "../nav";
 import { refreshPuzzleDb, themeLabel, usePuzzleDb, type ThemeMastery } from "../puzzles/puzzles";
 import { rushBest as bestRush, startPuzzles, startRatedPuzzles, startRush, useParkedPuzzles } from "../puzzles/session";
-import { commonness, findSet, pickLine, seenCounts, shortName, TRAINING_SETS, type Commonness, type TrainingLine } from "../openings/training";
+import { commonness, familyOf, findSet, modesOf, pickLine, seenCounts, shortName, TRAINING_SETS, type Commonness, type TrainingLine } from "../openings/training";
 import { startOpening, useOpening } from "../openings/session";
 import { getRepertoire, repertoireSetId, useRepertoire } from "../openings/repertoire";
 import { fromLichess, POOL_LABEL, RATING_POOLS, signed, type PlayerRating } from "../rating";
@@ -20,6 +20,8 @@ import { ProfileMenu, RatingHistory, Weaknesses } from "./Profile";
 import { EndgameMenu } from "./Endgames";
 import { GuessMenu } from "./Guess";
 import { MasteryRule, StarBadge, XpBar } from "./Mastery";
+import { TimerScreen } from "./Timer";
+import { clockLabel, started as clockStarted, useTimer } from "../utility/timer";
 
 /** Drills and puzzles would leave a rated game's clock (or position) sitting mid-game. */
 export function useSessionsBlocked() {
@@ -33,6 +35,8 @@ export const BLOCKED = "Finish your current game first";
 /** The left column when no board is showing: the home menu and each section's menu. */
 export function Home() {
   const view = useNav((n) => n.view);
+  // The clock is a screen of its own: on a phone it covers everything, top bar included.
+  if (view === "timer") return <TimerScreen />;
   return (
     <main className="home-panel">
       <div className="home-inner">
@@ -49,6 +53,7 @@ export function Home() {
         {view === "ratings" && <RatingHistory />}
         {view === "endgames" && <EndgameMenu />}
         {view === "guess" && <GuessMenu />}
+        {view === "utility" && <UtilityMenu />}
       </div>
     </main>
   );
@@ -142,6 +147,45 @@ function MainMenu() {
           onClick={() => go("puzzles")}
         />
         <Tile big icon="◔" title="Profile" sub="Your games, weaknesses and ratings" onClick={() => go("profile")} />
+        <Tile big icon="⚒" title="Utility" sub="Analysis board and chess clock" onClick={() => go("utility")} />
+      </div>
+    </>
+  );
+}
+
+/** Tools for chess away from the coach: a free board to analyse on, and a clock for over-the-board games. */
+function UtilityMenu() {
+  const clock = useTimer();
+  const [a, b] = clock.setup.sides;
+  const same = a.base === b.base && a.inc === b.inc;
+  return (
+    <>
+      <h2 className="section-title">Utility</h2>
+      <div className="menu-grid">
+        <Tile
+          icon="⊞"
+          title="Analysis board"
+          onClick={async () => {
+            await newGame({
+              mode: "practice",
+              studentColor: "both",
+              opponentElo: null,
+            });
+            go("board", "utility");
+          }}
+        />
+        <Tile
+          icon="⏱"
+          title="Chess clock"
+          sub={
+            clockStarted(clock) && clock.flagged === null
+              ? "Game in progress"
+              : same
+                ? clockLabel(a)
+                : `${clockLabel(b)} against ${clockLabel(a)}`
+          }
+          onClick={() => go("timer")}
+        />
       </div>
     </>
   );
@@ -160,18 +204,6 @@ function GamesMenu() {
       <div className="menu-grid">
         <Tile icon="▶" title="Play rated" onClick={() => setDialog("rated")} />
         <Tile icon="⚙" title="Choose game" onClick={() => setDialog("play")} />
-        <Tile
-          icon="⊞"
-          title="Analysis board"
-          onClick={async () => {
-            await newGame({
-              mode: "practice",
-              studentColor: "both",
-              opponentElo: null,
-            });
-            go("board");
-          }}
-        />
         {hasGame && <Tile icon="◻" title="Current board" onClick={() => go("board")} />}
       </div>
       {dialog === "rated" && <PlayRatedDialog onClose={close} />}
@@ -306,6 +338,9 @@ function OpeningTraining() {
   }, []);
   const set = findSet(setId) ?? TRAINING_SETS[0];
   const mine = set.id === repertoireSetId(set.color);
+  // Ways to train one opening (from the start, punishing White...) sit under it, not beside it.
+  const family = familyOf(set);
+  const modes = mine ? [] : modesOf(family);
   const faced = set.lines.filter((l) => seen[l.moves.join(" ")]).length;
 
   // A session of its own, not a game: it doesn't touch the game in progress or the saved games.
@@ -320,7 +355,7 @@ function OpeningTraining() {
             <button
               key={c}
               className={set.color === c ? "on" : ""}
-              onClick={() => set.color !== c && setSetId(TRAINING_SETS.find((s) => s.color === c)!.id)}
+              onClick={() => set.color !== c && setSetId(TRAINING_SETS.find((s) => s.color === c && !s.parent)!.id)}
             >
               {c === "white" ? "Openings as White" : "Defences as Black"}
             </button>
@@ -330,12 +365,22 @@ function OpeningTraining() {
           <button className={mine ? "on" : ""} onClick={() => setSetId(repertoireSetId(set.color))}>
             ★ Your repertoire
           </button>
-          {TRAINING_SETS.filter((s) => s.color === set.color).map((s) => (
-            <button key={s.id} className={s.id === setId ? "on" : ""} onClick={() => setSetId(s.id)}>
+          {TRAINING_SETS.filter((s) => s.color === set.color && !s.parent).map((s) => (
+            <button key={s.id} className={!mine && s.id === family.id ? "on" : ""} onClick={() => s.id !== family.id && setSetId(s.id)}>
               {s.name}
             </button>
           ))}
         </div>
+        {modes.length > 1 && (
+          <div className="segmented opening-modes">
+            <span className="muted small">{family.name}:</span>
+            {modes.map((s) => (
+              <button key={s.id} className={s.id === set.id ? "on" : ""} onClick={() => setSetId(s.id)}>
+                {s.mode ?? s.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <p className="section-lede muted">
         {mine ? (
@@ -378,7 +423,10 @@ function OpeningTraining() {
               {!mine && <span className={`line-tag ${c}`}>{COMMONNESS_LABEL[c]}</span>}
               <span className="history-main">
                 <span>{shortName(set, l)}</span>
-                <span className="muted small">{numberedMoves(l.moves)}</span>
+                <span className="muted small">
+                  {l.start ? `Starts at move ${Math.floor(l.start / 2) + 1} · ` : ""}
+                  {numberedMoves(l.moves)}
+                </span>
               </span>
               <span className="history-side">
                 <button onClick={() => play(l)}>Play</button>

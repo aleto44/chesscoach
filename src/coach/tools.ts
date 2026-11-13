@@ -285,7 +285,8 @@ Object.assign(handlers, {
       else shapes.push({ orig: square as Key, brush: BRUSHES[color] ?? "green" });
     }
     if (bad.length) return { text: `Not squares: ${bad.join(", ")}. Use e.g. "e4".`, isError: true };
-    useStore.setState({ arrows: shapes.length ? { fen: screenFen(), shapes } : null });
+    // boardFen: the trainer's or drill's position when one is on screen, not the game's behind it.
+    useStore.setState({ arrows: shapes.length ? { fen: boardFen(), shapes } : null });
     return { text: shapes.length ? `Drew ${shapes.length} on the board.` : "Cleared." };
   },
 

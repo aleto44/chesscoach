@@ -165,7 +165,14 @@ export interface RefContext {
   earlier?: string[];
   /** A game the text quotes by move number ("35...Kf6"): fens[i] is the position before ply i. */
   game?: { fens: string[] };
+  /**
+   * Moves the text looks back on (a plan at the end of a line: "...Nxe4 won the pawn"): a move it
+   * names that was played there is shown where it was played (the latest time), not from `at`.
+   */
+  played?: { fens: string[]; sans: string[] };
 }
+
+const bare = (san: string) => san.replace(/[+#!?]/g, "");
 
 export type TextPart = string | { text: string; square: string; ref: string; place?: RefPlace };
 
@@ -223,6 +230,15 @@ export function splitSquares(text: string, ctx: RefContext = {}): TextPart[] {
       if (num && ctx.game) {
         const ply = plyOf(ctx.game, Number(num[1]), num[2] === "." ? "w" : "b");
         if (ply !== null) playFrom(ctx.game.fens[ply]);
+      }
+      if (!got.place && !num && ctx.played && MOVE_TOKEN.test(token)) {
+        const { fens, sans } = ctx.played;
+        for (let i = sans.length - 1; i >= 0; i--)
+          // "...Nxe4" is Black's; without the dots it could be either side's.
+          if (bare(sans[i]) === bare(token) && (side !== "b" || fens[i].split(" ")[1] === "b")) {
+            playFrom(fens[i]);
+            break;
+          }
       }
       // A bare square only counts as a move with a number ("12.e4"); "the e4 pawn" is a square.
       const isMove = !!num || MOVE_TOKEN.test(token);

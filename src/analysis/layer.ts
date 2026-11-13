@@ -9,7 +9,7 @@ import { explore, exploreGoto, exploreMove, type Explore } from "../chess/explor
 import type { Line } from "../chess/line";
 import { stepView, viewedPly, type Step } from "../chess/view";
 import { useNav, peeking } from "../nav";
-import { boardOrientation, isLocked, screen, useStore, type Color } from "../store";
+import { boardOrientation, isLocked, quizWaiting, screen, useStore, type Color } from "../store";
 import { holdPuzzle, usePuzzle } from "../puzzles/session";
 import { useDrill } from "./drillSession";
 import { endgameOf, useEndgame } from "../endgames/session";
@@ -41,6 +41,9 @@ const at = (line: Line, view: number | null) => viewedPly(line.sans.length, view
  */
 export function analysisSource(): Source | null {
   if (isLocked()) return null;
+  // The coach's open quiz: the engine's lines would be the answer.
+  const { chat, active } = useStore.getState();
+  if (quizWaiting(chat, active)) return null;
   if (peeking()) {
     const { line, ply } = screen();
     return { line, ply, orientation: boardOrientation(), from: "scenario" };
@@ -68,6 +71,7 @@ export function analysisSource(): Source | null {
 export function useCanAnalyze(): boolean {
   useStore((s) => s.meta);
   useStore((s) => s.active);
+  useStore((s) => s.chat);
   useNav((n) => n.view);
   useNav((n) => n.peek);
   usePuzzle((p) => p?.status);

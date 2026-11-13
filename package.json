@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "postinstall": "patch-package && node scripts/copy-stockfish.mjs && node scripts/setup-maia.mjs"
+    "postinstall": "patch-package && node scripts/copy-stockfish.mjs && node scripts/setup-maia.mjs && node scripts/setup-vosk.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -20,6 +20,7 @@
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
     "stockfish": "^19.0.1",
+    "vosk-browser": "^0.0.8",
     "zustand": "^5.0.16"
   },
   "devDependencies": {

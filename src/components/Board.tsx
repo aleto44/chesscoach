@@ -9,6 +9,11 @@ import { legalDests, sideToMove } from "../chess/line";
 import { afterUci, resolveRef, samePosition, useHoverSquare } from "../chess/squareRefs";
 import { play } from "../sound";
 import { MOVE_CHAR, MOVE_START, legalNow, queuedPosition, readTyped, type Queued } from "../chess/typed";
+import { addHearer, type Utterance } from "../voice/listen";
+import { hearMove, pickMove, promotionPiece, sayMove, type VoiceMove } from "../voice/parse";
+import { needsConfirm } from "../voice/confirm";
+import { useSettings } from "../settings";
+import { useStore } from "../store";
 
 interface Props {
   fen: string;
@@ -30,6 +35,18 @@ interface Props {
   shapes?: DrawShape[];
   /** A click or tap on a square (left button / one finger), for boards that ask the student to pick squares. */
   onSquare?: (key: Key) => void;
+}
+
+/**
+ * A spoken move on the board: waiting for a yes, waiting to hear which of several, or not a move
+ * here (shown briefly). `fen` is where it was read, so it lapses when the position moves on.
+ */
+interface VoiceAsk {
+  fen: string;
+  status: "confirm" | "pick" | "missed";
+  moves: VoiceMove[];
+  said: string;
+  note?: string;
 }
 
 const PROMO_NAMES = { q: "Queen", r: "Rook", b: "Bishop", n: "Knight" };
@@ -103,6 +120,12 @@ export function Board({
     setTypedState(t);
   };
   const [shake, setShake] = useState(0);
+  const [voice, setVoiceState] = useState<VoiceAsk | null>(null);
+  const voiceRef = useRef<VoiceAsk | null>(null);
+  const setVoice = (v: VoiceAsk | null) => {
+    voiceRef.current = v;
+    setVoiceState(v);
+  };
   /**
    * Moves typed on the opponent's turn, played one per turn as each of the student's turns comes.
    * If the next one isn't legal when its turn comes, the whole queue goes: the rest were planned
@@ -117,6 +140,8 @@ export function Board({
   };
   const playedAt = useRef<string | null>(null);
   const typedShapes = useRef<DrawShape[]>([]);
+  /** The coach's drawings for this board's position (set below), for the redraws that don't depend on them. */
+  const coachRef = useRef<DrawShape[]>([]);
   const props = useRef({ fen, orientation, lastMove, onMove, viewOnly, canMove, premoveColor, shapes, onSquare });
   props.current = { fen, orientation, lastMove, onMove, viewOnly, canMove, premoveColor, shapes, onSquare };
 
@@ -144,7 +169,7 @@ export function Board({
     };
     cg.set(config);
     shown.current = p.fen;
-    cg.setAutoShapes([...(p.shapes ?? []), ...typedShapes.current]);
+    cg.setAutoShapes([...(p.shapes ?? []), ...coachRef.current, ...typedShapes.current]);
     if (live) cg.playPremove();
     else if (!premove) cg.cancelPremove();
     const next = queueRef.current[0];
@@ -236,6 +261,12 @@ export function Board({
       return;
     }
     setTyped("");
+    playFound({ ...r, from: r.from, to: r.to });
+  };
+
+  /** Plays (or queues, on the opponent's turn) a move typed or said, the way a dragged piece would be. */
+  const playFound = (r: { from: Key; to: Key; promotion?: string; needsPromotion?: boolean }) => {
+    const p = props.current;
     const { from, to } = r;
     if (premoving(p)) {
       // Typed premoves are kept here, not in Chessground, which holds only one.
@@ -260,9 +291,84 @@ export function Board({
     queueMicrotask(sync);
   };
 
+  // Spoken moves (voice/listen.ts sends them to the last board on screen that takes moves).
+  const promoRef = useRef(promo);
+  promoRef.current = promo;
+  const playVoice = (m: VoiceMove) => {
+    setVoice(null);
+    playFound({ from: m.from as Key, to: m.to as Key, promotion: m.promotion, needsPromotion: !m.promotion && m.san.includes("=?") });
+  };
+  const missed = (at: string, said: string, note?: string) => {
+    play("illegal");
+    setVoice({ fen: at, status: "missed", moves: [], said, note });
+  };
+  const hearRef = useRef<(u: Utterance) => void>(() => {});
+  hearRef.current = (u) => {
+    const p = props.current;
+    const s = useSettings.getState();
+    const words = { confirm: s.voiceConfirmWords, cancel: s.voiceCancelWords };
+    // The promotion picker is up: the piece's name picks it.
+    if (promoRef.current) {
+      const piece = promotionPiece(u.text);
+      if (piece) chooseRef.current(piece);
+      else if (hearMove(p.fen, u.text, words).kind === "cancel") chooseRef.current(null);
+      return;
+    }
+    const at = typingFen(p, queueRef.current);
+    const asked = voiceRef.current;
+    const pending = at && asked?.fen === at && asked.status !== "missed" ? asked : null;
+    const h = hearMove(at ?? p.fen, u.text, words);
+    if (h.kind === "cancel") {
+      // "No" with nothing waiting drops the queued premoves, like Escape.
+      if (!pending && queueRef.current.length) setQueue([]);
+      setVoice(null);
+      return;
+    }
+    if (h.kind === "confirm") {
+      if (pending?.status === "confirm") playVoice(pending.moves[0]);
+      return;
+    }
+    if (!at) return h.kind === "move" ? missed(p.fen, u.text, "Not your move") : undefined;
+    const decide = (m: VoiceMove, sure: boolean) =>
+      needsConfirm(sure, u.conf) ? setVoice({ fen: at, status: "confirm", moves: [m], said: u.text }) : playVoice(m);
+    if (pending?.status === "pick") {
+      const i = pickMove(at, pending.moves, u.text);
+      if (i !== null) return decide(pending.moves[i], true);
+    }
+    if (h.kind === "nothing") return missed(at, u.text);
+    if (h.moves.length > 1) return setVoice({ fen: at, status: "pick", moves: h.moves, said: u.text });
+    decide(h.moves[0], h.sure);
+  };
+  useEffect(() => {
+    if (!typeable) return;
+    const off = addHearer({ el: () => el.current, hear: (u) => hearRef.current(u) });
+    return () => {
+      off();
+      setVoice(null);
+    };
+  }, [typeable]);
+  // A spoken move belongs to the position it was said in (a premove, to where the queue leaves the student).
+  useEffect(() => {
+    const asked = voiceRef.current;
+    if (asked && asked.status !== "missed" && asked.fen !== typingFen(props.current, queueRef.current)) setVoice(null);
+  }, [fen]);
+  // One that wasn't a move fades.
+  useEffect(() => {
+    if (voice?.status !== "missed") return;
+    const t = setTimeout(() => voiceRef.current === voice && setVoice(null), 2500);
+    return () => clearTimeout(t);
+  }, [voice]);
+
   const keyRef = useRef<(e: KeyboardEvent) => boolean>(() => false);
   keyRef.current = (e) => {
     const text = typedRef.current;
+    const asked = voiceRef.current;
+    // A spoken move waiting for a yes: Enter plays it, Escape drops it.
+    if (!text && asked && asked.status !== "missed" && (e.key === "Enter" || e.key === "Escape")) {
+      if (e.key === "Enter" && asked.status === "confirm") playVoice(asked.moves[0]);
+      else if (e.key === "Escape") setVoice(null);
+      return true;
+    }
     if (!text) {
       // With nothing typed, Escape drops the queued premoves and Backspace the last one.
       if (queueRef.current.length && (e.key === "Escape" || e.key === "Backspace")) {
@@ -302,18 +408,32 @@ export function Board({
         : r?.status === "partial" && r.from
           ? [{ orig: r.from, brush: "green" }]
           : [];
+    // A spoken move waiting for a yes is a green arrow; several to pick from are numbered.
+    const spoken: DrawShape[] =
+      voice?.status === "confirm"
+        ? [{ orig: voice.moves[0].from as Key, dest: voice.moves[0].to as Key, brush: "green" }]
+        : voice?.status === "pick"
+          ? voice.moves.map((m, i): DrawShape => ({ orig: m.from as Key, dest: m.to as Key, brush: "green", label: { text: String(i + 1) } }))
+          : [];
     typedShapes.current = [
       ...queue.map((m, i): DrawShape => ({ orig: m.from, dest: m.to, brush: "paleRed", label: { text: String(i + 1) } })),
       ...now,
+      ...spoken,
     ];
-    if (!peek.current) api.current?.setAutoShapes([...(shapes ?? []), ...typedShapes.current]);
-  }, [reading?.status, reading?.from, reading?.to, shapes, queue]);
+    if (!peek.current) api.current?.setAutoShapes([...(shapes ?? []), ...coachRef.current, ...typedShapes.current]);
+  }, [reading?.status, reading?.from, reading?.to, shapes, queue, voice]);
 
   // A square or move the mouse is over in text shows here (not on thumbnails): a move as an arrow
   // from its piece, a bare square highlighted. A move from another position (further down a line,
   // or a move the text names from before) shows that position for as long as it's hovered, with
   // the line's moves up to it as numbered arrows; the student's drawings come back afterwards.
   const hoveredRef = useHoverSquare((s) => (preview ? null : s.ref));
+  // The coach's draw_arrows, on whichever board shows the position it drew on: a trainer's or a
+  // drill's too, not only the game board. A board that already passes them in (BoardPanel) gets them once.
+  const coachArrows = useStore((s) => (preview ? null : s.arrows));
+  const coachShapes =
+    coachArrows && samePosition(coachArrows.fen, fen) && !coachArrows.shapes.some((c) => shapes?.includes(c)) ? coachArrows.shapes : [];
+  coachRef.current = coachShapes;
   const hoveredPlace = useHoverSquare((s) => (preview ? null : s.place));
   useEffect(() => {
     const cg = api.current;
@@ -380,8 +500,8 @@ export function Board({
       if (drawnOn === props.current.fen) cg.setShapes(drawings);
     }
     cg.set({ highlight: { custom: new Map(square ? [[square, "chat-hover"]] : []) } });
-    cg.setAutoShapes([...(shapes ?? []), ...typedShapes.current, ...arrows]);
-  }, [hoveredRef, hoveredPlace, fen, shapes]);
+    cg.setAutoShapes([...(shapes ?? []), ...coachShapes, ...typedShapes.current, ...arrows]);
+  }, [hoveredRef, hoveredPlace, fen, shapes, coachArrows]);
 
   const choose = (piece: string | null) => {
     const move = promo;
@@ -450,6 +570,7 @@ export function Board({
           </span>
         </div>
       )}
+      {!typed && voice && <VoiceChip ask={voice} onPlay={() => voice.status === "confirm" && playVoice(voice.moves[0])} />}
       {promo && (
         <div className="promo-backdrop" onMouseDown={() => settled() && choose(null)}>
           <div className="promo-picker" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label="Promote to">
@@ -467,6 +588,24 @@ export function Board({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** A spoken move over the board, like a typed one: what was heard and what to say next. Tapping it plays a move waiting for a yes. */
+function VoiceChip({ ask, onPlay }: { ask: VoiceAsk; onPlay: () => void }) {
+  const yes = useSettings((s) => s.voiceConfirmWords[0] ?? "yes");
+  const no = useSettings((s) => s.voiceCancelWords[0] ?? "no");
+  const [text, hint] =
+    ask.status === "confirm"
+      ? [sayMove(ask.fen, ask.moves[0]), `Say "${yes}", tap or Enter · "${no}" cancels`]
+      : ask.status === "pick"
+        ? ["Which one?", `Say 1–${ask.moves.length}, the file or the square`]
+        : [`"${ask.said}"`, ask.note ?? "Not a move here"];
+  return (
+    <div className={`typed-move voice-move ${ask.status === "missed" ? "bad" : "ok"}`} role="status" aria-label={`Heard: ${text}`} onClick={onPlay}>
+      <span className="typed-text">{text}</span>
+      <span className="typed-hint">{hint}</span>
     </div>
   );
 }

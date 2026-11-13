@@ -37,6 +37,18 @@ export interface Settings {
   boardDark: string;
   pieceSet: string;
   coordSize: "off" | "small" | "medium" | "large";
+  /**
+   * Voice moves (src/voice/): when a heard move waits for a yes. "rated": in rated games and
+   * whenever the words didn't name the move exactly; "unsure": only then; "always": every move.
+   */
+  voiceConfirm: "rated" | "unsure" | "always";
+  /** Phrases that play a waiting move, and ones that drop it. */
+  voiceConfirmWords: string[];
+  voiceCancelWords: string[];
+  /** Microphone level (0..1 RMS) below which sound counts as the room, not the student; 0 = off. Set by the mic test. */
+  voiceGate: number;
+  /** Listen only while Space (desktop) or the mic button (phones) is held: best in a noisy room. */
+  voicePushToTalk: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -58,6 +70,11 @@ const DEFAULTS: Settings = {
   boardDark: "#b58863",
   pieceSet: "cburnett",
   coordSize: "medium",
+  voiceConfirm: "rated",
+  voiceConfirmWords: ["yes", "confirm"],
+  voiceCancelWords: ["no", "cancel"],
+  voiceGate: 0,
+  voicePushToTalk: false,
 };
 
 /** The setting each rating pool lives in (rating_key in src-tauri/src/db.rs). */

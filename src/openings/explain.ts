@@ -2,7 +2,8 @@
 // (computed, so the coach reports it rather than guessing), then the coach's one-off explanation of
 // the theory: what the student's move gives up, why the book move is played, what the line is for.
 // Answers are kept on this device, so the same slip doesn't cost another coach call.
-import { Chess } from "chess.js";
+import { Chess, type Square } from "chess.js";
+import type { PlanIdea } from "./plans";
 import { invoke, hasBackend } from "../backend";
 import { useAuth } from "../coach/auth";
 import { evalWords, storedEval, topMoves } from "../coach/insight";
@@ -100,16 +101,73 @@ export async function offLineFacts(
     verdict,
     ...(early ? [`${played} is a move this line plays later: the student played it too early, and the engine says the move order costs something here.`] : []),
     "",
-    "Explain in three short sections, about 200 words in all, for this player:",
-    `### Why not ${played}`,
-    `What it gives up, allows or misplaces. If the engine rates it about the same, say honestly that it's playable, and what different kind of position it leads to instead of the line's.`,
-    `### Why ${book}`,
-    `What the book move does here and why theory plays it.`,
-    `### What ${set.color === "white" ? "White" : "Black"} is playing for`,
-    `The plans of this line for the player's side: pawn structure, where the pieces go, the pawn breaks to aim for, and what the opponent is trying to do.`,
-    "No long move lists; a move or two to illustrate is fine.",
+    `Pieces in that position: ${pieceList(fen)}`,
+    "",
+    ...IDEAS_FORMAT(played, book),
   ].join("\n");
   return { evals, prompt };
+}
+
+/**
+ * How the answer is laid out: the same shape as the trainer's own move notes and line plans, which
+ * read well because they're short, about one thing each, and drawn on the board. Read by parseIdeas.
+ */
+const IDEAS_FORMAT = (played: string, book: string) => [
+  "Answer with 2 or 3 ideas, in exactly this format and nothing else:",
+  "## <title, 2 to 6 words>",
+  "<1 to 3 short sentences: the idea, then how it's carried out here>",
+  "draw: <drawings on the position above, before their move>",
+  "",
+  `First idea: what ${played} gives up or allows (if the engine rates it about the same, say it's playable and what it changes). ` +
+    `Then what ${book} does, and, if there's a third, what the line is aiming for.`,
+  "Drawings are space-separated tokens: g:e2e4 a green arrow (a move or pawn break for the player), b:g1f3 a blue arrow (a piece route), " +
+    "r:d8h4 a red arrow (the opponent's threat or reply), r:d4 a red circle (a target or weak square), y:a1h8 a yellow line (a diagonal or file), " +
+    "y:d5 a yellow circle (a key square). Every green, blue and red arrow starts on a piece in the position above, or where an earlier arrow " +
+    "of the same idea ends. 2 to 4 drawings per idea; they should show exactly what the sentences say.",
+  "Under 90 words in all. No preamble, no summary, no move lists (a move or two to illustrate is fine). " +
+    'Write Black\'s moves with "..." (...Nf6) and White\'s without (Nf3). Everything you say agrees with the engine numbers above.',
+];
+
+/** "White: Kg1 Qd1 Ra1 ... Black: Kg8 ...", so drawings start on real pieces. */
+function pieceList(fen: string): string {
+  const out: Record<"w" | "b", string[]> = { w: [], b: [] };
+  for (const row of new Chess(fen).board())
+    for (const p of row) if (p) out[p.color].push(`${p.type === "p" ? "" : p.type.toUpperCase()}${p.square}`);
+  return `White: ${out.w.join(" ")}. Black: ${out.b.join(" ")}.`;
+}
+
+/**
+ * The coach's answer as ideas (the plans' shape), its drawings checked against the position they're
+ * drawn on: an arrow that doesn't start on a piece or an earlier arrow's end is dropped. Null when
+ * the answer isn't in the format at all.
+ */
+export function parseIdeas(text: string, fen: string): PlanIdea[] | null {
+  const chess = new Chess(fen);
+  const ideas: PlanIdea[] = [];
+  for (const block of text.split(/^#{2,3}\s+/m).slice(1)) {
+    const lines = block.split("\n").map((l) => l.trim());
+    const title = lines[0].replace(/[*#]/g, "").trim();
+    const drawLine = lines.find((l) => /^draw:/i.test(l)) ?? "";
+    const body = lines
+      .slice(1)
+      .filter((l) => l && !/^draw:/i.test(l))
+      .join(" ");
+    const reached = new Set<string>();
+    const draw = drawLine
+      .replace(/^draw:/i, "")
+      .split(/\s+/)
+      .filter((t) => {
+        const m = t.match(/^([gbry]):([a-h][1-8])([a-h][1-8])?$/);
+        if (!m) return false;
+        const [, brush, from, to] = m;
+        if (to && brush !== "y" && !chess.get(from as Square) && !reached.has(from)) return false;
+        if (to) reached.add(to);
+        return true;
+      })
+      .join(" ");
+    if (title && body) ideas.push({ title, text: body, draw });
+  }
+  return ideas.length ? ideas : null;
 }
 
 /** Whether the coach can be asked at all here (a signed-in desktop or a phone linked to one). */
@@ -127,13 +185,15 @@ export interface Slip {
  * Saved answers are keyed by the line (its plan is part of the answer) and the position, not the
  * moves that led there: a different move order to the same position reuses the answer.
  */
-const CACHE_KEY = "cc-opening-why-2";
+// 3: answers in the ideas format (parseIdeas); older prose answers are asked again.
+const CACHE_KEY = "cc-opening-why-3";
 const cacheKey = (s: Slip) => [s.target.moves.join(" "), s.fen.split(" ").slice(0, 4).join(" "), s.played, s.book].join("|");
 
 function readCache(): Record<string, string> {
   try {
     // The first cache was keyed by move sequence only, which could show another line's plan.
     localStorage.removeItem("cc-opening-why");
+    localStorage.removeItem("cc-opening-why-2");
     return JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}");
   } catch {
     return {};

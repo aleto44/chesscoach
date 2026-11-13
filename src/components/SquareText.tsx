@@ -37,10 +37,10 @@ export function SquareRef({
  * from, so a move it names is played from there (and a line it writes out, move after move),
  * whatever the board shows at the moment.
  */
-export function SquareText({ text, at, earlier, game }: { text: string } & RefContext) {
+export function SquareText({ text, at, earlier, game, played }: { text: string } & RefContext) {
   const earlierKey = earlier?.join("|");
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `earlier` by value: callers build it each render.
-  const parts = useMemo(() => splitSquares(text, { at, earlier, game }), [text, at, earlierKey, game]);
+  const parts = useMemo(() => splitSquares(text, { at, earlier, game, played }), [text, at, earlierKey, game, played]);
   return (
     <>
       {parts.map((part, i) =>

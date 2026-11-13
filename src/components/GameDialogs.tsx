@@ -46,7 +46,7 @@ export function Modal({
 
 /**
  * `mode`: the game type to start with; defaults to the last game's. `withOpponent`: from the games
- * menu a game means a computer opponent (free play is its own "Analysis board" entry).
+ * menu a game means a computer opponent (free play is Utility's "Analysis board").
  */
 export function NewGameDialog({ onClose, mode: initialMode, withOpponent }: { onClose: () => void; mode?: GameMode; withOpponent?: boolean }) {
   const last = useStore((s) => s.meta);

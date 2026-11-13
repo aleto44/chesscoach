@@ -36,9 +36,12 @@ Rules:
 
 - The left/middle column shows the **home menu** (`src/components/Home.tsx`) or the screen picked from it:
   Games (Play rated: pick a clock and get paired with a Maia near your rating, `src/game/matchmaking.ts`;
-  Choose game: every option, rated or practice; analysis board), School (drills, opening training with the
+  Choose game: every option, rated or practice), School (drills, opening training with the
   repertoire, the endgame trainer, guess the move), Puzzles, and Profile (weaknesses, rating history,
-  saved games, import from chess.com and Lichess), each with its own sub-menu. The top bar's back button
+  saved games, import from chess.com and Lichess), and Utility (the free analysis board, and a
+  two-player chess clock for over-the-board games, `src/utility/timer.ts` + `src/components/Timer.tsx`:
+  full-screen on phones, the top half turned to the player across, separate time and increment per
+  side for odds games), each with its own sub-menu. The top bar's back button
   returns one level, and the brand / home button returns to the main menu.
 - The view lives in `useNav` (`src/nav.ts`). Puzzle, drill, opening, endgame and guess-the-move sessions have
   their own stores (`src/puzzles/session.ts`, `src/analysis/drillSession.ts`, `src/openings/session.ts`,
@@ -53,6 +56,9 @@ Rules:
   matches moves by what's left of the line, not by ply (`src/openings/order.ts`): a move the line plays
   later is fine when the engine says the order costs nothing, and an engine-equal move outside the line
   is marked "≈", not wrong.
+  Now and then the opponent plays a mistake instead of the book move: one from `src/openings/traps.ts`,
+  precomputed by `node scripts/find-traps.mjs` (Maia says players of a rating really make it, Stockfish
+  says it loses at least a pawn). Run that again after adding or changing lines; nothing is searched live.
 - Screens that aren't a game ask the coach one-off questions with `coach_explain` (`src/coach.rs` `explain`):
   no tools, no conversation, so it works during a rated game. Its answers show in the chat column through
   `src/coach/trainerChat.ts`, a thread of their own that is never saved into the game's chat. Hand it computed
@@ -83,6 +89,11 @@ drills, puzzles, the why-screen, the coach's scenario boards and any board added
 - On desktop the student can type a move (e2e4, Nf3, O-O) when no text field has focus: `Board` shows it
   green/red over the board, Enter plays it and Escape drops it (`src/chess/typed.ts`). Keys go to the last
   mounted board that's on screen and takes moves; it types whichever side is to move.
+- Moves can also be spoken (the top bar's mic, `src/components/Voice.tsx`): Vosk recognizes offline on
+  the device with a chess-words grammar (`src/voice/listen.ts`, model from `scripts/setup-vosk.mjs`),
+  `src/voice/parse.ts` reads the words against the legal moves (checked by `node scripts/check-voice.mjs`),
+  and they go to the same board typed moves do. A move waits for a yes per `needsConfirm`
+  (`src/voice/confirm.ts`): rated games and unsure readings by default. Phones need the https address.
 - The student's drawings belong to the position: they clear when the position changes, not on re-renders.
 - Any text about a position on screen, not only the coach's chat, makes its squares and moves hoverable
   (desktop) and tappable (phones) so they show on the board: render it with `SquareText` / `SquareRef`

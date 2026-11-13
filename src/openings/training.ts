@@ -11,6 +11,8 @@ export interface TrainingLine {
   moves: string[];
   /** Relative frequency among the set's lines (roughly per 100 club games). */
   weight: number;
+  /** Plies already on the board when the line starts (startNearSplit); from the first move otherwise. */
+  start?: number;
 }
 
 export interface TrainingSet {
@@ -19,7 +21,17 @@ export interface TrainingSet {
   color: Color;
   blurb: string;
   lines: TrainingLine[];
+  /** A way of training another set's opening: listed under that set (its id), not beside it. */
+  parent?: string;
+  /** This set's name among its opening's ways to train, e.g. "From the start" or "Punishing White". */
+  mode?: string;
 }
+
+/** The set's opening: its parent, or itself. */
+export const familyOf = (s: TrainingSet): TrainingSet => (s.parent && TRAINING_SETS.find((p) => p.id === s.parent)) || s;
+
+/** The ways to train an opening: the set itself, then the sets listed under it. */
+export const modesOf = (top: TrainingSet): TrainingSet[] => [top, ...TRAINING_SETS.filter((s) => s.parent === top.id)];
 
 const T = (eco: string, name: string, moves: string, weight: number): TrainingLine => ({
   eco,
@@ -27,6 +39,27 @@ const T = (eco: string, name: string, moves: string, weight: number): TrainingLi
   moves: moves.split(" "),
   weight,
 });
+
+/**
+ * For sets about the middlegame-deep part of an opening: each line starts one full move before White's
+ * move that sets it apart from the rest of the set, so the student gets straight to the position that
+ * matters instead of replaying the same first ten moves. The opponent's move then comes first.
+ */
+function startNearSplit(lines: TrainingLine[], studentIsBlack: boolean): TrainingLine[] {
+  return lines.map((l) => {
+    let split = 0;
+    for (const o of lines) {
+      if (o === l) continue;
+      let i = 0;
+      while (i < l.moves.length && l.moves[i] === o.moves[i]) i++;
+      split = Math.max(split, i);
+    }
+    // Back to the opponent's move at or before the split, then one full move earlier.
+    const opponentParity = studentIsBlack ? 0 : 1;
+    if (split % 2 !== opponentParity) split--;
+    return { ...l, start: Math.max(0, split - 2) };
+  });
+}
 
 export const TRAINING_SETS: TrainingSet[] = [
   {
@@ -123,6 +156,7 @@ export const TRAINING_SETS: TrainingSet[] = [
     id: "kid",
     name: "King's Indian",
     color: "black",
+    mode: "From the start",
     blurb: "...Nf6, ...g6, ...Bg7, ...d6 and ...O-O, then ...e5 (or ...c5) to hit the center. These are White's setups against it.",
     lines: [
       T("E99", "King's Indian Defense: Mar del Plata, ...Ne7 and ...f5", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7 Ne1 Nd7 Nd3 f5", 14),
@@ -136,6 +170,44 @@ export const TRAINING_SETS: TrainingSet[] = [
       T("A48", "Torre Attack: King's Indian setup", "d4 Nf6 Nf3 g6 Bg5 Bg7 Nbd2 O-O e3 d6 Be2 Nbd7 O-O e5 c3 h6 Bh4", 4),
       T("A26", "English Opening: Botvinnik setup vs the King's Indian", "c4 Nf6 Nc3 g6 g3 Bg7 Bg2 O-O e4 d6 Nge2 e5 O-O c6 d3", 4),
     ],
+  },
+  {
+    // Deeper than the King's Indian set: past move 10, where natural-looking White moves have a concrete
+    // answer, mostly through the g7 bishop. Every Black move was checked with Stockfish (within ~0.2 of
+    // its best), and each trap line ends with Black clearly better.
+    id: "kid-punish",
+    name: "King's Indian: punishing White",
+    color: "black",
+    parent: "kid",
+    mode: "Punishing White",
+    blurb:
+      "Deeper King's Indian lines: the Orthodox 6...e5, the Glek 7...Na6, the Four Pawns and the London. Each starts a move before White's choice, with your setup already on the board. Some are main lines to know; the rest are natural White moves that lose something, and how the g7 bishop cashes in.",
+    lines: startNearSplit([
+      // Orthodox 7.O-O Nc6: main lines to know.
+      T("E99", "King's Indian Defense: Mar del Plata, 10.f3 and the ...g5 storm", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7 Ne1 Nd7 f3 f5 Be3 f4 Bf2 g5 Nd3 Ng6 c5 Nf6", 12),
+      T("E97", "King's Indian Defense: Bayonet, 9.b4 Nh5", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7 b4 Nh5 Re1 f5 Ng5 Nf6 Bf3 c6", 9),
+      T("E97", "King's Indian Defense: Orthodox, 8.Be3 Ng4 main line", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 Be3 Ng4 Bg5 f6 Bh4 g5 Bg3 Nh6 d5 Ne7 Nd2 f5", 7),
+      // Orthodox: natural moves that lose something.
+      T("E97", "King's Indian Defense: Orthodox, 8.Be3 Ng4 9.Qd2?", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 Be3 Ng4 Qd2 Nxe3 fxe3 exd4 exd4 Bg4", 3),
+      T("E97", "King's Indian Defense: Orthodox, 8.Be3 Ng4 9.Bc1?", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 Be3 Ng4 Bc1 exd4 Nxd4 Nxf2 Rxf2 Bxd4 Qe1 f5", 2),
+      T("E97", "King's Indian Defense: Orthodox, 8.Bg5 and 10.Bg3?", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 Bg5 h6 Bh4 g5 Bg3 exd4 Nxd4 Nxe4 Nxc6 Nxc3 bxc3 bxc6", 3),
+      T("E92", "King's Indian Defense: Gligoric, 7.Be3 Ng4 8.Bd2?", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 Be3 Ng4 Bd2 exd4 Nxd4 Bxd4 Bxg4 Qh4 O-O Bxg4", 2),
+      // 7...exd4 8.Nxd4 Re8: only f3 or Bf3 keeps e4.
+      T("E94", "King's Indian Defense: Classical, ...exd4 and ...d5", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O exd4 Nxd4 Re8 f3 c6 Kh1 d5 cxd5 cxd5", 5),
+      T("E94", "King's Indian Defense: Classical, ...exd4 9.Qc2?", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O exd4 Nxd4 Re8 Qc2 Nxe4 Nxe4 Bxd4 Bg5 f6 Bd2 Bf5", 3),
+      T("E94", "King's Indian Defense: Classical, ...exd4 9.Bf4?", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O exd4 Nxd4 Re8 Bf4 Nxe4 Nxe4 Rxe4 Be3 Qe7", 3),
+      // Glek, 7...Na6.
+      T("E94", "King's Indian Defense: Glek, 8.Be3 Ng4", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Na6 Be3 Ng4 Bg5 Qe8 dxe5 dxe5 h3 h6 Bd2 Nf6", 6),
+      T("E94", "King's Indian Defense: Glek, 8.d5 Nc5", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Na6 d5 Nc5 Qc2 a5 Bg5 h6 Be3 b6", 5),
+      T("E94", "King's Indian Defense: Glek, queens off and 11.Nd5?", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Na6 dxe5 dxe5 Qxd8 Rxd8 Bg5 Re8 Nd5 Nxe4 Ne7+ Kf8 Nxc8 Raxc8 Be3 f5", 3),
+      // Four Pawns.
+      T("E76", "King's Indian Defense: Four Pawns, 10.e5 main line", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f4 O-O Nf3 c5 d5 e6 Be2 exd5 cxd5 Re8 e5 dxe5 fxe5 Ng4 Bg5 Qb6 O-O Nxe5 Nxe5 Bxe5", 4),
+      T("E76", "King's Indian Defense: Four Pawns, early 9.e5? and 10.Nxd5", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f4 O-O Nf3 c5 d5 e6 Be2 exd5 e5 Ne4 Nxd5 Nc6 Bd3 f5 O-O dxe5 fxe5 Be6", 2),
+      T("E76", "King's Indian Defense: Four Pawns, early 9.e5? and 10.cxd5", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f4 O-O Nf3 c5 d5 e6 Be2 exd5 e5 Ne4 cxd5 Nxc3 bxc3 Nd7 e6 fxe6 dxe6 Nf6", 2),
+      // London.
+      T("A48", "London System: King's Indian, 7.c4 Nh5", "d4 Nf6 Bf4 g6 e3 Bg7 Nf3 O-O Be2 d6 O-O Nbd7 c4 Nh5 Bg5 h6 Bh4 g5 Bg3 Nxg3 hxg3", 5),
+      T("A48", "London System: King's Indian, ...Qb6 and ...Be6", "d4 Nf6 Bf4 g6 e3 Bg7 Nf3 O-O Be2 d6 h3 c5 c3 Qb6 Qb3 Be6 Qxb6 axb6", 5),
+    ], true),
   },
   {
     id: "qgd",
@@ -153,10 +225,13 @@ export const TRAINING_SETS: TrainingSet[] = [
   },
 ];
 
-/** A line's name within its set: "Caro-Kann Defense: Panov Attack" is just "Panov Attack" under Caro-Kann. */
+/**
+ * A line's name within its set: "Caro-Kann Defense: Panov Attack" is just "Panov Attack" under Caro-Kann.
+ * A set named "King's Indian: punishing White" counts as King's Indian here.
+ */
 export function shortName(set: TrainingSet, line: TrainingLine): string {
   const i = line.name.indexOf(": ");
-  return i > 0 && line.name.startsWith(set.name) ? line.name.slice(i + 2) : line.name;
+  return i > 0 && line.name.startsWith(set.name.split(": ")[0]) ? line.name.slice(i + 2) : line.name;
 }
 
 export type Commonness = "common" | "occasional" | "rare";
@@ -169,12 +244,17 @@ export function findSet(id: string): TrainingSet | undefined {
   return own ? repertoireSet(own[1] as Color) : TRAINING_SETS.find((s) => s.id === id);
 }
 
-/** One line of the set, weighted by how often it's played. */
-export function pickLine(set: TrainingSet): TrainingLine {
-  const total = set.lines.reduce((n, l) => n + l.weight, 0);
+/**
+ * One line of the set, weighted by how often it's played. `avoid` (the line just played) is left out
+ * when there's another: "Another line" kept dealing the set's commonest line twice in a row.
+ */
+export function pickLine(set: TrainingSet, avoid?: TrainingLine): TrainingLine {
+  const same = (l: TrainingLine) => !!avoid && l.moves.join(" ") === avoid.moves.join(" ");
+  const lines = set.lines.length > 1 ? set.lines.filter((l) => !same(l)) : set.lines;
+  const total = lines.reduce((n, l) => n + l.weight, 0);
   let r = Math.random() * total;
-  for (const l of set.lines) if ((r -= l.weight) < 0) return l;
-  return set.lines[set.lines.length - 1];
+  for (const l of lines) if ((r -= l.weight) < 0) return l;
+  return lines[lines.length - 1];
 }
 
 /** How many times each line has come up, per device: enough to show which ones are still new. */

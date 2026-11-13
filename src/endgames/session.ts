@@ -13,6 +13,7 @@ import { stopPuzzles } from "../puzzles/session";
 import { stopDrills } from "../analysis/drillSession";
 import { stopGuess } from "../guess/session";
 import { stopOpening } from "../openings/session";
+import { keepSession } from "../persist";
 
 export interface EndgameSession {
   id: string;
@@ -82,6 +83,23 @@ export function startEndgame(id: string) {
   if (sideToMove(e.fen) !== e.side) reply();
 }
 
+/** Restores the last session (if any) and keeps saving it, for a phone that dropped the page. Call once at startup. */
+export const initEndgameSession = () =>
+  keepSession(useEndgame, "cc-endgame", (s) => !!(ENDGAMES.find((e) => e.id === s.id) && s.line?.fens), resume);
+
+/** Picks a saved session back up, redoing what the engine was in the middle of when the page went away. */
+function resume(saved: EndgameSession) {
+  useEndgame.setState({ ...saved, status: saved.status === "thinking" ? "playing" : saved.status }, true);
+  if (saved.status !== "thinking") return;
+  const s = get()!;
+  const ply = s.line.sans.length;
+  // The engine's turn: it was judging the student's last move (or replying, after which judging again is harmless).
+  if (ply > 0 && sideToMove(s.line.fens[ply]) !== endgameOf(s).side) {
+    set({ status: "thinking" });
+    check(s.line, s.line.sans[ply - 1], s.moves);
+  }
+}
+
 export const stopEndgame = () => useEndgame.setState(null, true);
 export const retryEndgame = () => {
   const s = get();
@@ -124,7 +142,13 @@ export async function endgameMove(from: Key, to: Key, promotion?: string) {
   const line = played.line;
   const moves = s.moves + 1;
   set({ line, moves, shapes: [], status: "thinking", message: "" });
+  return check(line, played.san, moves);
+}
 
+/** The engine's verdict on the student's move that left `line`; the try ends there or the engine replies. */
+async function check(line: Line, san: string, moves: number) {
+  const e = endgameOf(get()!);
+  const ply = line.sans.length - 1;
   const end = ending(line);
   if (end === "mate") return finish(true, "won", e.goal === "draw" ? "Checkmate! More than a draw." : "Checkmate. Well done.");
   if (end === "draw") {
@@ -146,9 +170,9 @@ export async function endgameMove(from: Key, to: Key, promotion?: string) {
   if (get()?.line !== line) return;
 
   if (e.goal !== "draw" && verdict < STILL_WON)
-    return finish(false, "failed", `${played.san} lets the win slip: with best play it's no longer won. Try again, or look at the hint.`);
-  if (e.goal === "draw" && verdict <= LOST) return finish(false, "failed", `${played.san} loses: the engine wins from here. Try again.`);
-  if (e.goal === "promote" && played.san.includes("=")) return finish(true, "won", "Promoted, and the win is safe. Well done.");
+    return finish(false, "failed", `${san} lets the win slip: with best play it's no longer won. Try again, or look at the hint.`);
+  if (e.goal === "draw" && verdict <= LOST) return finish(false, "failed", `${san} loses: the engine wins from here. Try again.`);
+  if (e.goal === "promote" && san.includes("=")) return finish(true, "won", "Promoted, and the win is safe. Well done.");
   if (e.goal === "draw" && moves >= (e.moves ?? 15)) return finish(true, "held", `${moves} moves and still a draw: you've held it.`);
   if (e.goal === "mate" && moves >= MOVE_LIMIT) return finish(false, "failed", `${MOVE_LIMIT} moves without mate. Push the king to the edge faster.`);
   set({ status: "playing" });
