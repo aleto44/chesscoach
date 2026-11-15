@@ -20,7 +20,7 @@ import { planOf, type PlanIdea } from "./plans";
 import { hasBackend } from "../backend";
 import { moveLabel } from "../chess/line";
 import { clearTrainerChat, pushTrainer, trainerGeneration } from "../coach/trainerChat";
-import { judgePunish, planTrap, positionKey, trapAt, type Blunder } from "./blunders";
+import { judgePunish, planTrap, positionKey, trapPlay, type Blunder, type Detour } from "./blunders";
 import { settingRating, useSettings } from "../settings";
 import { START_RATING } from "../rating";
 import { keepSession } from "../persist";
@@ -56,6 +56,8 @@ export interface OpeningSession {
   trapAt: string | null;
   /** The opponent's blunder on the board, waiting to be punished. */
   blunder: Blunder | null;
+  /** The opponent left the book on a detour toward a trap (blunders.ts Route): the student's answer is due. */
+  detour?: Detour | null;
   /** The ply whose move note (guides.ts) the student asked for with Hint; notes stay hidden otherwise. */
   noteAt?: number | null;
 }
@@ -87,7 +89,7 @@ export function startOpening(setId: string, target: TrainingLine) {
   const trap = planTrap(target, set.color, start, studentRating());
   const message = start ? `Starting after ${moveLabelAt(target.moves, start - 1)}, with the setup on the board. Step back to see how it got here.` : "";
   useOpening.setState(
-    { setId, target, line, status: "playing", message, shapes: [], view: null, why: null, trapAt: trap, blunder: null },
+    { setId, target, line, status: "playing", message, shapes: [], view: null, why: null, trapAt: trap, blunder: null, detour: null },
     true,
   );
   if (sideToMove(line.fens[start]) !== set.color) reply();
@@ -112,6 +114,8 @@ function resume(saved: OpeningSession) {
   if (sideToMove(s.line.fens[ply]) === openingSetOf(s).color) return;
   // The student had answered the opponent's mistake and the engine was judging it.
   if (s.blunder && ply > 0) return punishMove(s, s.blunder, s.line, s.line.sans[ply - 1]);
+  // The opponent was about to play its mistake after a detour.
+  if (s.trapAt === positionKey(s.line.fens[ply])) return reply();
   // The opponent was about to reply, or the engine was still weighing a move off the line: that
   // move is taken back to play again, rather than let through unjudged.
   if (reachable(s.target, s.line)) return reply();
@@ -186,6 +190,7 @@ export async function openingMove(from: Key, to: Key, promotion?: string) {
   if (!played) return;
   const line = played.line;
   if (s.blunder) return punishMove(s, s.blunder, line, played.san);
+  if (s.detour) return detourMove(s, s.detour, line, played.san);
   const book = bookNext(s);
 
   // The book move of this line, or of another line of the set (a move order the student knows).
@@ -243,8 +248,53 @@ export async function openingMove(from: Key, to: Key, promotion?: string) {
 /** How often players at the student's level fall for it, as Maia sees it. */
 const common = (b: Blunder) => `${Math.max(1, Math.round(b.p * 100))}% of players at your level play it here`;
 
-/** The student's answer to the opponent's blunder: the engine says whether it cashed in. */
+/** `sans` numbered from ply `at` of the game ("9.Nxc6 bxc6 10.Bxd6"), so the message's moves can be hovered. */
+const numberedFrom = (at: number, sans: string[]) =>
+  sans
+    .map((x, i) => ((at + i) % 2 === 0 ? `${(at + i) / 2 + 1}.${x}` : i === 0 ? `${Math.floor((at + i) / 2) + 1}...${x}` : x))
+    .join(" ");
+
+/** The opponent's next move in the played-out punishment (`b.cont`), after the usual pause. */
+function contReply(b: Blunder, line: Line, k: number) {
+  window.setTimeout(() => {
+    const now = get();
+    if (!now || now.line !== line) return;
+    const ply = line.sans.length;
+    let m: { from: string; to: string; promotion?: string } | null = null;
+    try {
+      m = new Chess(line.fens[ply]).move(b.cont[k]);
+    } catch {
+      m = null;
+    }
+    const played = m && playAt(line, ply, m.from as Key, m.to as Key, m.promotion);
+    if (!played) return set({ status: "done", message: punishedText(b) });
+    set({ line: played.line, view: null, status: "playing" });
+  }, REPLY_MS);
+}
+
+const punishedText = (b: Blunder) =>
+  `Punished. ${b.san} was a mistake (${common(b)}): ${numberedFrom(b.at, b.cont)} wins it (${evalText(b.bestEval)} for you). Off the book, but that's a line you want.`;
+
+/**
+ * The student's answer to the opponent's blunder. The stored punishment is played out to where the
+ * win is on the board (b.cont): the student finds each of their moves and the opponent defends, so the
+ * point of the tactic gets played, not just its first move. Any other move the engine judges.
+ */
 async function punishMove(s: OpeningSession, b: Blunder, line: Line, san: string) {
+  // Which of the continuation's moves this was (even: the student's).
+  const k = line.sans.length - 1 - b.at;
+  const expected = b.cont[k];
+  if (san === expected) {
+    if (k + 1 >= b.cont.length) return set({ line, status: "done", message: punishedText(b), shapes: [] });
+    set({
+      line,
+      status: "thinking",
+      message: k === 0 ? `${san}! ${b.san} was a mistake. Keep going: there's more to it.` : `${san}, right. Keep going.`,
+      shapes: [],
+    });
+    return contReply(b, line, k + 1);
+  }
+  if (k > 0) return contSlip(s, b, line, san, expected);
   set({ line, status: "thinking", message: "", shapes: [] });
   const color = openingSetOf(s).color;
   let verdict: { eval: number; ok: boolean } | null = null;
@@ -268,6 +318,66 @@ async function punishMove(s: OpeningSession, b: Blunder, line: Line, san: string
     status: "off",
     message: `${b.san} was a mistake (${common(b)}), and ${san} lets it go (${evalText(verdict.eval)} for you). ${b.best} wins: ${evalText(b.bestEval)}. Look for what your opponent just left loose.`,
     shapes: [{ orig: b.bestMove.from, dest: b.bestMove.to, brush: "green" }],
+    why: null,
+  });
+}
+
+/**
+ * The student's answer to the opponent's detour: the expected move walks on into the trap, an
+ * engine-equal one is fine but ends the session (no trap after it), anything worse is a slip.
+ */
+async function detourMove(s: OpeningSession, d: Detour, line: Line, san: string) {
+  if (san === d.reply) {
+    set({ line, detour: null, trapAt: d.trapKey, status: "playing", message: "", shapes: [], why: null });
+    return reply();
+  }
+  const fen = s.line.fens[s.line.sans.length];
+  const color = openingSetOf(s).color;
+  set({ line, status: "thinking", message: "", shapes: [] });
+  let evals: MoveEvals | null = null;
+  try {
+    evals = await compareMoves(fen, san, d.reply, color);
+  } catch (e) {
+    console.error("detour check failed", e);
+  }
+  if (get()?.line !== line) return;
+  if (!evals || evals.book - evals.played <= CLOSE)
+    return set({
+      status: "done",
+      detour: null,
+      message: `${san} is a fine answer to ${d.lead} too (about as good as ${d.reply}). Off the book from here: it's a middlegame.`,
+    });
+  const arrow = uciOf(fen, d.reply);
+  set({
+    status: "off",
+    message: `${san} costs something after ${d.lead} (${evalText(evals.played)} for you). ${d.reply} was the move (${evalText(evals.book)}).`,
+    shapes: arrow ? [{ orig: arrow.from, dest: arrow.to, brush: "green" }] : [],
+    why: null,
+  });
+}
+
+/** A move other than the continuation's, partway through the punishment: fine if it keeps the gain. */
+async function contSlip(s: OpeningSession, b: Blunder, line: Line, san: string, expected: string) {
+  const before = line.fens[line.sans.length - 1];
+  set({ line, status: "thinking", message: "", shapes: [] });
+  let verdict: { eval: number; ok: boolean } | null = null;
+  try {
+    verdict = await judgePunish({ ...b, best: expected }, line.fens[line.sans.length], san, openingSetOf(s).color);
+  } catch (e) {
+    console.error("blunder check failed", e);
+  }
+  if (get()?.line !== line) return;
+  if (!verdict || verdict.ok)
+    return set({
+      status: "done",
+      message: `Punished. ${b.san} was a mistake (${common(b)}), and ${san} keeps the gain (${evalText(verdict?.eval ?? b.bestEval)} for you; the engine went ${numberedFrom(line.sans.length - 1, b.cont.slice(line.sans.length - 1 - b.at))}).`,
+      shapes: [],
+    });
+  const arrow = uciOf(before, expected);
+  set({
+    status: "off",
+    message: `${san} lets the win go (${evalText(verdict.eval)} for you). ${expected} keeps going: ${evalText(b.bestEval)}.`,
+    shapes: arrow ? [{ orig: arrow.from, dest: arrow.to, brush: "green" }] : [],
     why: null,
   });
 }
@@ -359,8 +469,8 @@ function reply() {
       ? now.target
       : [...openingSetOf(now).lines].sort((x, y) => y.weight - x.weight).find((l) => reachable(l, now.line));
     if (target && target !== now.target) set({ target });
-    const next = target && legalNext(matchLine(target, now.line).remaining, sideToMove(fen), fen)[0];
-    if (next && now.trapAt === positionKey(fen)) return trapReply(now, next);
+    const next = (target && legalNext(matchLine(target, now.line).remaining, sideToMove(fen), fen)[0]) || null;
+    if (now.trapAt === positionKey(fen)) return trapReply(now, next);
     const played = next && playAt(now.line, ply, next.from, next.to, next.promotion);
     if (!played) {
       return set({
@@ -373,15 +483,34 @@ function reply() {
   }, REPLY_MS);
 }
 
-/** The opponent's stored mistake instead of `next`, the book move (played when there's none after all). */
-function trapReply(s: OpeningSession, next: Planned) {
+/**
+ * The opponent's stored mistake, or a detour toward one, instead of `next`, the book move (played
+ * when there's neither after all; off the book there may be no book move either).
+ */
+function trapReply(s: OpeningSession, next: Planned | null) {
   const ply = s.line.sans.length;
   const fen = s.line.fens[ply];
-  const b = trapAt(fen, studentRating());
-  const move = b && uciOf(fen, b.san);
-  const played = move ? playAt(s.line, ply, move.from, move.to) : playAt(s.line, ply, next.from, next.to, next.promotion);
-  if (!played) return set({ trapAt: null, status: "playing" });
-  set({ line: played.line, view: null, status: "playing", trapAt: null, blunder: move ? b : null });
+  const pick = trapPlay(fen, studentRating());
+  const san = pick && ("blunder" in pick ? pick.blunder.san : pick.detour.lead);
+  const move = san && uciOf(fen, san);
+  const played = move ? playAt(s.line, ply, move.from, move.to) : next && playAt(s.line, ply, next.from, next.to, next.promotion);
+  if (!played) {
+    set({ trapAt: null });
+    return next
+      ? set({ status: "playing" })
+      : set({ status: "done", message: "Off the book from here: it's a middlegame." });
+  }
+  const blunder = move && pick && "blunder" in pick ? { ...pick.blunder, at: played.line.sans.length } : null;
+  const detour = move && pick && "detour" in pick ? pick.detour : null;
+  set({
+    line: played.line,
+    view: null,
+    status: "playing",
+    trapAt: null,
+    blunder,
+    detour,
+    message: detour ? `${detour.lead}: your opponent leaves the book. Find a good answer.` : "",
+  });
   if (!move) finished(get()!, played.line);
 }
 
@@ -396,7 +525,16 @@ export function openingTakeBack() {
 export function openingHint() {
   const s = get();
   if (!s || s.status !== "playing") return;
-  if (s.blunder) return set({ shapes: [{ orig: s.blunder.bestMove.from, dest: s.blunder.bestMove.to, brush: "green" }] });
+  if (s.blunder) {
+    // The continuation's move due now (the first is the punishment itself).
+    const due = s.blunder.cont?.[s.line.sans.length - (s.blunder.at ?? s.line.sans.length)] ?? s.blunder.best;
+    const arrow = uciOf(s.line.fens[s.line.sans.length], due);
+    return set({ shapes: arrow ? [{ orig: arrow.from, dest: arrow.to, brush: "green" }] : [] });
+  }
+  if (s.detour) {
+    const arrow = uciOf(s.line.fens[s.line.sans.length], s.detour.reply);
+    return set({ shapes: arrow ? [{ orig: arrow.from, dest: arrow.to, brush: "green" }] : [] });
+  }
   // A line with move notes gives the idea first (with its drawings); the arrow comes on a second press.
   const ply = s.line.sans.length;
   if (s.noteAt !== ply && guideAt(s.target, ply)) return set({ noteAt: ply, shapes: [] });

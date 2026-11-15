@@ -22,6 +22,7 @@ export type View =
   | "profile"
   | "weaknesses"
   | "ratings"
+  | "saved-games"
   | "endgames"
   | "guess"
   | "convert"
@@ -43,6 +44,7 @@ export const VIEW_TITLE: Record<View, string> = {
   profile: "Profile",
   weaknesses: "Weaknesses",
   ratings: "Rating history",
+  "saved-games": "Saved games",
   endgames: "Endgame trainer",
   guess: "Guess the move",
   convert: "Win it again",
@@ -65,6 +67,7 @@ const PARENT: Partial<Record<View, View>> = {
   profile: "home",
   weaknesses: "profile",
   ratings: "profile",
+  "saved-games": "profile",
   endgames: "school",
   guess: "school",
   convert: "school",
@@ -91,14 +94,16 @@ function savedView(): View {
 
 /**
  * The board's back button returns to the menu that opened it: Games, Utility's analysis board, or
- * Profile's saved games list (which opens again).
+ * the saved games screen.
  */
-type BoardFrom = "games" | "utility" | "profile";
+type BoardFrom = "games" | "utility" | "saved-games";
 const BOARD_FROM_KEY = "cc-board-from";
 function savedBoardFrom(): BoardFrom {
   try {
     const v = localStorage.getItem(BOARD_FROM_KEY);
-    if (v === "utility" || v === "profile") return v;
+    if (v === "utility" || v === "saved-games") return v;
+    // Saved games used to be a popup on Profile.
+    if (v === "profile") return "saved-games";
   } catch {
     // Private mode: Games.
   }
@@ -107,14 +112,12 @@ function savedBoardFrom(): BoardFrom {
 
 /**
  * `peek`: a coach scenario is open over a puzzle, drill or trainer session, which keeps running
- * underneath; returning from the scenario goes back to it. `openSaved`: going back from a saved
- * game lands on Profile with the saved games list open again; Profile clears it once shown.
+ * underneath; returning from the scenario goes back to it.
  */
-export const useNav = create<{ view: View; peek: boolean; boardFrom: BoardFrom; openSaved: boolean }>(() => ({
+export const useNav = create<{ view: View; peek: boolean; boardFrom: BoardFrom }>(() => ({
   view: savedView(),
   peek: false,
   boardFrom: savedBoardFrom(),
-  openSaved: false,
 }));
 useNav.subscribe(({ view, boardFrom }) => {
   try {
@@ -127,7 +130,7 @@ useNav.subscribe(({ view, boardFrom }) => {
 
 /**
  * Going anywhere leaves a running puzzle or drill session. `from` names the menu the board's
- * back button returns to: Games unless Utility or the saved games list opened it. Without one,
+ * back button returns to: Games unless Utility or the saved games screen opened it. Without one,
  * a board that's already showing (the coach opening a scenario) keeps where it came from.
  */
 export function go(view: View, from?: BoardFrom) {
@@ -140,8 +143,8 @@ export function go(view: View, from?: BoardFrom) {
   stopPlans();
   const cur = useNav.getState();
   if (view === "board")
-    useNav.setState({ view, peek: false, openSaved: false, boardFrom: from ?? (cur.view === "board" ? cur.boardFrom : "games") });
-  else useNav.setState({ view, peek: false, openSaved: false });
+    useNav.setState({ view, peek: false, boardFrom: from ?? (cur.view === "board" ? cur.boardFrom : "games") });
+  else useNav.setState({ view, peek: false });
 }
 
 const parentOf = (v: View): View | undefined => (v === "board" ? useNav.getState().boardFrom : PARENT[v]);
@@ -164,11 +167,8 @@ export function back() {
   if (useOpening.getState()) return stopOpening();
   if (useGuess.getState()) return stopGuess();
   if (usePlan.getState()) return stopPlans();
-  const { view, boardFrom } = useNav.getState();
-  const parent = parentOf(view);
-  if (!parent) return;
-  go(parent);
-  if (view === "board" && boardFrom === "profile") useNav.setState({ openSaved: true });
+  const parent = parentOf(useNav.getState().view);
+  if (parent) go(parent);
 }
 
 /** A puzzle, drill, endgame or guess-the-move session is on the board. */

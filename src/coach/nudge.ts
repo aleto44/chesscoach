@@ -18,9 +18,12 @@ export interface Nudge {
   ply: number;
   san: string;
   severity: "mistake" | "blunder";
-  /** The student's winning chances before and after, percent. */
+  /** The student's winning chances before and after, percent: only to decide whether to nudge. */
   before: number;
   after: number;
+  /** The eval before and after, student's view, as text (+1.2, #3): what the note says. */
+  evalBefore: string;
+  evalAfter: string;
   fenBefore: string;
   bestUci: string | null;
   showBest: boolean;
@@ -32,6 +35,15 @@ const win = (l: EngineLine | undefined, side: Color) => {
   if (!l) return 50;
   const w = l.mate !== undefined ? (l.mate > 0 ? 100 : 0) : whiteWinPercent({ cp: l.cp ?? 0 });
   return side === "white" ? w : 100 - w;
+};
+
+/** An engine line (White's view) as text from `side`'s view: "+1.2", "-0.4", "#3", "-#2". */
+const evalText = (l: EngineLine | undefined, side: Color) => {
+  if (!l) return "0.0";
+  const sign = side === "white" ? 1 : -1;
+  if (l.mate !== undefined) return `${l.mate * sign > 0 ? "" : "-"}#${Math.abs(l.mate)}`;
+  const v = ((l.cp ?? 0) * sign) / 100;
+  return (v >= 0 ? "+" : "") + v.toFixed(1);
 };
 
 export function bestSan(n: Nudge): string | null {
@@ -64,7 +76,7 @@ async function check(gameId: number | null, ply: number, fenBefore: string, fenA
   const s = useStore.getState();
   // Only if the game is still where it was (the opponent may have replied: that's fine).
   if (s.gameId !== gameId || s.game.fens[ply] !== fenBefore || s.game.sans[ply] !== san || s.meta.result) return;
-  useNudge.setState({ gameId, ply, san, severity, before, after, fenBefore, bestUci: best?.pv[0] ?? null, showBest: false }, true);
+  useNudge.setState({ gameId, ply, san, severity, before, after, evalBefore: evalText(best, side), evalAfter: evalText(reply, side), fenBefore, bestUci: best?.pv[0] ?? null, showBest: false }, true);
 }
 
 export function initNudges() {
@@ -93,7 +105,7 @@ export function nudgeQuestion(n: Nudge): string {
   const best = bestSan(n);
   return (
     `I just played ${full}${turn === "w" ? "." : "..."}${n.san} (position before it: ${n.fenBefore}). ` +
-    `The app's engine check says my winning chances went from ${Math.round(n.before)}% to ${Math.round(n.after)}%` +
+    `The app's engine check says the eval went from ${n.evalBefore} to ${n.evalAfter} for me` +
     `${best ? `; its best move was ${best}` : ""}. What did I miss? Keep it short.`
   );
 }

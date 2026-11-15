@@ -8,7 +8,6 @@ import { clockLeft, formatClock } from "../game/clock";
 import { gamesText, profileText } from "./profile";
 import { continuations, openingName } from "../openings/book";
 import { START_FEN } from "../chess/line";
-import { getRepertoire } from "../openings/repertoire";
 import { askMove } from "./quiz";
 import { findPuzzles, openingLabel, openingTag, refreshPuzzleDb, themeKey, themeLabel, usePuzzleDb } from "../puzzles/puzzles";
 import { puzzleContext, startCoachSet, usePuzzle } from "../puzzles/session";
@@ -249,8 +248,6 @@ Object.assign(handlers, {
         ? `Book continuations: ${moves.map((m) => `${m} (${next.filter((n) => n.move === m).map((n) => n.opening.name).join(" / ")})`).join("; ")}.`
         : "The book has nothing further from here.",
     ];
-    const rep = (await getRepertoire()).filter((r) => r.moves.length > sans.length && r.moves.slice(0, sans.length).every((m, i) => m === sans[i]));
-    if (rep.length) out.push(`Student's repertoire continues: ${rep.map((r) => `${r.moves[sans.length]} (${r.color}, ${r.name})`).join("; ")}.`);
     return { text: out.join("\n") };
   },
 
@@ -364,7 +361,7 @@ Object.assign(handlers, {
 function soundVerdict(verdict: string, afterCp: number): string {
   // Only the generic "gets better / chances drop" verdict is wrong here; a sound sacrifice's
   // "You lose a knight" stays.
-  if (!/position gets .*better: your winning chances drop/.test(verdict)) return verdict;
+  if (!/position gets .*better: the eval drops/.test(verdict)) return verdict;
   const won = verdict.match(/^You do win (.+?), but/);
   const holds = `the position stays about where it was (${evalWords(afterCp)})`;
   return won ? `a sound move: you win ${won[1]}, and ${holds}.` : `a sound move: ${holds}.`;
@@ -436,7 +433,7 @@ Object.assign(handlers, {
       const ex = await explainCached({ fenBefore: fen, uci, bestUci, evalBefore: before, evalAfter: afterCp });
       const sound = cls === "best" || cls === "good";
       out.push(
-        `\n${m.san}: ${evalWords(before)} → ${evalWords(afterCp)}, ${cls} (gives away ${loss.toFixed(1)} points of winning chances; winning chances ${ex.winBefore}% → ${ex.winAfter}% for ${mover}).`,
+        `\n${m.san}: ${evalWords(before)} → ${evalWords(afterCp)}, ${cls} (eval ${ex.evalBefore} → ${ex.evalAfter} for ${mover}).`,
         `What happens (notes say "You" for ${mover}): ${ex.played.steps.map((s) => `${s.label} ${s.note}`).join(" ")}`,
         // The why-screen's verdict assumes a bad move ("the position gets better for them, your
         // chances drop"), which read as nonsense for a sound move that wins material: say what the

@@ -33,3 +33,6 @@ public/vosk
 crash.log
 dev-console.log
 crash-console.log
+
+# scripts/trap-harness.mjs output
+trap-preview.html

@@ -57,7 +57,7 @@ unguarded square, ...). Drills return on a spaced-repetition schedule until you 
 <img src="docs/screenshots/opening-blunder.png" alt="The opening trainer: the opponent blundered with Ba3 and Nxa3 punished it" />
 
 ### 📖 An opening trainer that knows the ideas
-Learn a repertoire against a book opponent that plays real-world move frequencies. Harmless
+Learn your openings against a book opponent that plays real-world move frequencies. Harmless
 transpositions count, engine-equal moves get `≈` instead of a red X, and **"why not?"** has the coach
 explain the theory. Now and then the opponent **blunders on purpose** to check you're looking at
 the board. Every line ends with **the plan**, drawn on the board.
@@ -183,7 +183,7 @@ exact positions, or to puzzles on that theme. Rating history tracks everything o
 Positions you got wrong come back on a **spaced-repetition** schedule until they stick. Every drill
 is a lesson worked out when the mistake was made: the move you played against the best one,
 searched deeply, with the concrete theme behind it ("unguarded square", "fork", "trapped piece", ...).
-Missed puzzles and your opening repertoire feed in too.
+Missed puzzles and the opening fixes you pick in Opening leaks feed in too.
 
 ### Puzzles
 
@@ -197,8 +197,8 @@ Millions of rated puzzles from the [Lichess puzzle database](https://database.li
 
 <img src="docs/screenshots/opening-plan.png" alt="Opening trainer showing the plan at the end of a London System line" width="100%" />
 
-- **Opening trainer:** build a repertoire (London, Italian, Queen's Gambit, and defences as Black)
-  and play it against the book. The opponent picks replies weighted by how often they're played.
+- **Opening trainer:** pick a side and an opening (London, Italian, Queen's Gambit, and defences as
+  Black), then its main lines or the common mistakes to punish, and play it against the book. The opponent picks replies weighted by how often they're played.
   Transpositions that cost nothing are accepted, and engine-equal alternatives are marked `≈`
   instead of wrong. Ask **"why not?"** after leaving the line and the coach explains the theory.
   Sometimes the opponent leaves the book with a real blunder, and you have to punish it. At the end

@@ -2146,6 +2146,26 @@ button.icon {
   min-height: 0;
 }
 
+/* Phones: the verdict and key-moment text, moved out of the side column to just under the board. */
+.review-note {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.review-note .note {
+  width: auto;
+  min-height: 0;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.review-note > :first-child {
+  border-top: none;
+}
+
 .game-side .review-bar {
   flex-wrap: wrap;
   white-space: normal;
@@ -2363,6 +2383,7 @@ button.danger {
   /* Live game: the opponent's card, the board (its move buttons under it), your card, then
      resign / take back. */
   .board-panel.play.live > .crumbs,
+  .board-panel.play.live > .review-note,
   .board-panel.play.live .game-head,
   .board-panel.play.live .side-body,
   .board-panel.play.live .side-controls {
@@ -2470,6 +2491,20 @@ button.danger {
     flex: 0 0 48px;
     margin-left: 6px;
     border-radius: 6px;
+  }
+
+  /* Review: the key-moment arrows as a second row under the board's move buttons. */
+  .moments.board-moments {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .board-moments button {
+    flex: 1;
+    min-height: 38px;
+    padding: 4px 0;
+    font-size: 15px;
   }
 
   /* Game report: no box-in-a-scrolling-page, and tighter rows so most of it fits on screen. */
@@ -2620,6 +2655,11 @@ button.danger {
   width: 18px;
   height: 18px;
   will-change: auto;
+}
+
+/* Black pieces sit on the dark page here, not a square: a light halo traces their outline. */
+.material.cg-wrap piece.black {
+  filter: drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.6));
 }
 
 .material.cg-wrap piece.stacked {

@@ -6,6 +6,7 @@ import { isStudentMove, keyMoments, labelOf, type KeyMoment, type MoveAnnotation
 import { gameReport, LABELS, type GameReport } from "../analysis/report";
 import { sendToCoach } from "../coach/bridge";
 import { goto, opponentLabel, useStore, type Color, type GameMeta } from "../store";
+import { usePhone } from "../phone";
 
 const MARKS: Partial<Record<MoveAnnotation["class"], string>> = { inaccuracy: "?!", mistake: "?", blunder: "??" };
 
@@ -100,7 +101,10 @@ function moment() {
   // Off the game's own moves (a tangent or what-if moves), the review has nothing to say.
   if (active || gameFork || gamePly >= game.sans.length) return null;
   const a = annotations[gamePly];
-  if (!a || !isStudentMove(game, meta, gamePly)) return null;
+  if (!a) return null;
+  // The opponent's real errors get the same arrows (what they played, what was better), so the
+  // student sees what they were handed; inaccuracies aren't worth the noise.
+  if (!isStudentMove(game, meta, gamePly)) return opponentMoment(gamePly, a);
   const key = keyMoments().find((m) => m.i === gamePly);
   if (!MARKS[a.class] && !key) return null;
   const fen = game.fens[gamePly];
@@ -118,6 +122,29 @@ function moment() {
     shapes,
     text: `Your move here was ${move}${MARKS[a.class]}, ${verdict}.${best ? ` Better was ${best}.` : ""}`,
     reason: key?.reason,
+  };
+}
+
+const OPPONENT_ERRORS: MoveLabel[] = ["mistake", "miss", "blunder"];
+
+function opponentMoment(i: number, a: MoveAnnotation) {
+  const label = labelOf(a);
+  if (!OPPONENT_ERRORS.includes(label)) return null;
+  const { game } = useStore.getState();
+  const fen = game.fens[i];
+  const [, turn, , , , full] = fen.split(" ");
+  const move = `${full}${turn === "w" ? "." : "..."}${game.sans[i]}`;
+  const verdict = LABEL_INFO[label].verdict.replace(/^is /, "");
+  const shapes: DrawShape[] = [{ orig: game.lastMoves[i][0], dest: game.lastMoves[i][1], brush: "red" }];
+  const best = san(fen, a.bestUci);
+  if (a.bestUci && best !== game.sans[i]) {
+    shapes.push({ orig: a.bestUci.slice(0, 2) as Key, dest: a.bestUci.slice(2, 4) as Key, brush: "green" });
+  }
+  return {
+    shapes,
+    text: `Your opponent played ${move}${MARKS[a.class] ?? ""}, ${verdict}.${best && best !== game.sans[i] ? ` Better was ${best}.` : ""}`,
+    reason: undefined as string | undefined,
+    opponent: true,
   };
 }
 
@@ -302,7 +329,8 @@ export function GameReportPanel({ report }: { report: GameReport }) {
 
 /** Below the moves once a game is over: analysis progress, then the report toggle and key moments. */
 export function ReviewBar() {
-  const { review, annotations, gamePly, meta, active, busy, reportOpen } = useStore();
+  const { review, annotations, meta, active, busy, reportOpen } = useStore();
+  const phone = usePhone();
   if (review) {
     return (
       <div className="review-bar">
@@ -316,10 +344,6 @@ export function ReviewBar() {
     );
   }
   if (!meta.result || active || !annotations.some(Boolean)) return null;
-  const moments = keyMoments().map((m) => m.i);
-  // No wrapping: past the last moment (or before the first) the arrow does nothing.
-  const next = moments.find((i) => i > gamePly);
-  const prev = [...moments].reverse().find((i) => i < gamePly);
 
   return (
     <div className="review-bar">
@@ -327,24 +351,39 @@ export function ReviewBar() {
         {reportOpen ? "Moves" : "Game report"}
       </button>
       <span className="spacer" />
-      {moments.length > 0 && (
-        // One group, so the arrows never wrap away from their label.
-        <span className="moments">
-          <button onClick={() => prev !== undefined && goto(prev)} disabled={prev === undefined} title="Previous key moment" aria-label="Previous key moment">
-            ◀
-          </button>
-          <span className="muted small">key moments</span>
-          <button onClick={() => next !== undefined && goto(next)} disabled={next === undefined} title="Next key moment" aria-label="Next key moment">
-            ▶
-          </button>
-        </span>
-      )}
+      {/* Phones have these right under the board instead (BoardPanel). */}
+      {!phone && <KeyMoments />}
       {!reportOpen && (
         <button onClick={() => sendToCoach(reviewPrompt())} disabled={busy} title="One message with the analysis already done">
           Review with coach
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * Previous / next key moment. No wrapping: past the last moment (or before the first) the arrow
+ * does nothing. Renders nothing before the review is done or when there are no moments.
+ */
+export function KeyMoments({ className = "moments" }: { className?: string }) {
+  const { annotations, gamePly, meta, active } = useStore();
+  if (!meta.result || active || !annotations.some(Boolean)) return null;
+  const moments = keyMoments().map((m) => m.i);
+  if (moments.length === 0) return null;
+  const next = moments.find((i) => i > gamePly);
+  const prev = [...moments].reverse().find((i) => i < gamePly);
+  // One group, so the arrows never wrap away from their label.
+  return (
+    <span className={className}>
+      <button onClick={() => prev !== undefined && goto(prev)} disabled={prev === undefined} title="Previous key moment" aria-label="Previous key moment">
+        ◀
+      </button>
+      <span className="muted small">key moments</span>
+      <button onClick={() => next !== undefined && goto(next)} disabled={next === undefined} title="Next key moment" aria-label="Next key moment">
+        ▶
+      </button>
+    </span>
   );
 }
 

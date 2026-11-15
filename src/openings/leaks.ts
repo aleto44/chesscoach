@@ -1,13 +1,10 @@
 // Opening leaks: where the student's real games (rated and imported, their unaided play) go wrong
 // in the first moves. Three views of the same games: how each opening scores and stands after it,
-// the positions the student keeps reaching and keeps misplaying, and, when there's a repertoire,
-// where the games leave it (the student forgetting a move, or the opponent playing a reply the
-// repertoire doesn't cover yet). All from the stored post-game analysis; no engine runs here.
+// and the positions the student keeps reaching and keeps misplaying. All from the stored post-game
+// analysis; no engine runs here.
 import { Chess } from "chess.js";
-import { START_FEN } from "../chess/line";
 import type { Color } from "../store";
 import { fenKey, forStudent, outcome, type TrainingGame } from "../training/games";
-import type { RepertoireLine } from "./repertoire";
 
 /** How far into a game counts as the opening, here. */
 export const LEAK_PLIES = 24;
@@ -44,27 +41,10 @@ export interface Leak {
   worst: string | null;
 }
 
-export interface RepertoireExit {
-  key: string;
-  color: Color;
-  /** "you": the student played something else than their line; "them": the opponent left it. */
-  kind: "you" | "them";
-  /** The position the student had to move in. */
-  fen: string;
-  path: string[];
-  games: number;
-  /** The student's move there, and the repertoire's (for "you") or the engine's (for "them"). */
-  played: string;
-  answer: string | null;
-  lastMove: string | null;
-}
-
 export interface Leaks {
   games: number;
   openings: OpeningScore[];
   leaks: Leak[];
-  exits: RepertoireExit[];
-  hasRepertoire: Record<Color, boolean>;
 }
 
 const pointsOf = (g: TrainingGame) => ({ won: 1, drew: 0.5, lost: 0 })[outcome(g)];
@@ -158,80 +138,8 @@ function findLeaks(games: TrainingGame[]): Leak[] {
     .map(({ totalLoss: _t, ...l }) => l);
 }
 
-/** Every position along the repertoire's lines for one color, and the moves its lines play from each. */
-function repertoireTree(lines: RepertoireLine[], color: Color) {
-  const next = new Map<string, Set<string>>();
-  for (const line of lines.filter((l) => l.color === color)) {
-    const chess = new Chess(START_FEN);
-    for (const san of line.moves) {
-      const key = fenKey(chess.fen());
-      let m;
-      try {
-        m = chess.move(san);
-      } catch {
-        break;
-      }
-      if (!next.has(key)) next.set(key, new Set());
-      next.get(key)!.add(m.san);
-    }
-    if (!next.has(fenKey(chess.fen()))) next.set(fenKey(chess.fen()), new Set());
-  }
-  return next;
-}
-
-function repertoireExits(games: TrainingGame[], lines: RepertoireLine[]): RepertoireExit[] {
-  const trees = { white: repertoireTree(lines, "white"), black: repertoireTree(lines, "black") };
-  const exits = new Map<string, RepertoireExit>();
-  const add = (e: Omit<RepertoireExit, "games">) => {
-    const row = exits.get(e.key);
-    if (row) row.games++;
-    else exits.set(e.key, { ...e, games: 1 });
-  };
-  for (const g of games) {
-    const tree = trees[g.color];
-    if (tree.size === 0) continue;
-    const sans: string[] = [];
-    for (let i = 0; i < g.moves.length; i++) {
-      const m = g.moves[i];
-      const key = fenKey(m.fenBefore);
-      const book = tree.get(key);
-      if (!book || book.size === 0) break;
-      if (m.byStudent) {
-        if (!book.has(m.san)) {
-          add({ key: `you|${g.color}|${key}|${m.san}`, color: g.color, kind: "you", fen: m.fenBefore, path: [...sans], played: m.san, answer: [...book][0], lastMove: sans[sans.length - 1] ?? null });
-          break;
-        }
-      } else if (!book.has(m.san)) {
-        // The opponent played a move the repertoire doesn't answer; the student's reply is the next move.
-        const reply = g.moves[i + 1];
-        if (reply) {
-          add({
-            key: `them|${g.color}|${fenKey(reply.fenBefore)}`,
-            color: g.color,
-            kind: "them",
-            fen: reply.fenBefore,
-            path: [...sans, m.san],
-            played: reply.san,
-            answer: sanOf(reply.fenBefore, reply.bestUci),
-            lastMove: m.san,
-          });
-        }
-        break;
-      }
-      sans.push(m.san);
-    }
-  }
-  return [...exits.values()].sort((a, b) => b.games - a.games).slice(0, 15);
-}
-
-export function openingLeaks(games: TrainingGame[], repertoire: RepertoireLine[]): Leaks {
-  return {
-    games: games.length,
-    openings: openingScores(games),
-    leaks: findLeaks(games),
-    exits: repertoireExits(games, repertoire),
-    hasRepertoire: { white: repertoire.some((r) => r.color === "white"), black: repertoire.some((r) => r.color === "black") },
-  };
+export function openingLeaks(games: TrainingGame[]): Leaks {
+  return { games: games.length, openings: openingScores(games), leaks: findLeaks(games) };
 }
 
 /** "1.e4 e5 2.Nf3 Nc6 3.Bc4": a path of moves from the start, numbered. */

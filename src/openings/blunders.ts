@@ -2,16 +2,16 @@
 // looking at the board and not only reciting moves. The mistakes are worked out ahead of time by
 // scripts/find-traps.mjs (traps.ts): moves Maia says players of a rating really make in the line's
 // positions, which Stockfish says lose at least a pawn. So the opponent plays one at once, and only
-// where one exists.
+// where one exists. Some come after a detour (Route): a sound move off the book, the student's answer,
+// then the mistake.
 import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
 import { storedEval } from "../coach/insight";
 import { getReviewEngine } from "../engine/stockfish";
+import { useSettings } from "../settings";
 import type { TrainingLine } from "./training";
-import { TRAPS } from "./traps";
+import { ROUTES, TRAPS } from "./traps";
 
-/** How often a line gets a mistake from the opponent (when it has a position with one). */
-export const BLUNDER_CHANCE = 1; // TEMP for testing the Maia traps; normally 0.2
 /** A mistake Maia gives less than this chance at the student's rating isn't one people play there. */
 const MIN_P = 0.03;
 /** The ratings find-traps.mjs works traps out for (chess.com scale). */
@@ -27,6 +27,27 @@ export interface Trap {
   eval: number;
   /** How likely a player of each rating band is to play the mistake (0–1), where it's 3% or more. */
   p: Record<string, number>;
+  /** The punishment played out (SAN from `best`, both sides) until the win is on the board. */
+  cont?: string[];
+}
+
+/**
+ * A detour to a trap one step off the book: from a book position the opponent plays `lead` (sound, and
+ * common at the bands in `p`), the student is expected to answer `reply`, and the position after that
+ * has stored mistakes (TRAPS). Quiet openings hide most of their tactics there rather than on the line.
+ */
+export interface Route {
+  lead: string;
+  reply: string;
+  p: Record<string, number>;
+}
+
+/** The opponent's detour on the board: the answer the student is expected to find, and where the trap is. */
+export interface Detour {
+  lead: string;
+  reply: string;
+  /** positionKey of the position after `reply`, where the opponent's mistake comes. */
+  trapKey: string;
 }
 
 export interface Blunder {
@@ -39,6 +60,10 @@ export interface Blunder {
   bestEval: number;
   /** How likely Maia thinks a player of the student's rating is to play it (0–1). */
   p: number;
+  /** The punishment played out, from `best`: the student finds every other move, the opponent defends. */
+  cont: string[];
+  /** The ply the punishment starts at (moves on the board once the mistake is played); set by the session. */
+  at: number;
 }
 
 /** A position without the move counters, as traps.ts is keyed. */
@@ -57,23 +82,61 @@ function weighted<T>(items: T[], weight: (t: T) => number): T | null {
   return items.find((t) => (r -= weight(t)) <= 0) ?? items[items.length - 1] ?? null;
 }
 
+/** How often a player of `rating` falls into one of this position's traps. */
+const trapWeight = (key: string, rating: number) =>
+  (TRAPS[key] ?? []).reduce((n, t) => n + ((t.p[bandOf(rating)] ?? 0) >= MIN_P ? t.p[bandOf(rating)] : 0), 0);
+
+/** The detours from this position a player of `rating` takes, each weighted by how often it ends in a mistake. */
+function routesAt(fen: string, rating: number): { detour: Detour; weight: number }[] {
+  return (ROUTES[positionKey(fen)] ?? []).flatMap((r) => {
+    const lead = r.p[bandOf(rating)] ?? 0;
+    if (lead < MIN_P) return [];
+    try {
+      const chess = new Chess(fen);
+      chess.move(r.lead);
+      chess.move(r.reply);
+      const trapKey = positionKey(chess.fen());
+      const weight = lead * trapWeight(trapKey, rating);
+      return weight ? [{ detour: { lead: r.lead, reply: r.reply, trapKey }, weight }] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** How likely the opponent goes wrong from this position: a mistake at once, or after a detour. */
+const spotWeight = (fen: string, rating: number) =>
+  trapWeight(positionKey(fen), rating) + routesAt(fen, rating).reduce((n, r) => n + r.weight, 0);
+
 /**
  * Whether this session gets a mistake, and where: the position (positionKey) on the line, from ply
- * `start`, where the opponent will play it. Positions whose traps are fallen into more often come up more.
+ * `start`, where the opponent leaves the book for it (at once or by a detour). Positions whose traps
+ * are fallen into more often come up more.
  */
 export function planTrap(line: TrainingLine, student: "white" | "black", start: number, rating: number): string | null {
-  if (Math.random() >= BLUNDER_CHANCE) return null;
+  // How often a line gets a mistake from the opponent (when it has a position with one): the student's setting.
+  if (Math.random() >= useSettings.getState().openingBlunders) return null;
   const chess = new Chess();
   const spots: { key: string; p: number }[] = [];
   line.moves.forEach((san, ply) => {
     const fen = chess.fen();
     if (ply >= start && (chess.turn() === "w" ? "white" : "black") !== student) {
-      const p = trapsAt(fen, rating).reduce((n, t) => n + t.p[bandOf(rating)], 0);
+      const p = spotWeight(fen, rating);
       if (p) spots.push({ key: positionKey(fen), p });
     }
     chess.move(san);
   });
   return weighted(spots, (s) => s.p)?.key ?? null;
+}
+
+/** What the opponent does at a planned trap spot: the mistake itself, or a detour toward one. */
+export function trapPlay(fen: string, rating: number): { blunder: Blunder } | { detour: Detour } | null {
+  const direct = trapWeight(positionKey(fen), rating);
+  const pick = weighted<{ weight: number; detour?: Detour }>([{ weight: direct }, ...routesAt(fen, rating)].filter((c) => c.weight > 0), (c) => c.weight);
+  if (!pick) return null;
+  if (pick.detour) return { detour: pick.detour };
+  const blunder = trapAt(fen, rating);
+  return blunder ? { blunder } : null;
 }
 
 /** The opponent's mistake in this position for a player of `rating`, or null when it has none. */
@@ -89,6 +152,8 @@ export function trapAt(fen: string, rating: number): Blunder | null {
     bestMove: { from: t.bestUci.slice(0, 2) as Key, to: t.bestUci.slice(2, 4) as Key },
     bestEval: t.eval,
     p: t.p[bandOf(rating)],
+    cont: t.cont?.length ? t.cont : [t.best],
+    at: 0,
   };
 }
 

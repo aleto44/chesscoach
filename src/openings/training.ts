@@ -3,7 +3,6 @@
 // student stays on the line, then plays on its own. The lines also feed the book (game names, the
 // coach's book_lookup). Every line is checked for legality by scripts/check-book.mjs.
 import type { Color } from "../store";
-import { repertoireSet } from "./repertoire";
 
 export interface TrainingLine {
   eco: string;
@@ -23,8 +22,10 @@ export interface TrainingSet {
   lines: TrainingLine[];
   /** A way of training another set's opening: listed under that set (its id), not beside it. */
   parent?: string;
-  /** This set's name among its opening's ways to train, e.g. "From the start" or "Punishing White". */
+  /** This set's name among its opening's ways to train: "Main lines" or "Punish mistakes". */
   mode?: string;
+  /** The start its lines' names share, when it isn't the set's own name ("London System" under "Against the London"). */
+  linePrefix?: string;
 }
 
 /** The set's opening: its parent, or itself. */
@@ -66,6 +67,7 @@ export const TRAINING_SETS: TrainingSet[] = [
     id: "london",
     name: "London System",
     color: "white",
+    mode: "Main lines",
     blurb: "d4, Bf4, e3, Nf3, c3 and Nbd2 against almost anything. These are the setups Black tries against it.",
     lines: [
       // 1...d5
@@ -88,6 +90,32 @@ export const TRAINING_SETS: TrainingSet[] = [
       T("A40", "Englund Gambit", "d4 e5 dxe5 Nc6 Nf3 Qe7 Bf4 Qb4+ Bd2 Qxb2 Nc3 Bb4 Rb1 Qa3 Nd5", 2),
       T("A43", "Old Benoni, ...c5", "d4 c5 d5 e5 e4 d6", 2),
     ],
+  },
+  {
+    // Black's natural moves against the London that lose something, found with Maia (club players
+    // really play them) and Stockfish (each costs Black at least a pawn). White's moves were checked
+    // with Stockfish (within ~0.3 of its best, the London's own setup moves aside), and each line ends
+    // with White clearly better. Most are the London's standard shots: Nxf7 against a loose d6 bishop,
+    // and Bxh7+ once hxg3 has opened the h-file.
+    id: "london-punish-black",
+    name: "London System: punishing Black",
+    color: "white",
+    parent: "london",
+    mode: "Punish mistakes",
+    blurb:
+      "Natural Black moves against the London that lose something, and how to cash in: Nxf7 when the d6 bishop is loose, Bxh7+ down the h-file you opened with hxg3, and the b7 pawn when Black's queen leaves it.",
+    lines: startNearSplit([
+      T("D02", "London System: ...Bd6 and ...Nbd7?, Nxf7", "d4 d5 Bf4 Bf5 e3 e6 Nf3 Nf6 Bd3 Bxd3 Qxd3 c6 Nbd2 Bd6 Ne5 Nbd7 Nxf7 Kxf7 Bxd6", 8),
+      T("A46", "London System: Queen's Indian, ...Nbd7? and Nxf7", "d4 Nf6 Bf4 e6 e3 b6 Nf3 Bb7 h3 d5 Bd3 c5 c3 Bd6 Ne5 c4 Bc2 Nbd7 Nxf7 Kxf7 Bxd6", 4),
+      T("D02", "London System: hxg3, ...Nxe5? and Bxh7+", "d4 d5 Bf4 Nf6 e3 e6 Nf3 Bd6 Bg3 O-O Bd3 Nc6 Nbd2 Bxg3 hxg3 Re8 Ne5 Nxe5 dxe5 Nd7 Bxh7+ Kf8 Qh5", 6),
+      T("D02", "London System: hxg3, ...Nxd2? and Bxh7+", "d4 d5 Bf4 Nf6 e3 Nc6 Nf3 e6 c3 Bd6 Bg3 O-O Bd3 Bxg3 hxg3 Ne4 Nbd2 Nxd2 Bxh7+ Kh8 Nxd2", 5),
+      T("D02", "London System: hxg3, g4-g5 and ...hxg5?", "d4 d5 Bf4 Nf6 e3 e6 Nf3 Bd6 Bg3 Bxg3 hxg3 O-O Bd3 Nbd7 g4 h6 g5 hxg5 Nxg5", 5),
+      T("D02", "London System: ...Qb6 and ...c4, 6...Bf5? Qxf5", "d4 d5 Bf4 Nf6 e3 c5 c3 Qb6 Qb3 c4 Qc2 Bf5 Qxf5 e5 dxe5", 6),
+      T("D02", "London System: ...Qb6 and ...Qxc5?, Qxb7", "d4 d5 Bf4 Nf6 e3 c5 c3 Nc6 Nd2 Qb6 Qb3 Bf5 dxc5 Qxc5 Qxb7 Rc8 Nb3 Qb6 Qxb6 axb6", 5),
+      T("A48", "London System: King's Indian, ...e5? and the e5 pawn", "d4 Nf6 Bf4 g6 e3 Bg7 Nf3 O-O Be2 d6 h3 Nc6 O-O e5 dxe5 dxe5 Nxe5 Nxe5 Qxd8 Rxd8 Bxe5", 6),
+      T("D02", "London System: Bb5 and Ne5, ...bxc6? Bxc6+", "d4 d5 Bf4 Nf6 e3 Nc6 Nf3 Bf5 Bb5 e6 Ne5 Bd6 Nxc6 bxc6 Bxc6+ Ke7 Bxa8 Qxa8", 4),
+      T("D00", "London System: Mirror, ...c5 Bb5+ and ...a6?", "d4 d5 Bf4 Bf5 e3 e6 Nf3 c5 Bb5+ Nd7 c4 a6 Bxd7+ Qxd7 Ne5 Qd8 Qa4+ Ke7 cxd5", 4),
+    ], false),
   },
   {
     id: "italian",
@@ -156,7 +184,7 @@ export const TRAINING_SETS: TrainingSet[] = [
     id: "kid",
     name: "King's Indian",
     color: "black",
-    mode: "From the start",
+    mode: "Main lines",
     blurb: "...Nf6, ...g6, ...Bg7, ...d6 and ...O-O, then ...e5 (or ...c5) to hit the center. These are White's setups against it.",
     lines: [
       T("E99", "King's Indian Defense: Mar del Plata, ...Ne7 and ...f5", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7 Ne1 Nd7 Nd3 f5", 14),
@@ -179,9 +207,9 @@ export const TRAINING_SETS: TrainingSet[] = [
     name: "King's Indian: punishing White",
     color: "black",
     parent: "kid",
-    mode: "Punishing White",
+    mode: "Punish mistakes",
     blurb:
-      "Deeper King's Indian lines: the Orthodox 6...e5, the Glek 7...Na6, the Four Pawns and the London. Each starts a move before White's choice, with your setup already on the board. Some are main lines to know; the rest are natural White moves that lose something, and how the g7 bishop cashes in.",
+      "Deeper King's Indian lines: the Orthodox 6...e5, the Glek 7...Na6, the Four Pawns and the London. Some are main lines to know; the rest are natural White moves that lose something, and how the g7 bishop cashes in.",
     lines: startNearSplit([
       // Orthodox 7.O-O Nc6: main lines to know.
       T("E99", "King's Indian Defense: Mar del Plata, 10.f3 and the ...g5 storm", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7 Ne1 Nd7 f3 f5 Be3 f4 Bf2 g5 Nd3 Ng6 c5 Nf6", 12),
@@ -210,6 +238,46 @@ export const TRAINING_SETS: TrainingSet[] = [
     ], true),
   },
   {
+    // The London from Black's side: 2...c5 and ...Qb6 against the b2 pawn the f4 bishop left behind,
+    // and ...e5 against the bishop itself. Black's moves were checked with Stockfish (within ~0.2 of
+    // its best; 7...Bxd3 in the 7.Bd3 line is ~0.3 below ...Nb4, kept as the clearer win), and the trap White moves were found with Maia (club
+    // players really play them) and end with Black clearly better. One Black answer per position.
+    id: "london-black",
+    name: "Against the London",
+    color: "black",
+    mode: "Main lines",
+    linePrefix: "London System",
+    blurb:
+      "Against 1.d4 d5 2.Bf4: 2...c5, ...Nc6 and ...Qb6, hitting b2 and d4 before the London setup is finished. These are White's main ways of meeting it.",
+    lines: [
+      T("D00", "London System: ...c5 and ...Qb6, 6.Qc2 e5", "d4 d5 Bf4 c5 e3 Nc6 c3 Qb6 Qb3 c4 Qc2 e5 dxe5 Bf5 Qc1 f6", 10),
+      T("D00", "London System: ...c5 and ...Qb6, 6.Qxb6 axb6", "d4 d5 Bf4 c5 e3 Nc6 c3 Qb6 Qb3 c4 Qxb6 axb6", 6),
+      T("D02", "London System: ...c5 and ...Qb6 with Nf3, 7.Qc2 Bf5", "d4 d5 Bf4 c5 e3 Nc6 Nf3 Nf6 c3 Qb6 Qb3 c4 Qc2 Bf5 Qc1 e6", 9),
+      T("D02", "London System: ...c5, 5.Nbd2 cxd4 and ...Bf5", "d4 d5 Bf4 c5 e3 Nc6 Nf3 Nf6 Nbd2 cxd4 exd4 Bf5", 7),
+      T("D00", "London System: 3.dxc5 e6 and ...f6", "d4 d5 Bf4 c5 dxc5 e6 e3 Bxc5 c3 Ne7 Nf3 f6", 5),
+      T("D00", "London System: Jobava-style 4.Nc3 a6", "d4 d5 Bf4 c5 e3 Nc6 Nc3 a6 Nf3 e6", 4),
+    ],
+  },
+  {
+    id: "london-punish",
+    name: "Against the London: punishing White",
+    color: "black",
+    parent: "london-black",
+    mode: "Punish mistakes",
+    blurb:
+      "Natural London moves that lose something against 2...c5, most of them to ...Qb6 against b2 or ...e5 against the f4 bishop.",
+    lines: [
+      T("D00", "London System: ...c5, 4.Nd2? cxd4 and ...Nxd4", "d4 d5 Bf4 c5 e3 Nc6 Nd2 cxd4 exd4 Nxd4 Ngf3 Nc6", 6),
+      T("D02", "London System: ...c5 and ...Qb6 with Nf3, 8.Qxf5? Qxb2", "d4 d5 Bf4 c5 e3 Nc6 Nf3 Nf6 c3 Qb6 Qb3 c4 Qc2 Bf5 Qxf5 Qxb2", 4),
+      T("D02", "London System: 3.Nf3 cxd4 4.Nxd4 Nd7 5.e3?", "d4 d5 Bf4 c5 Nf3 cxd4 Nxd4 Nd7 e3 e5 Bg3 exd4 Qxd4 Ngf6", 4),
+      T("D02", "London System: 3.Nf3 cxd4 4.Qxd4 Nc6 5.Qa4 Bd7 6.e3?", "d4 d5 Bf4 c5 Nf3 cxd4 Qxd4 Nc6 Qa4 Bd7 e3 e5 Bg3 Nd4 Qxd7+ Qxd7 exd4 exd4", 3),
+      T("D00", "London System: 3.c3 Qb6 4.Qc2 cxd4 and 7.Bd3?", "d4 d5 Bf4 c5 c3 Qb6 Qc2 cxd4 cxd4 Nc6 e3 Bf5 Bd3 Bxd3 Qxd3 e5 Bxe5 Qxb2", 3),
+      T("D00", "London System: 3.c3 Qb6 4.b3 and 8.Nd2?", "d4 d5 Bf4 c5 c3 Qb6 b3 cxd4 cxd4 Bf5 e3 e6 Bd3 Qa5+ Nd2 Bxd3", 3),
+      T("D00", "London System: 3.dxc5 e6 4.b4? Qf6", "d4 d5 Bf4 c5 dxc5 e6 b4 Qf6 Bxb8 Qxa1 Bg3 Qxa2", 3),
+      T("D00", "London System: 3.dxc5 e6 and 8.Nxe5?", "d4 d5 Bf4 c5 dxc5 e6 e3 Bxc5 c3 Ne7 Nf3 f6 Bd3 e5 Nxe5 fxe5 Qh5+ g6 Qxe5 O-O", 2),
+    ],
+  },
+  {
     id: "qgd",
     name: "Queen's Gambit Declined",
     color: "black",
@@ -227,21 +295,22 @@ export const TRAINING_SETS: TrainingSet[] = [
 
 /**
  * A line's name within its set: "Caro-Kann Defense: Panov Attack" is just "Panov Attack" under Caro-Kann.
- * A set named "King's Indian: punishing White" counts as King's Indian here.
+ * A set named "King's Indian: punishing White" counts as King's Indian here, and an opening's
+ * `linePrefix` stands in for its name ("London System: ..." lines under "Against the London").
  */
 export function shortName(set: TrainingSet, line: TrainingLine): string {
   const i = line.name.indexOf(": ");
-  return i > 0 && line.name.startsWith(set.name.split(": ")[0]) ? line.name.slice(i + 2) : line.name;
+  const prefix = familyOf(set).linePrefix ?? set.name.split(": ")[0];
+  return i > 0 && line.name.startsWith(prefix) ? line.name.slice(i + 2) : line.name;
 }
 
 export type Commonness = "common" | "occasional" | "rare";
 
 export const commonness = (l: TrainingLine): Commonness => (l.weight >= 8 ? "common" : l.weight >= 4 ? "occasional" : "rare");
 
-/** A built-in set or the student's repertoire for a color (see repertoire.ts). */
+/** A built-in set by id. */
 export function findSet(id: string): TrainingSet | undefined {
-  const own = id.match(/^mine-(white|black)$/);
-  return own ? repertoireSet(own[1] as Color) : TRAINING_SETS.find((s) => s.id === id);
+  return TRAINING_SETS.find((s) => s.id === id);
 }
 
 /**

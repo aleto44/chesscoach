@@ -13,9 +13,11 @@ import type { Mark } from "./positional";
  * Bumped when the reasoning in explain.ts changes enough that stored lessons should be worked out
  * again: the computer redoes older ones in the background (backfillLessons). 3: an unguarded square
  * is only a reason when the reply wins material or checks, and the better move's themes count only
- * when it's shown on its own.
+ * when it's shown on its own. 4: verdicts give the eval in pawns, not winning chances. 5: no
+ * "unguarded square" or "wins a move" for a plain recapture, the double attack named when material
+ * goes, "can't take back" only when it's true, "better off" netted out.
  */
-export const LESSON_VERSION = 3;
+export const LESSON_VERSION = 5;
 
 /** Deeper than a live explanation (14): steadier lines, and it runs in the background. */
 export const LESSON_DEPTH = 18;

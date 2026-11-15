@@ -1,6 +1,6 @@
 // A drill session: works through due cards on the main board, graded locally by Stockfish.
 // "Mistake" and "coach" cards: any move the review would call good (under an inaccuracy) counts. "Opening" cards:
-// the student plays their repertoire line from memory while the app plays the other side.
+// the student plays an opening line from memory while the app plays the other side.
 // "Puzzle" cards replay a missed Lichess puzzle the same way, and any mating move counts.
 // Each drill opens on the position before the opponent's last move and plays it, so the student
 // sees what led there (as a puzzle does), and a wrong answer comes with the engine's reasons.
@@ -500,12 +500,12 @@ export async function drillMove(from: Key, to: Key, promotion?: string) {
     }
     const exp = new Chess(fen).move(expected);
     useDrill.setState({ shapes: [{ orig: exp.from as Key, dest: exp.to as Key, brush: "green" }] });
-    // A repertoire move isn't always the engine's, so only puzzle misses get the engine's reasons.
+    // An opening line's move isn't always the engine's, so only puzzle misses get the engine's reasons.
     if (drill.kind === "puzzle") explainWrong(fen, uci, uciOf(fen, expected), undefined, true);
     return finish(
       false,
       played.san,
-      drill.kind === "puzzle" ? `${played.san} isn't it. The solution: ${drill.line.slice(ply - s.base).join(" ")}.` : `Your repertoire plays ${expected} here.`,
+      drill.kind === "puzzle" ? `${played.san} isn't it. The solution: ${drill.line.slice(ply - s.base).join(" ")}.` : `The line plays ${expected} here.`,
     );
   }
 
@@ -653,7 +653,7 @@ export function drillContext(): {
       : drill.kind === "puzzle"
         ? `A Lichess puzzle the student (${side}) missed${lead}; the drill asks for ${side}'s solution.`
         : drill.kind === "opening"
-          ? `A repertoire drill for ${side}${lead}: the drill asks for the repertoire move.`
+          ? `An opening-line drill for ${side}${lead}: the drill asks for the line's move.`
           : `A position the coach asked about before${lead}: the drill asks for ${side}'s best move.`;
   const answered = s.status === "right" || s.status === "wrong";
   const tried = s.line.sans[s.base];
@@ -671,7 +671,7 @@ export function drillQuestion(): string {
     return `I missed this puzzle again (FEN ${start}, I play ${drill.color}). The solution is ${drill.line.join(" ")}. What's the idea? Keep it short.`;
   }
   if (drill.kind === "opening") {
-    return `In my repertoire drill "${drill.title}" (line: ${drill.line.join(" ")}), I played ${moves}. ${s.message} Why is the repertoire move better here? Keep it short.`;
+    return `In my opening drill "${drill.title}" (line: ${drill.line.join(" ")}), I played ${moves}. ${s.message} Why is the line's move better here? Keep it short.`;
   }
   const lead = s.lead ? ` after my opponent's ${s.lead.label}` : "";
   return (

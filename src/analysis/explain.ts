@@ -373,6 +373,9 @@ const pieceAt = (chess: Chess, sq: Square) => NAME[chess.get(sq)?.type ?? ""] ??
  */
 function lostGuard(fen: string, played: Step, reply: Step | undefined, betterUci: string, mover: Color): { played: string; better: string } | null {
   if (!reply) return null;
+  // The reply takes the piece that just moved: a trade on that square, not a guard that went
+  // missing ("Bxf3 moves the bishop that guarded f3" after Bxf3 Qxf3 said nothing).
+  if (reply.to === played.to) return null;
   const c = mover === "white" ? "w" : "b";
   const x = reply.to as Square;
   const afterPlayed = new Chess(played.fen);
@@ -391,6 +394,9 @@ function lostGuard(fen: string, played: Step, reply: Step | undefined, betterUci
     return null;
   }
   if (!r.captured && !r.san.includes("+")) return null;
+  // The better move takes the attacked piece off the square (or trades it): nothing there needs a
+  // guard, so "after Ne6 your knight would guard c5" would be about an empty square.
+  if (r.captured && afterBetter.get(x)?.color !== c) return null;
   const guardsNow = afterPlayed.attackers(x, c);
   const guardsBetter = afterBetter.attackers(x, c);
   if (guardsBetter.length <= guardsNow.length) return null;
@@ -408,11 +414,50 @@ function lostGuard(fen: string, played: Step, reply: Step | undefined, betterUci
 }
 
 /**
+ * Where the material goes, when it's lost by the mover's pieces being attacked after the reply:
+ * "after 9.Qxf3 your knight on f6 (attacked by the pawn on e5) and the pawn on b7 (by the queen) are
+ * both attacked, and you can't save both: 10.Qxb7 takes the pawn." Only when the line really takes
+ * one of them; null otherwise.
+ */
+function lossAfterReply(line: Step[], mover: Color): string | null {
+  const reply = line[1];
+  if (!reply) return null;
+  const c = mover === "white" ? "w" : "b";
+  const them = c === "w" ? "b" : "w";
+  const at = new Chess(reply.fen);
+  // Ours and en prise: attacked and unguarded, or attacked by something cheaper.
+  const hit: { sq: Square; type: PieceType; by: Square }[] = [];
+  for (const p of at.board().flat()) {
+    if (!p || p.color !== c || p.type === "k") continue;
+    const by = at.attackers(p.square, them).sort((a, b) => PIECE_VALUES[at.get(a)!.type as PieceType] - PIECE_VALUES[at.get(b)!.type as PieceType])[0];
+    if (!by) continue;
+    const cheaper = at.get(by)!.type !== "k" && PIECE_VALUES[at.get(by)!.type as PieceType] < PIECE_VALUES[p.type as PieceType];
+    if (cheaper || !at.attackers(p.square, c).length) hit.push({ sq: p.square, type: p.type as PieceType, by });
+  }
+  // The opponent's capture further on that takes one of them.
+  const take = line.slice(2).find((s, i) => i % 2 === 1 && /x/.test(s.san) && hit.some((h) => h.sq === s.to));
+  if (!take) return null;
+  const taken = hit.find((h) => h.sq === take.to)!;
+  const by = (h: (typeof hit)[number]) => `${at.get(h.by)!.type === "p" ? "pawn" : pieceAt(at, h.by)} on ${h.by}`;
+  const name = (h: (typeof hit)[number]) => `${h.type === "p" ? "the" : "your"} ${PIECE_NAMES[h.type]} on ${h.sq}`;
+  const what = `${taken.type === "p" ? "the pawn" : `your ${PIECE_NAMES[taken.type]}`}`;
+  if (hit.length >= 2) {
+    const shown = hit.slice(0, 3);
+    const saved = shown.length === 2 ? "are both attacked and you can only save one" : "are all attacked and you can't save them all";
+    return `After ${reply.label} ${andList(shown.map((h) => `${name(h)} (by the ${by(h)})`))} ${saved}: ${take.label} takes ${what}.`;
+  }
+  return `After ${reply.label} ${name(taken)} is attacked by the ${by(taken)} and can't be saved: ${take.label} takes it.`;
+}
+
+/**
  * The reply comes with check after the move played but wouldn't after the better move: the check
  * wins the opponent a move (in an endgame, often the whole race). Null otherwise.
  */
 function lostTempo(fen: string, played: Step, reply: Step | undefined, betterUci: string, mover: Color): { played: string; better: string } | null {
   if (!reply?.san.includes("+")) return null;
+  // Taking back the piece that just moved, with check: the point is the trade, and "after Nfd7,
+  // Qxf3+ isn't possible" would only say there's nothing on f3 to take.
+  if (reply.to === played.to) return null;
   const b = new Chess(fen);
   let betterSan: string;
   try {
@@ -686,13 +731,18 @@ async function failedRecapture(first: Step, reply: Step | undefined, lineEval: n
   const them = after.turn();
   const opp = sideName(other(mover));
   const legal = after.moves({ verbose: true }).filter((mv) => mv.to === x && mv.captured);
-  // A piece that attacks the square but has no legal capture there is pinned to its king.
+  // A piece that attacks the square but has no legal capture there is pinned to its king, unless
+  // the king is in check from somewhere else (then nothing but answering the check is legal).
+  const king = after.findPiece({ type: "k", color: them })[0];
+  const checkers = after.inCheck() && king ? after.attackers(king, them === "w" ? "b" : "w").filter((sq) => sq !== x) : [];
   const stuck = after
     .attackers(x, them)
     .filter((sq) => after.get(sq)?.type !== "k" && !legal.some((mv) => mv.from === sq));
   const cheapest = legal.filter((mv) => mv.piece !== "k").sort((a, b) => PIECE_VALUES[a.piece as PieceType] - PIECE_VALUES[b.piece as PieceType])[0];
   if (!cheapest) {
-    if (!stuck.length) return null;
+    // The king can still take back: not a "can't".
+    if (legal.length || !stuck.length) return null;
+    if (checkers.length) return `${opp} can't take back: the ${pieceAt(after, checkers[0])} on ${checkers[0]} gives check, and that comes first.`;
     return `${opp} can't take back: the ${pieceAt(after, stuck[0])} on ${stuck[0]} is pinned to the king.`;
   }
   if (reply && reply.from === cheapest.from && reply.to === cheapest.to) return null;
@@ -724,6 +774,8 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
   const mover = colorOf(m.fenBefore);
   const opp = other(mover);
   const [winBefore, winAfter] = [winFor(m.evalBefore, mover), winFor(m.evalAfter, mover)];
+  // Text speaks in evals (pawns, mover's view), never in winning chances: those only steer the logic.
+  const [evB, evA] = [evalFor(m.evalBefore, mover), evalFor(m.evalAfter, mover)];
 
   const depth = m.depth ?? DEPTH;
   const p = await followLine(m.fenBefore, m.uci, mover, QUIET_PLIES, undefined, undefined, false, depth);
@@ -743,6 +795,7 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
   // find. So a lone best move gets its full line only when it really stands out.
   const root = await getReviewEngine().analyze(m.fenBefore, CANDIDATES, depth);
   const winOf = (l: EngineLine) => winFor(stored(l), mover);
+  const evOf = (l: EngineLine) => evalFor(stored(l), mover);
   const candidates = root.filter((l) => l.pv[0] && l.pv[0] !== m.uci);
   // The caller's better move (the review's best, or the student's right answer in a drill) when the
   // search has it among the candidates, so the explanation is about that move.
@@ -774,6 +827,7 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
       const [gave, won] = [b.lost[mover], b.lost[opp]];
       const san = b.steps[0]?.san ?? "";
       const w = winOf(l);
+      const e = evOf(l);
       // Material the move played also gets isn't a reason to prefer this one: both Nxg1 and Kxg1
       // take the rook, so "Kxg1 wins a rook" says nothing about why it's the better of the two.
       const sameTake = b.steps[0] && p.steps[0] && b.steps[0].to === p.steps[0].to && /x/.test(b.steps[0].san) && /x/.test(playedSan);
@@ -811,17 +865,20 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
         same = `${san} takes the same ${pieceAt(new Chess(m.fenBefore), first.to as Square)}${tempoBy ? ` ${tempoBy}` : ""}${instead}.`;
       }
       const sameLead = same ? `${same} ` : "";
-      const diff = listPieces([...without(lost, gave), ...without(won, got)]);
+      // What this line is up on the move played's line, with what both pay netted out (a knight lost
+      // there and a bishop given here is no difference): "a pawn", or "a rook for a knight".
+      const [plus, minus] = minorsCancelled(without([...lost, ...won], [...gave, ...got]), without([...gave, ...got], [...lost, ...won]));
+      const diff = plus.length ? listPieces(plus) + (minus.length ? ` for ${listPieces(minus)}` : "") : "a little";
       let v: string;
       let threat: string | null = null;
       if (mates) v = `${why}${san} leads to mate.`;
       else if (wins) v = `${why}${san} wins ${netGain(won, gave)}.`;
       else if (guard && l === top) v = `${sameLead}${guard.better}`;
-      else if (tempo && l === top) v = `${sameLead}${tempo.better} Your winning chances stay at ${w}%.`;
+      else if (tempo && l === top) v = `${sameLead}${tempo.better} The eval stays at ${e} for you.`;
       else if (pawns && l === top)
         v =
-          `${same ? `${same} It also` : san} ${pawns.better} That's how it holds your winning chances at ${w}%` +
-          (standout && runnerUp ? `; the next best move keeps ${winOf(runnerUp)}%.` : ".");
+          `${same ? `${same} It also` : san} ${pawns.better} That's how it holds the eval at ${e} for you` +
+          (standout && runnerUp ? `; the next best move gets ${evOf(runnerUp)}.` : ".");
       else if (same && net - playedNet >= 1) v = `${same} You come out ${diff} better off.`;
       // Nothing won outright: what the move threatens is its point, and why the opponent answers as
       // they do. Ahead of "comes out a pawn better off", which says how much but not why.
@@ -832,13 +889,13 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
           (net - playedNet >= 1
             ? `You come out ${diff} better off than after ${playedSan}.`
             : standout && runnerUp
-              ? `It keeps your winning chances at ${w}%; the next best move keeps ${winOf(runnerUp)}%.`
-              : `Your winning chances stay at ${w}%.`);
+              ? `It keeps the eval at ${e} for you; the next best move gets ${evOf(runnerUp)}.`
+              : `The eval stays at ${e} for you.`);
       } else if (net - playedNet >= 1) v = `${san} comes out ${diff} better off than ${playedSan}.`;
       else if (standout)
-        v = `${san} is the move here: it keeps your winning chances at ${w}%, and every other move gives some away (the next best keeps ${runnerUp ? winOf(runnerUp) : w}%).`;
-      else if (w >= winBefore + 3) v = `${san} improves your position: your winning chances go to ${w}%.`;
-      else v = `${san} is solid: your winning chances stay at ${w}%.`;
+        v = `${san} is the move here: it keeps the eval at ${e} for you, and every other move gives some away (the next best gets ${runnerUp ? evOf(runnerUp) : e}).`;
+      else if (w >= winBefore + 3) v = `${san} improves your position: the eval goes from ${evB} to ${e} for you.`;
+      else v = `${san} is solid: the eval stays at ${e} for you.`;
       // A capture the opponent can't simply answer by taking back: say why first (often a pin).
       if (l === top && first && /x/.test(san) && !mates) {
         const no = await failedRecapture(first, b.steps[1], stored(l), mover, depth).catch(() => null);
@@ -857,8 +914,8 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
     }
     if (alternatives.length > 1)
       betterSummary =
-        `No single move stands out: ${andList(alternatives.map((a) => a.steps[0].san))} ${alternatives.length === 2 ? "both" : "all"} keep your winning chances ` +
-        `around ${alternatives[0].win}%, against ${winAfter}% after the move you played. Pick one to see the reply.`;
+        `No single move stands out: ${andList(alternatives.map((a) => a.steps[0].san))} ${alternatives.length === 2 ? "both" : "all"} keep the eval ` +
+        `around ${alternatives[0].evalText} for you, against ${evA} after the move you played. Pick one to see the reply.`;
   }
 
   // The move played loses nothing by itself, but the better one wins something or mates: the
@@ -892,7 +949,7 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
   }
 
   const drop = winBefore - winAfter;
-  const chances = `Your winning chances drop from ${winBefore}% to ${winAfter}%.`;
+  const chances = `The eval drops from ${evB} to ${evA} for you.`;
   const better0 = alternatives[0]?.steps[0]?.san ?? "";
   // The reply traps a piece, and the line does win it: that's the reason, said before what it costs.
   const losesPiece = [...lost, ...deepLost].some((t) => t !== "p");
@@ -905,14 +962,15 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
   const topWin = alternatives[0]?.win ?? winAfter;
   const keepsLead =
     winBefore >= 65 && topWin >= winBefore - SOUND
-      ? `You were clearly ahead here, and ${better0} keeps it (${topWin}%). `
-      : `${better0} was the move here: it keeps your winning chances at ${topWin}%. `;
+      ? `You were clearly ahead here, and ${better0} keeps it (${alternatives[0]?.evalText ?? evA}). `
+      : `${better0} was the move here: it keeps the eval at ${alternatives[0]?.evalText ?? evA} for you. `;
   let focusBetter = false;
   if (forcedMate) {
     played.verdict = `${sideName(opp)} has a forced mate.`;
     playedThemes.push("mate");
   } else if (playedNet <= -1) {
-    played.verdict = `${trap}You lose ${netGain(lost, got)}.${guard ? ` ${guard.played}` : ""}`;
+    const how = guard?.played ?? (trap ? null : lossAfterReply(p.steps, mover));
+    played.verdict = `${trap}You lose ${netGain(lost, got)}.${how ? ` ${how}` : ""}`;
     playedThemes.push("material");
     if (guard) playedThemes.push("loose-square");
   } else if (guard) {
@@ -963,10 +1021,10 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
       (focusBetter ? keepsLead : "") +
       (replyThreat ? `${reply.san} ${replyThreat}. ` : "") +
       (drop < SOUND
-        ? `It was nearly as good: your winning chances only go from ${winBefore}% to ${winAfter}%, so there's no big lesson here.`
+        ? `It was nearly as good: the eval only goes from ${evB} to ${evA} for you, so there's no big lesson here.`
         : facts.length
-          ? `${start} look at the position after ${end.label}: ${andList(facts)}. ${sideName(opp)}'s position gets ${much}better: your winning chances drop from ${winBefore}% to ${winAfter}%.`
-          : `${start} ${sideName(opp)}'s position gets ${much}better: your winning chances drop from ${winBefore}% to ${winAfter}%.`);
+          ? `${start} look at the position after ${end.label}: ${andList(facts)}. ${sideName(opp)}'s position gets ${much}better: the eval drops from ${evB} to ${evA} for you.`
+          : `${start} ${sideName(opp)}'s position gets ${much}better: the eval drops from ${evB} to ${evA} for you.`);
   }
 
   return {

@@ -30,8 +30,8 @@ pub fn definitions() -> Value {
         {
             "name": "evaluate_moves",
             "description": "Judge up to 4 candidate moves in a position against the engine: the eval before and \
-                after each, its verdict on chess.com's scale (best, good, inaccuracy, mistake, blunder), the \
-                winning chances it gives away, and what happens next (the opponent's best reply played out to \
+                after each, its verdict on chess.com's scale (best, good, inaccuracy, mistake, blunder), how \
+                much it gives away in pawns, and what happens next (the opponent's best reply played out to \
                 where the material settles, with a note per move), plus the engine's better move and what it \
                 does. Use it for \"why not X?\", \"is X good?\", \"X or Y?\" and before saying what a move wins, \
                 loses or allows.",
@@ -224,7 +224,7 @@ pub fn definitions() -> Value {
         },
         {
             "name": "book_lookup",
-            "description": "The app's opening book: the name of the opening on the student's board, the book                 continuations from here, and what the student's own repertoire plays. Cheaper and more reliable                 than recalling theory. Only works for lines from the normal starting position.",
+            "description": "The app's opening book: the name of the opening on the student's board, the book                 continuations from here. Cheaper and more reliable                 than recalling theory. Only works for lines from the normal starting position.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

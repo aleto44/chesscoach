@@ -98,9 +98,12 @@ export function formatMoves(line: Pick<Line, "fens" | "sans">, from = 0, to = li
  * What text about `line` speaks from, for SquareText: the position before its last move, then the
  * few before that (a message may name the opponent's move before it, or a reply came since).
  */
-export function lastMoveContext(line: Pick<Line, "fens">, upTo = line.fens.length - 1): { at?: string; earlier: string[] } {
+export function lastMoveContext(
+  line: Pick<Line, "fens">,
+  upTo = line.fens.length - 1,
+): { at?: string; now?: string; earlier: string[] } {
   const i = Math.max(0, upTo - 1);
-  return { at: line.fens[i], earlier: line.fens.slice(Math.max(0, i - 3), i).reverse() };
+  return { at: line.fens[i], now: line.fens[upTo], earlier: line.fens.slice(Math.max(0, i - 3), i).reverse() };
 }
 
 export function sideToMove(fen: string): "white" | "black" {

@@ -9,14 +9,13 @@ import { go, useNav } from "../nav";
 import { refreshPuzzleDb, themeLabel, usePuzzleDb, type ThemeMastery } from "../puzzles/puzzles";
 import { rushBest as bestRush, startPuzzles, startRatedPuzzles, startRush, useParkedPuzzles } from "../puzzles/session";
 import { commonness, familyOf, findSet, modesOf, pickLine, seenCounts, shortName, TRAINING_SETS, type Commonness, type TrainingLine } from "../openings/training";
-import { startOpening, useOpening } from "../openings/session";
-import { getRepertoire, repertoireSetId, useRepertoire } from "../openings/repertoire";
+import { startOpening } from "../openings/session";
 import { fromLichess, POOL_LABEL, RATING_POOLS, signed, type PlayerRating } from "../rating";
 import { isLocked, opponentLabel, useStore } from "../store";
 import { NewGameDialog, PlayRatedDialog, usePoolRating } from "./GameDialogs";
 import { ModeBadge } from "./ModeBadge";
-import { RepertoireDialog } from "./RepertoireDialog";
 import { ProfileMenu, RatingHistory, Weaknesses } from "./Profile";
+import { SavedGames } from "./SavedGames";
 import { EndgameMenu } from "./Endgames";
 import { GuessMenu } from "./Guess";
 import { WinAgainMenu } from "./WinAgain";
@@ -25,6 +24,7 @@ import { LeaksMenu } from "./Leaks";
 import { MasteryRule, StarBadge, XpBar } from "./Mastery";
 import { TimerScreen } from "./Timer";
 import { clockLabel, started as clockStarted, useTimer } from "../utility/timer";
+import { saveSetting, useSettings } from "../settings";
 
 /** Drills and puzzles would leave a rated game's clock (or position) sitting mid-game. */
 export function useSessionsBlocked() {
@@ -54,6 +54,7 @@ export function Home() {
         {view === "profile" && <ProfileMenu />}
         {view === "weaknesses" && <Weaknesses />}
         {view === "ratings" && <RatingHistory />}
+        {view === "saved-games" && <SavedGames />}
         {view === "endgames" && <EndgameMenu />}
         {view === "guess" && <GuessMenu />}
         {view === "convert" && <WinAgainMenu />}
@@ -237,7 +238,7 @@ interface DrillOverview {
 
 const KIND_LABEL: Record<string, string> = {
   mistake: "From your games",
-  opening: "Repertoire",
+  opening: "Opening lines",
   coach: "From the coach",
   puzzle: "Missed puzzles",
 };
@@ -290,7 +291,7 @@ function SchoolMenu() {
         <Tile
           icon="♜"
           title="Opening training"
-          sub={faced ? `Faced ${faced} of ${lines.length} lines · your repertoire` : "Your repertoire, and every reply to your opening"}
+          sub={faced ? `Faced ${faced} of ${lines.length} lines` : "Every reply to your opening, and the mistakes to punish"}
           onClick={() => go("openings")}
         />
         <Tile icon="♚" title="Endgame trainer" sub="Win the standard endings against Stockfish" onClick={() => go("endgames")} />
@@ -321,9 +322,39 @@ function savedSetId(): string {
   return TRAINING_SETS[0].id;
 }
 
+/** What each way of training an opening is, under its tab. */
+const MODE_HELP: Record<string, string> = {
+  "Main lines": "The replies you'll face, the common ones most often.",
+  "Punish mistakes": "Your opponent makes a common mistake. Find the move that punishes it.",
+};
+
+/** How often a line has the opponent leave the book for a mistake to punish (openings/blunders.ts). */
+function OpponentMistakes() {
+  const pct = Math.round(useSettings((s) => s.openingBlunders) * 100);
+  return (
+    <label
+      className="opening-mistakes"
+      title="Now and then the opponent leaves the book for a mistake players at your rating really make, for you to punish. 0% plays the book every time."
+    >
+      <span className="muted small">Opponent mistakes</span>
+      <input
+        type="range"
+        className="elo-slider"
+        min={0}
+        max={100}
+        step={5}
+        value={pct}
+        onChange={(e) => saveSetting("openingBlunders", Number(e.target.value) / 100)}
+      />
+      <strong className="small">{pct}%</strong>
+    </label>
+  );
+}
+
 /**
- * Practice against the replies to one opening: pick a side, then the opening, then a line on
- * purpose or a weighted-random one, so the common ones come up most and the rare ones still show.
+ * Practice against the replies to one opening: pick a side, then the opening, then how to train it (main
+ * lines or punishing mistakes), then a random line or one from the list. Kept to names and buttons: the
+ * moves themselves are on the board once a line starts (and in a row's tooltip).
  */
 function OpeningTraining() {
   const [setId, setSetIdState] = useState(savedSetId);
@@ -335,117 +366,74 @@ function OpeningTraining() {
       // Private mode: not kept.
     }
   };
-  // Re-read the counts when a session ends and the list shows again.
-  const training = useOpening((o) => o !== null);
-  const [seen, setSeen] = useState(seenCounts);
-  useEffect(() => setSeen(seenCounts()), [training]);
-  const [repertoire, setRepertoire] = useState(false);
-  // The student's own lines are a set too; re-read them so the list follows edits in the dialog.
-  useRepertoire();
-  useEffect(() => {
-    getRepertoire().catch(() => undefined);
-  }, []);
-  const set = findSet(setId) ?? TRAINING_SETS[0];
-  const mine = set.id === repertoireSetId(set.color);
-  // Ways to train one opening (from the start, punishing White...) sit under it, not beside it.
+  // Only the built-in openings here (a saved pick of the student's own lines falls back to the first).
+  const set = TRAINING_SETS.find((s) => s.id === setId) ?? TRAINING_SETS[0];
   const family = familyOf(set);
-  const modes = mine ? [] : modesOf(family);
-  const faced = set.lines.filter((l) => seen[l.moves.join(" ")]).length;
+  const modes = modesOf(family);
 
   // A session of its own, not a game: it doesn't touch the game in progress or the saved games.
   const play = (line: TrainingLine) => startOpening(set.id, line);
 
+  const openings = TRAINING_SETS.filter((s) => s.color === set.color && !s.parent);
+  const pickSide = (c: "white" | "black") => c !== set.color && setSetId(TRAINING_SETS.find((s) => s.color === c && !s.parent)!.id);
+
   return (
     <>
       <h2 className="section-title">Opening training</h2>
-      <div className="opening-pick">
-        <div className="segmented">
-          {(["white", "black"] as const).map((c) => (
-            <button
-              key={c}
-              className={set.color === c ? "on" : ""}
-              onClick={() => set.color !== c && setSetId(TRAINING_SETS.find((s) => s.color === c && !s.parent)!.id)}
-            >
-              {c === "white" ? "Openings as White" : "Defences as Black"}
-            </button>
-          ))}
-        </div>
-        <div className="segmented">
-          <button className={mine ? "on" : ""} onClick={() => setSetId(repertoireSetId(set.color))}>
-            ★ Your repertoire
+      {/* Three choices, each a level below the last: side, then opening, then how to train it. */}
+      <div className="segmented opening-side">
+        {(["white", "black"] as const).map((c) => (
+          <button key={c} className={set.color === c ? "on" : ""} onClick={() => pickSide(c)}>
+            {c === "white" ? "I play White" : "I play Black"}
           </button>
-          {TRAINING_SETS.filter((s) => s.color === set.color && !s.parent).map((s) => (
-            <button key={s.id} className={!mine && s.id === family.id ? "on" : ""} onClick={() => s.id !== family.id && setSetId(s.id)}>
-              {s.name}
-            </button>
-          ))}
-        </div>
-        {modes.length > 1 && (
-          <div className="segmented opening-modes">
-            <span className="muted small">{family.name}:</span>
-            {modes.map((s) => (
-              <button key={s.id} className={s.id === set.id ? "on" : ""} onClick={() => setSetId(s.id)}>
-                {s.mode ?? s.name}
-              </button>
-            ))}
-          </div>
-        )}
+        ))}
       </div>
-      <p className="section-lede muted">
-        {mine ? (
-          <>
-            {set.blurb} Each line is also a drill under Drills, and new games can steer into it. Practice only: these don't go into your games.
-          </>
-        ) : (
-          <>
-            <strong>{set.name}</strong> as {set.color}. {set.blurb} Each time the computer picks a reply, the common ones most often, and plays it
-            from the book until the line ends. Practice only: these don't go into your games.
-          </>
-        )}
-      </p>
-      <div className="menu-grid">
-        {mine && (
-          <Tile icon="♜" title="Edit repertoire" sub={`Add or remove your ${set.color} lines`} onClick={() => setRepertoire(true)} />
-        )}
-        <Tile
-          icon="⚄"
-          title="Surprise me"
-          sub={mine ? "A random line from your repertoire" : `A random ${set.name} line, weighted by how often it's played`}
-          disabled={!set.lines.length}
-          onClick={() => play(pickLine(set))}
-        />
+      <div className="opening-grid">
+        {openings.map((s) => (
+          <button key={s.id} className={`opening-card ${s.id === family.id ? "on" : ""}`} onClick={() => s.id !== family.id && setSetId(s.id)}>
+            <span className="opening-card-name">{s.name}</span>
+            {modesOf(s).length > 1 && <span className="mode-chip">+ Punish mistakes</span>}
+          </button>
+        ))}
       </div>
-      <h3 className="sub-title">
-        Lines{" "}
-        <span className="muted small">
-          · faced {faced} of {set.lines.length}
-        </span>
-      </h3>
-      {mine && !set.lines.length && <p className="muted">No {set.color} lines yet. Add the openings you play with Edit repertoire.</p>}
-      <div className="history-list">
-        {/* Most played first; the repertoire keeps the student's own order. Ties keep the file's order. */}
-        {(mine ? set.lines : [...set.lines].sort((a, b) => b.weight - a.weight)).map((l) => {
-          const n = seen[l.moves.join(" ")] ?? 0;
-          const c = commonness(l);
-          return (
-            <div key={l.moves.join(" ")} className="history-row">
-              {!mine && <span className={`line-tag ${c}`}>{COMMONNESS_LABEL[c]}</span>}
-              <span className="history-main">
-                <span>{shortName(set, l)}</span>
-                <span className="muted small">
-                  {l.start ? `Starts at move ${Math.floor(l.start / 2) + 1} · ` : ""}
-                  {numberedMoves(l.moves)}
-                </span>
-              </span>
-              <span className="history-side">
-                <button onClick={() => play(l)}>Play</button>
-                <span className="muted small">{n ? `faced ${n}×` : "new"}</span>
-              </span>
+      <section className="opening-detail">
+        <div className="opening-detail-head">
+          <h3 className="opening-detail-title">{family.name}</h3>
+          {modes.length > 1 && (
+            <div className="segmented opening-modes">
+              {modes.map((s) => (
+                <button key={s.id} className={s.id === set.id ? "on" : ""} onClick={() => setSetId(s.id)}>
+                  {s.mode ?? s.name}
+                </button>
+              ))}
             </div>
-          );
-        })}
-      </div>
-      {repertoire && <RepertoireDialog initialColor={set.color} onClose={() => setRepertoire(false)} />}
+          )}
+        </div>
+        <p className="opening-mode-help muted">{MODE_HELP[set.mode ?? "Main lines"]}</p>
+        <div className="opening-start">
+          <button className="primary" disabled={!set.lines.length} onClick={() => play(pickLine(set))}>
+            ▶ Play a random line
+          </button>
+          <OpponentMistakes />
+        </div>
+        <h3 className="sub-title">
+          Or pick one
+        </h3>
+        <div className="opening-lines">
+          {/* Most played first, each with how often it comes up; ties keep the file's order. The moves are in the tooltip. */}
+          {[...set.lines]
+            .sort((a, b) => b.weight - a.weight)
+            .map((l) => {
+              const c = commonness(l);
+              return (
+                <button key={l.moves.join(" ")} className="opening-line" title={numberedMoves(l.moves)} onClick={() => play(l)}>
+                  <span className="opening-line-name">{shortName(set, l)}</span>
+                  <span className={`rarity ${c}`}>{COMMONNESS_LABEL[c]}</span>
+                </button>
+              );
+            })}
+        </div>
+      </section>
     </>
   );
 }
@@ -455,7 +443,6 @@ const numberedMoves = (moves: string[]) => moves.map((m, i) => (i % 2 === 0 ? `$
 function DrillsMenu() {
   const counts = useDrillCounts();
   const blocked = useSessionsBlocked();
-  const [repertoire, setRepertoire] = useState(false);
   const { data } = useDrillOverview(0);
   const parked = useParkedDrills();
   const due = parkedFor(parked);
@@ -465,7 +452,7 @@ function DrillsMenu() {
     <>
       <h2 className="section-title">Drills</h2>
       <p className="section-lede muted">
-        Positions you got wrong come back on a schedule until they stick: mistakes from your analyzed games, missed puzzles, your repertoire, and
+        Positions you got wrong come back on a schedule until they stick: mistakes from your analyzed games, missed puzzles, opening fixes, and
         positions the coach set.
       </p>
       <div className="menu-grid">
@@ -485,7 +472,6 @@ function DrillsMenu() {
           onClick={() => startDrills(true)}
         />
         <Tile icon="☰" title="Drill history" sub="What you got right and wrong lately" onClick={() => go("drill-history")} />
-        <Tile icon="♜" title="Opening repertoire" sub="Repertoire drills come from these lines" onClick={() => setRepertoire(true)} />
       </div>
       {data && data.kinds.length > 0 && (
         <table className="stat-table">
@@ -509,7 +495,6 @@ function DrillsMenu() {
           </tbody>
         </table>
       )}
-      {repertoire && <RepertoireDialog onClose={() => setRepertoire(false)} />}
     </>
   );
 }

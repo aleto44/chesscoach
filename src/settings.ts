@@ -49,6 +49,8 @@ export interface Settings {
   voiceGate: number;
   /** Listen only while Space (desktop) or the mic button (phones) is held: best in a noisy room. */
   voicePushToTalk: boolean;
+  /** Opening trainer: the chance (0..1) a line gets one of the opponent's stored mistakes (openings/blunders.ts). */
+  openingBlunders: number;
 }
 
 const DEFAULTS: Settings = {
@@ -75,6 +77,7 @@ const DEFAULTS: Settings = {
   voiceCancelWords: ["no", "cancel"],
   voiceGate: 0,
   voicePushToTalk: false,
+  openingBlunders: 0.2,
 };
 
 /** The setting each rating pool lives in (rating_key in src-tauri/src/db.rs). */

@@ -5,13 +5,14 @@ import { labelOf, type MoveLabel } from "../analysis/review";
 import { useStore } from "../store";
 import type { Key } from "chessground/types";
 import { explore, exploreGoto, exploreMove, type Explore } from "../chess/explore";
-import { moveLabel, type Line } from "../chess/line";
+import { lastMoveContext, moveLabel, type Line } from "../chess/line";
 import { setEvalFocus, TOP_LINES } from "../engine/live";
 import { Board } from "./Board";
 import { EvalBar } from "./EvalBar";
 import { EngineLines, useEngineLines } from "./Analysis";
 import { Modal } from "./GameDialogs";
 import { MaterialStrip } from "./Material";
+import { SquareText } from "./SquareText";
 
 const NOUN: Partial<Record<MoveLabel, string>> = {
   inaccuracy: "an inaccuracy",
@@ -73,15 +74,11 @@ function WhyDialog({ i, onClose }: { i: number; onClose: () => void }) {
             <span>
               Eval for you <strong>{ex.evalBefore}</strong> → <strong>{ex.evalAfter}</strong>
             </span>
-            <span>
-              Winning chances <strong>{ex.winBefore}%</strong> → <strong>{ex.winAfter}%</strong>
-            </span>
           </div>
           <WhyLines ex={ex} playedSan={game.sans[i]} orientation={orientation} />
           <p className="muted small why-foot">
-            {noun[0].toUpperCase() + noun.slice(1)} means the move gave away{" "}
-            {{ inaccuracy: "5–10%", mistake: "10–20%", blunder: "20% or more", miss: "a winning chance" }[labelOf(a) as string] ?? "some"} of
-            your winning chances (chess.com's scale).
+            Labels follow chess.com's scale: a pawn given away counts for more in a close game than in
+            one that's already decided.
           </p>
         </>
       )}
@@ -113,7 +110,9 @@ export function WhyLines({ ex, playedSan, orientation }: { ex: Explanation; play
       )}
       {tab === "better" && several && (
         <div className="why-options">
-          <p className="muted small">{ex.betterSummary}</p>
+          <p className="muted small">
+            <SquareText text={ex.betterSummary} at={ex.played.startFen} />
+          </p>
           <div className="why-moves">
             {alts.map((a, k) => (
               <button key={k} className={`better ${k === pick ? "current" : ""}`} onClick={() => setPick(k)}>
@@ -211,6 +210,13 @@ function LineViewer({
     return out;
   }, [ply, step, next, kind, forked, options, line]);
 
+  // What the texts speak from, so their squares and moves show on this board. The verdict is about
+  // the whole line: a move it names is found where the line plays it, else tried from the start and
+  // then along the line ("Nd6 runs into cxd6" is a knight move from after the reply).
+  const verdictAt = useMemo(
+    () => ({ at: base.fens[0], earlier: base.fens.slice(1), played: { fens: base.fens, sans: base.sans } }),
+    [base],
+  );
   const top = orientation === "white" ? "black" : "white";
   const lastMove = ply > 0 ? x.line.lastMoves[ply - 1] : undefined;
   // The line's own moves (up to the fork), then the student's.
@@ -241,7 +247,9 @@ function LineViewer({
         <MaterialStrip fen={fen} side={orientation} />
       </div>
       <div className="why-side">
-        <p className={`why-verdict ${kind}`}>{line.verdict}</p>
+        <p className={`why-verdict ${kind}`}>
+          <SquareText text={line.verdict} {...verdictAt} />
+        </p>
         {/* Above everything that changes while stepping (the eval line, the caption), so the buttons
             stay put under the pointer. */}
         <div className="nav-buttons">
@@ -267,7 +275,7 @@ function LineViewer({
               {forkAt === 0 ? "the start" : line.steps[forkAt - 1].label} to get the line back.
             </>
           ) : step ? (
-            step.note
+            <SquareText text={step.note} {...lastMoveContext(base, ply)} played={verdictAt.played} />
           ) : options ? (
             "Green arrows: moves that would have kept the position. Step forward to see the brighter one and the reply."
           ) : (

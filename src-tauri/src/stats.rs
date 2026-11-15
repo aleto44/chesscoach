@@ -1,5 +1,5 @@
 //! What the app learns about the student: post-game analysis, the profile built from rated games,
-//! the coach's observations, spaced-repetition drills and the opening repertoire.
+//! the coach's observations, and spaced-repetition drills.
 //! The frontend runs the engine; this module stores results and does the aggregation in SQL.
 
 use rusqlite::{params, OptionalExtension};
@@ -711,53 +711,4 @@ pub fn db_grade_drill(db: State<Db>, id: i64, correct: bool, played: String, ms:
 #[tauri::command]
 pub fn db_retire_drill(db: State<Db>, id: i64) -> Result<(), String> {
     db.conn().execute("UPDATE drills SET retired = 1 WHERE id = ?1", [id]).map(|_| ()).map_err(err)
-}
-
-// ---- Repertoire ----
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RepertoireLine {
-    #[serde(default)]
-    id: i64,
-    color: String,
-    name: String,
-    moves: Vec<String>,
-}
-
-#[tauri::command]
-pub fn db_repertoire(db: State<Db>) -> Result<Vec<RepertoireLine>, String> {
-    let conn = db.conn();
-    let mut stmt = conn.prepare("SELECT id, color, name, moves FROM repertoire ORDER BY color DESC, name").map_err(err)?;
-    let lines = stmt
-        .query_map([], |r| {
-            let moves: String = r.get(3)?;
-            Ok(RepertoireLine {
-                id: r.get(0)?,
-                color: r.get(1)?,
-                name: r.get(2)?,
-                moves: serde_json::from_str(&moves).unwrap_or_default(),
-            })
-        })
-        .map_err(err)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(err)?;
-    Ok(lines)
-}
-
-#[tauri::command]
-pub fn db_add_repertoire(db: State<Db>, line: RepertoireLine) -> Result<(), String> {
-    db.conn()
-        .execute(
-            "INSERT INTO repertoire (color, name, moves) VALUES (?1, ?2, ?3)
-             ON CONFLICT (color, moves) DO UPDATE SET name = excluded.name",
-            params![line.color, line.name, serde_json::to_string(&line.moves).map_err(err)?],
-        )
-        .map(|_| ())
-        .map_err(err)
-}
-
-#[tauri::command]
-pub fn db_remove_repertoire(db: State<Db>, id: i64) -> Result<(), String> {
-    db.conn().execute("DELETE FROM repertoire WHERE id = ?1", [id]).map(|_| ()).map_err(err)
 }

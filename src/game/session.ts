@@ -299,7 +299,7 @@ export async function resign() {
 }
 
 /** "180+2" → 3+2 blitz. */
-function parseTimeControl(s: string | null): TimeControl | null {
+export function parseTimeControl(s: string | null): TimeControl | null {
   const m = s?.match(/^(\d+)\+(\d+)$/);
   return m ? { initial: Number(m[1]), increment: Number(m[2]) } : null;
 }

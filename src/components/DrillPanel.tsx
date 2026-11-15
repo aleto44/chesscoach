@@ -35,7 +35,7 @@ import { WhyLines } from "./Why";
 
 const KIND_LABEL = {
   mistake: "From your games",
-  opening: "Repertoire",
+  opening: "Opening line",
   coach: "From the coach",
   puzzle: "Missed puzzle",
 } as const;
@@ -162,7 +162,7 @@ export function DrillPanel() {
                   <>
                     {lead}
                     {drill.kind === "opening"
-                      ? `Play your ${drill.color} repertoire from memory.`
+                      ? `Play the line as ${drill.color} from memory.`
                       : drill.kind === "puzzle"
                         ? `${side} to move. Find the winning line.`
                         : `${side} to move. Find a good move.`}
@@ -221,10 +221,6 @@ export function DrillPanel() {
                     Eval for you <strong>{s.why.evalBefore}</strong> →{" "}
                     <strong>{s.why.evalAfter}</strong>
                   </span>
-                  <span>
-                    Winning chances <strong>{s.why.winBefore}%</strong> →{" "}
-                    <strong>{s.why.winAfter}%</strong>
-                  </span>
                 </div>
                 <WhyLines
                   ex={s.why}
@@ -276,7 +272,7 @@ export function DrillPanel() {
             <p>
               {s.queue.length
                 ? `Done: ${s.correct} of ${s.queue.length} correct.`
-                : "Nothing is due right now. Drills come from mistakes in your analyzed games and from your repertoire."}
+                : "Nothing is due right now. Drills come from mistakes in your analyzed games, missed puzzles and opening fixes."}
             </p>
             <div className="controls">
               <button onClick={() => startDrills(true)}>

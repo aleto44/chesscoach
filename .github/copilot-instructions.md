@@ -36,9 +36,12 @@ Rules:
 
 - The left/middle column shows the **home menu** (`src/components/Home.tsx`) or the screen picked from it:
   Games (Play rated: pick a clock and get paired with a Maia near your rating, `src/game/matchmaking.ts`;
-  Choose game: every option, rated or practice), School (drills, opening training with the
-  repertoire, the endgame trainer, guess the move, win it again, find the plan, opening leaks), Puzzles, and Profile (weaknesses, rating history,
-  saved games, import from chess.com and Lichess), and Utility (the free analysis board, and a
+  Choose game: every option, rated or practice), School (drills, opening training (side,
+  then an opening, then Main lines or Punish mistakes), the endgame trainer, guess the move, win it again, find the plan, opening leaks), Puzzles, and Profile (weaknesses, rating history,
+  saved games, import from chess.com and Lichess). Saved games is its own screen
+  (`src/components/SavedGames.tsx`): filters by source (chess.com, Lichess, rated or practice here),
+  clock, color, result, date and opponent/opening, and a games-over-time chart with wins, draws and
+  losses built from the same filtered list, and Utility (the free analysis board, and a
   two-player chess clock for over-the-board games, `src/utility/timer.ts` + `src/components/Timer.tsx`:
   full-screen on phones, the top half turned to the player across, separate time and increment per
   side for odds games), each with its own sub-menu. The top bar's back button
@@ -52,21 +55,29 @@ Rules:
   were clearly better in and didn't win, or worse but holding and lost, played in the endgame session as a
   `spec` with its own bars), "Find the plan" (`src/plans/`: quiet, non-tactical middlegame slips; the
   engine grades the move and `describe.ts` names the plan) and "Opening leaks" (`src/openings/leaks.ts`:
-  real games only; repeated costly positions and where games leave the repertoire, fixed by adding the
-  engine's move to the repertoire). Endgame positions that Stockfish can't score as won without
+  real games only; repeated costly positions, fixed by drilling the engine's move as an opening
+  drill). There is no repertoire feature any more (removed on purpose; the old `repertoire` table is
+  left unused). Endgame positions that Stockfish can't score as won without
   tablebases (bishop and knight mate) don't work in the endgame trainer, which judges by eval.
 - The opening and endgame trainers are not games: they never create a game or show up in saved games, and
   they can start while a game is in progress (a rated game's clock pauses meanwhile, `src/game/clock.ts`).
   Opening sets live in `src/openings/training.ts`, checked by `node scripts/check-book.mjs`. Every
   built-in line has a plan in `src/openings/plans.ts` (two or three ideas with drawings for the line's
   final position), shown when the student finishes the line; a new line needs one, and the check fails
-  without it. The trainer
+  without it. The check also reads every move the plans and move notes (`guides.ts`) name the way the
+  board shows them, and fails on one it can't place: write a move so it can be played where the text
+  speaks from, as a line ("...Bxg3 hxg3"), one side's plan ("...g6, ...Bg7 and ...O-O"), a route
+  ("...Na6-c5") or a numbered move past the line's end ("10.e5"). The trainer
   matches moves by what's left of the line, not by ply (`src/openings/order.ts`): a move the line plays
   later is fine when the engine says the order costs nothing, and an engine-equal move outside the line
   is marked "≈", not wrong.
   Now and then the opponent plays a mistake instead of the book move: one from `src/openings/traps.ts`,
   precomputed by `node scripts/find-traps.mjs` (Maia says players of a rating really make it, Stockfish
   says it loses at least a pawn). Run that again after adding or changing lines; nothing is searched live.
+  Quiet openings hide most of their traps one step off the book, so the script also stores detours
+  (`ROUTES`): a sound, common non-book move, the student's natural answer, then the mistake. To judge
+  traps outside the app, `node scripts/trap-harness.mjs [--set london] [--detours]` writes
+  `trap-preview.html` (open it at `localhost:1420/trap-preview.html`), each trap stepped through as a drill.
 - Screens that aren't a game ask the coach one-off questions with `coach_explain` (`src/coach.rs` `explain`):
   no tools, no conversation, so it works during a rated game. Its answers show in the chat column through
   `src/coach/trainerChat.ts`, a thread of their own that is never saved into the game's chat. Hand it computed

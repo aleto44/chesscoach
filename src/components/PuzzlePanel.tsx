@@ -5,12 +5,10 @@ import { createPortal } from "react-dom";
 import { hasBackend, isRemote } from "../backend";
 import { useAuth } from "../coach/auth";
 import { sendToCoach } from "../coach/bridge";
-import { getRepertoire } from "../openings/repertoire";
 import {
   cancelImport,
   META_THEMES,
   openingLabel,
-  openingTag,
   refreshPuzzleDb,
   startImport,
   themeLabel,
@@ -577,15 +575,9 @@ function ChoiceSummary({ className = "puzzle-choice" }: { className?: string }) 
 function Filters() {
   const choice = usePuzzle((s) => s!.choice);
   const tags = usePuzzleDb((s) => s.tags);
-  const [repertoire, setRepertoire] = useState<string[]>([]);
-  useEffect(() => {
-    getRepertoire()
-      .then((lines) => setRepertoire([...new Set(lines.map((l) => openingTag(l.name, tags)).filter((t): t is string => !!t))]))
-      .catch(() => undefined);
-  }, [tags]);
   const themes = tags.filter((t) => t.kind === "theme" && !META_THEMES.has(t.tag)).sort((a, b) => themeLabel(a.tag).localeCompare(themeLabel(b.tag)));
   const families = tags.filter((t) => t.kind === "family").slice(0, 60).sort((a, b) => a.tag.localeCompare(b.tag));
-  const extra = choice.opening && !families.some((f) => f.tag === choice.opening) && !repertoire.includes(choice.opening) ? [choice.opening] : [];
+  const extra = choice.opening && !families.some((f) => f.tag === choice.opening) ? [choice.opening] : [];
 
   return (
     <div className="puzzle-filters">
@@ -601,17 +593,8 @@ function Filters() {
       <span className="field-label">Position</span>
       <select value={choice.opening ?? ""} onChange={(e) => setChoice({ opening: e.target.value || null })} aria-label="Opening">
         <option value="">Any position</option>
-        {repertoire.length > 0 && (
-          <optgroup label="Your repertoire">
-            {repertoire.map((t) => (
-              <option key={t} value={t}>
-                {openingLabel(t)}
-              </option>
-            ))}
-          </optgroup>
-        )}
         <optgroup label="Openings">
-          {[...extra, ...families.map((f) => f.tag).filter((t) => !repertoire.includes(t))].map((t) => (
+          {[...extra, ...families.map((f) => f.tag)].map((t) => (
             <option key={t} value={t}>
               {openingLabel(t)}
             </option>

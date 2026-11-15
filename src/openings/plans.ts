@@ -41,7 +41,7 @@ export function planShapes(idea: PlanIdea): DrawShape[] {
     });
 }
 
-/** The plan for a built-in line; the student's own repertoire lines have none. */
+/** The plan for a training line, if it has one. */
 export function planOf(line: TrainingLine): PlanIdea[] | null {
   return PLANS[line.name] ?? null;
 }
@@ -76,7 +76,7 @@ const CARO_CLASSICAL: PlanIdea[] = [
   ),
   I(
     "Develop, and pick a side for your king",
-    "...Ngf6, ...Be7 (or ...Bd6) and ...Qc7. White's h5 pawn and queen on d3 aim at the kingside, so castling long with ...O-O-O is common and safe.",
+    "Finish developing with ...Ngf6 and ...Be7 (or ...Bd6). White's h5 pawn and queen on d3 aim at the kingside, so ...Qc7 and ...O-O-O, castling long, is common and safe.",
     "b:g8f6 b:f8e7 b:d8c7",
   ),
   I(
@@ -116,7 +116,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "The bishop question",
-      "...Bd6 asks your bishop to trade. Bxd6 Qxd6 is simple and fine; Bg3 keeps the tension, and after ...Bxg3 hxg3 your rook gets the h-file.",
+      "...Bd6 asks your bishop to trade. Bxd6 Qxd6 is simple and fine. Or keep the tension with Bg3: if ...Bxg3 hxg3, your rook gets the h-file.",
       "y:f4d6 b:f4g3",
     ),
     I(
@@ -282,7 +282,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "Up a pawn: trade pieces",
-      "Every trade brings you closer to an endgame where the extra pawn wins. Aim for the queen trade on the open d-file, develop with Nc3 and Rd1, and don't grab more.",
+      "Every trade brings you closer to an endgame where the extra pawn wins. Aim for the queen trade on the open d-file; after it, Nc3 and a rook to d1 finish your development. Don't grab more.",
       "y:d1d8 b:b1c3",
     ),
   ],
@@ -333,8 +333,8 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "Black's break: ...f5",
-      "Black's freeing move is ...f5, after ...Ne7 or ...Nf6-e8. Meet it with exf5 and use the e4 square for your pieces.",
-      "r:f7f5 y:e4",
+      "Black wants to free the position with ...f5, but the knight on g8 has to get out of the f-pawn's way first: ...Ne7 (after ...g6 and ...Bg7), or ...Be7, ...Nf6, ...O-O and ...Ne8. Meet ...f5 with exf5 and put your pieces on e4.",
+      "b:g8e7 r:f7f5 y:e4",
     ),
   ],
 
@@ -354,7 +354,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "Black wants ...d5 and your bishop",
-      "Black's freeing break is ...d5, and ...Be6 would trade off your best bishop. Bb3 or Ba2 keeps the bishop on the diagonal toward f7.",
+      "Black's freeing break is ...d5, and ...Be6 would trade off your best bishop. Keep it on the diagonal toward f7: Bb3, or 9.a3 and Ba2, where ...a4 can't hit it.",
       "r:d6d5 b:c4b3 y:f7",
     ),
   ],
@@ -605,8 +605,8 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "Castle long",
-      "Your king is safer on the queenside, away from White's pawns: ...Qc7 and ...O-O-O.",
-      "b:d8c7 b:e8c8",
+      "Your king is safer on the queenside, away from White's pawns: ...Nc6, ...Qc7 and ...O-O-O.",
+      "b:b8c6 b:d8c7 b:e8c8",
     ),
   ],
   "Caro-Kann Defense: Classical, h4 and h5": CARO_CLASSICAL,
@@ -689,7 +689,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "...Na5 and ...c5",
-      "The Chigorin plan: ...Na5 hits the bishop on b3, then ...c5 and ...Qc7 gain queenside space and support e5.",
+      "The Chigorin plan: ...Na5, ...c5 and ...Qc7. The knight kicks the bishop on b3, ...c5 gains queenside space, and the queen backs up e5.",
       "b:c6a5 r:b3 g:c7c5",
     ),
     I(
@@ -706,8 +706,8 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "Fast development after the queen trade",
-      "After Nb3 Qxd1 Rxd1, ...Bg4 and ...O-O-O get your pieces out with tempo.",
-      "b:c8g4 b:e8c8",
+      "After Nb3 Qxd1 Rxd1, ...Bd7 and ...O-O-O get your pieces out fast: the bishop blocks the d-file, so your king can castle past d8.",
+      "b:c8d7 b:e8c8",
     ),
     I(
       "Avoid pawn endgames",
@@ -822,7 +822,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "Bring the knights",
-      "...Nf6, and ...Ng6 once ...g5 has cleared the square, support the storm.",
+      "...Nf6, then ...g5 and ...Ng6 support the storm: the pawn clears g6 for the knight.",
       "b:d7f6 b:e7g6",
     ),
   ],
@@ -841,7 +841,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
   "King's Indian Defense: Petrosian, d5 and Bg5": [
     I(
       "White's pin is the problem",
-      "Petrosian's Bg5 pins your f6 knight, so the usual ...Nh5 and ...f5 plan is slower. Free the knight first: ...Qe8 breaks the pin, ...h6 and ...g5 kicks the bishop.",
+      "Petrosian's 8.Bg5 pins your f6 knight, so the usual ...Nh5 and ...f5 plan is slower. Free the knight first: ...Qe8 breaks the pin, ...h6 and ...g5 kicks the bishop.",
       "b:d8e8 r:h4",
     ),
     I(
@@ -981,7 +981,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
   "King's Indian Defense: Bayonet, 9.b4 Nh5": [
     I(
       "Kick the knight with ...h6",
-      "Ng5 eyes e6 and f7. ...h6 sends it away; if it jumps to e6, take it: ...Bxe6 dxe6, and the e6 pawn is cut off from White's chain and becomes a target.",
+      "Ng5 eyes e6 and f7. ...h6 sends it away. If instead Ne6, ...Bxe6 dxe6, and the e6 pawn is cut off from White's chain and becomes a target.",
       "g:h7h6 r:g5e6 b:c8e6",
     ),
     I(
@@ -1008,7 +1008,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "If exf5, take with the bishop",
-      "exf5 Bxf5 gives your light bishop a fine diagonal, and Nde4 is met by ...Ng6, heading for f4 again.",
+      "14.exf5 Bxf5 gives your light bishop a fine diagonal. If 15.Nde4, ...Ng6 heads for f4 again.",
       "r:e4f5 b:c8f5",
     ),
   ],
@@ -1073,7 +1073,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "Develop with ...Nc6",
-      "...Nc6 hits d4 a second time and makes ...Nxd4 a threat. Then ...Be6 and a rook to the open c-file.",
+      "...Nc6 develops with a hit on the d4 knight. Then ...Be6 and a rook to the open c-file.",
       "b:b8c6 r:d4 b:c8e6",
     ),
     I(
@@ -1112,7 +1112,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "Watch Nb5",
-      "Nb5 hits c7. But the knight leaves d4, so your bishop sees b2: ...Bxb2 is often there, or ...Na6 simply covers c7.",
+      "Nb5 hits c7, but the knight leaves d4 and your bishop sees b2. So meet Nb5 with ...Bxb2, or simply cover c7 with ...Na6.",
       "r:d4b5 r:c7 y:g7b2",
     ),
   ],
@@ -1124,7 +1124,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "...Nh5-f4 too",
-      "The other knight can head for f4, another hole, by ...Nh5. If White covers both squares with Be3, ...Ne6 and ...Nd4 still come.",
+      "The other knight heads for f4, another hole: ...Nh5-f4. If White covers both holes with Be3, the a6 knight still comes to d4 by ...Nc5-e6-d4.",
       "b:f6h5 b:h5f4 y:f4",
     ),
     I(
@@ -1146,7 +1146,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "If Bxc5",
-      "Recapture with the b-pawn (...bxc5): your pawns then hold b4 and d4, and the b-file opens for your rook.",
+      "If Bxc5, ...bxc5: recapture with the b-pawn. Your pawns then hold b4 and d4, and the b-file opens for your rook.",
       "r:e3c5 g:b6c5",
     ),
   ],
@@ -1248,6 +1248,388 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
   ],
 
+  // ---- London System: punishing Black (White) ----
+  "London System: ...Bd6 and ...Nbd7?, Nxf7": [
+    I(
+      "A pawn up, and Black's king is bare",
+      "8...Nbd7 put the knight between Black's queen and the d6 bishop, so 9.Nxf7 uncovered your f4 bishop on d6 and 10.Bxd6 took it for nothing. You're a clean pawn up, and Black's king has lost f7 and castling.",
+      "y:d6 r:f7",
+    ),
+    I(
+      "Bring the bishop home, then e4",
+      "The d6 bishop is deep in Black's camp: Bg3 brings it back before Black can hunt it. Then castle and push e4 to open lines at the king.",
+      "b:d6g3 g:e3e4",
+    ),
+    I(
+      "Black's play: ...Qb6 and ...c5",
+      "Black will use the open lines: ...Qb6 hits b2, and ...c5 opens the c-file. b3 keeps b2 safe.",
+      "r:d8b6 r:b2 g:b2b3",
+    ),
+  ],
+  "London System: Queen's Indian, ...Nbd7? and Nxf7": [
+    I(
+      "A pawn up, and Black's king is bare",
+      "9...Nbd7 put the knight between Black's queen and the d6 bishop, so 10.Nxf7 uncovered your f4 bishop on d6 and 11.Bxd6 took it for nothing. You're a clean pawn up, and Black's king has lost f7 and castling.",
+      "y:d6 r:f7",
+    ),
+    I(
+      "Bishop to h2, then castle",
+      "Bh2 keeps the bishop on its diagonal and out of reach. Then castle: your king is safe and Black's isn't.",
+      "b:d6h2",
+    ),
+    I(
+      "Black's play: ...e5",
+      "Black wants ...e5 to open lines while you're still uncastled. With the bishop on h2 aimed at e5, castle first and the break loses its sting.",
+      "r:e6e5",
+    ),
+  ],
+  "London System: hxg3, ...Nxe5? and Bxh7+": [
+    I(
+      "The h-file is open",
+      "8.hxg3 opened the h-file, and 11.Bxh7+ took the pawn that stood on it. Your queen, rook and h7 bishop now all aim at Black's king on f8.",
+      "y:h1h8 y:h5f7 r:f8",
+    ),
+    I(
+      "f4 and long castling",
+      "f4 keeps the e5 pawn, which takes f6 and d6 from Black's pieces. Then castle long: your king is safe on the queenside and the other rook joins.",
+      "g:f2f4 g:e1c1",
+    ),
+    I(
+      "Black's king runs to e7",
+      "Black will try to escape to e7 and trade a rook on the h-file. Keep the queen near the king and bring your last rook to d1 or the h-file.",
+      "r:f8e7",
+    ),
+  ],
+  "London System: hxg3, ...Nxd2? and Bxh7+": [
+    I(
+      "Discovered check is coming",
+      "Black's king is on h8, in line with your rook behind the h7 bishop. Any bishop move is a discovered check: Bg6+ when it wins something.",
+      "y:h1h8 b:h7g6",
+    ),
+    I(
+      "Black's try: ...Qg5",
+      "...Qg5 hits g3 and e3. Rh5 hits the queen, and after ...g6 the bishop takes on g6 with discovered check and wins it.",
+      "r:d8g5 b:h1h5",
+    ),
+  ],
+  "London System: hxg3, g4-g5 and ...hxg5?": [
+    I(
+      "Everything points at h7",
+      "...hxg5 opened the h-file for your rook, and the g5 knight and d3 bishop both hit h7. Qf3 and Qh3 brings the queen too, with mate on h7 or h8.",
+      "y:h1h8 b:d1f3 r:h7",
+    ),
+    I(
+      "Black's defence: ...e5 and ...Re8",
+      "Black wants ...e5 and ...Re8 so the king can run to f8. The faster your queen reaches the h-file, the less that matters.",
+      "r:e6e5",
+    ),
+  ],
+  "London System: ...Qb6 and ...c4, 6...Bf5? Qxf5": [
+    I(
+      "A piece up",
+      "7.Qxf5 won a bishop. Black's ...Qxb2 grab doesn't work while c8 is weak: the b8 knight keeps the a8 rook from guarding it, so Qc8+ wins more.",
+      "y:f5c8 r:b8",
+    ),
+    I(
+      "Develop and take c4",
+      "Nf3 and Nd2, and Bxc4 when it wins the pawn. With a piece up, every trade helps you.",
+      "b:g1f3 b:f1c4",
+    ),
+  ],
+  "London System: ...Qb6 and ...Qxc5?, Qxb7": [
+    I(
+      "A clean pawn up",
+      "8.Qxb7 won the b7 pawn, and the queen trade left Black with doubled b-pawns.",
+      "r:b6 y:b7",
+    ),
+    I(
+      "Ba6, then castle",
+      "Ba6 hits the c8 rook and keeps the b-pawns where they are. Then Nf3 and castle.",
+      "b:f1a6 r:c8 b:g1f3",
+    ),
+    I(
+      "Black's play: ...e5",
+      "Black wants ...e5 to free the f8 bishop with tempo on your f4 bishop. Bg3 sidesteps it.",
+      "r:e7e5 b:f4g3",
+    ),
+  ],
+  "London System: King's Indian, ...e5? and the e5 pawn": [
+    I(
+      "A clean pawn up",
+      "7...e5 came before Black could guard it: after the trades on e5 and the queens, you've won a pawn, and your bishop on e5 hits c7 and the g7 bishop.",
+      "y:e5 r:c7",
+    ),
+    I(
+      "Keep the bishop, then develop",
+      "Black will hit the e5 bishop with ...Re8 and ...Nd7. Bh2 or Bd4 keeps it on the board; then Nc3 and a rook to d1.",
+      "r:d8e8 b:e5h2",
+    ),
+    I(
+      "Watch the d-file",
+      "Black's rook owns the d-file, and ...Rd2 would hit c2 and e2. Contest the file with Rd1.",
+      "r:d8d2 b:f1d1",
+    ),
+  ],
+  "London System: Bb5 and Ne5, ...bxc6? Bxc6+": [
+    I(
+      "The exchange up",
+      "7...bxc6 let 8.Bxc6+ fork the king and the a8 rook: you've won a rook for a bishop, and a pawn on top.",
+      "y:a8",
+    ),
+    I(
+      "Castle and cover b2",
+      "Castle and keep b2 covered with b3: Black's queen will swing to b8 to look for counterplay.",
+      "r:a8b8 r:b2 g:b2b3",
+    ),
+    I(
+      "Black's king is in the centre",
+      "Black's king is stuck on e7. Open lines with c4 once your pieces are out.",
+      "r:e7 g:c2c4",
+    ),
+  ],
+  "London System: Mirror, ...c5 Bb5+ and ...a6?": [
+    I(
+      "Black's king is caught in the centre",
+      "6...a6 cost a tempo, and after 9.Qa4+ Ke7 Black can't castle any more. 10.cxd5 opens lines at the king on e7.",
+      "r:e7 y:a4e8",
+    ),
+    I(
+      "Keep opening lines",
+      "dxe6 and dxc5 open more files toward the king; Nc3 and castling bring the rest of your pieces.",
+      "g:d5e6 g:d4c5 b:b1c3",
+    ),
+    I(
+      "Watch ...b5",
+      "...b5 kicks your queen off the a4-e8 diagonal. Qa3 keeps it aimed at c5 and e7.",
+      "r:b7b5 b:a4a3",
+    ),
+  ],
+
+  // ---- London System: punishing White (Black) ----
+  "London System: ...c5 and ...Qb6, 6.Qc2 e5": [
+    I(
+      "A pawn for the lead",
+      "White's queen went b3, c2 and back to c1 while 6...e5 opened your pieces. The f5 bishop owns the b1-h7 diagonal, White's queenside hasn't moved, and ...fxe5 takes the pawn back next.",
+      "y:f5b1 g:f6e5 r:e5",
+    ),
+    I(
+      "Chase the London bishop",
+      "If White holds e5 with Nf3, go after the f4 bishop instead: ...g5 and ...h5 gain space and drive it back toward g3, where ...h4 can trap it.",
+      "g:g7g5 g:h7h5 r:f4",
+    ),
+    I(
+      "White's breaks: b3 and e4",
+      "White wants b3 against your c4 pawn and e4 against d5. Keep c4 protected (...b5 backs it up) and d5 covered.",
+      "r:b2b3 r:c4 g:b7b5",
+    ),
+  ],
+  "London System: ...c5 and ...Qb6, 6.Qxb6 axb6": [
+    I(
+      "The a-file and the c4 bind",
+      "The queen trade opened the a-file for your rook, aimed at a2. The c4 pawn locks White's queenside: b3 is hard to arrange, and ...b5 and ...b4 can follow to break up c3.",
+      "y:a8a2 r:a2 g:b6b5",
+    ),
+    I(
+      "Stop e4",
+      "White's only freeing move is e4, hitting d5. ...Bf5 develops and stops it for now; ...e6 then holds d5 for good.",
+      "r:e3e4 b:c8f5 y:d5",
+    ),
+  ],
+  "London System: ...c5 and ...Qb6 with Nf3, 7.Qc2 Bf5": [
+    I(
+      "Why the bishop could go to f5",
+      "With your knight on f6 guarding d5, the f5 bishop wasn't loose: taking it would have cost White b2 and the a1 rook. So it drove the queen back to c1 and took the b1-h7 diagonal.",
+      "y:f6d5 y:f5b1 r:b2",
+    ),
+    I(
+      "Hunt the London bishop",
+      "...Be7, ...O-O, and ...Nh5 to go after the f4 bishop: trading it leaves White without the London's best piece and gives you the bishop pair.",
+      "b:f8e7 b:f6h5 r:f4",
+    ),
+    I(
+      "White's play: b3 and e4",
+      "White wants b3 to break up your c4 pawn, and Nbd2 with e4 against d5. ...b5 supports c4.",
+      "r:b2b3 r:c4 g:b7b5",
+    ),
+  ],
+  "London System: ...c5, 5.Nbd2 cxd4 and ...Bf5": [
+    I(
+      "Your bishop got out first",
+      "5...cxd4 6.exd4 took White's e-pawn away, so the London bishop has no e3 pawn behind it and the e-file is half-open. Your light bishop reached f5 before ...e6 could shut it in, the main thing Black wants in the London.",
+      "y:f5b1 y:e8e1",
+    ),
+    I(
+      "Develop and trade the London bishop",
+      "...e6, ...Bd6 and ...O-O: the d6 bishop offers to trade White's best piece. A rook to c8 then uses the half-open c-file.",
+      "g:e7e6 b:f8d6 y:c8c2",
+    ),
+    I(
+      "White's try: Bb5 and Ne5",
+      "White's active plan is Bb5 and Ne5, piling up on the c6 knight. ...Qb6 meets it: the queen backs up c6 and hits b2 and d4.",
+      "r:f1b5 r:f3e5 b:d8b6",
+    ),
+  ],
+  "London System: 3.dxc5 e6 and ...f6": [
+    I(
+      "...f6 prepares ...e5",
+      "4...Bxc5 got the pawn back with a developed bishop, and 5...Ne7 with 6...f6 prepare ...e5: a big centre that hits the f4 bishop.",
+      "g:e6e5 r:f4 y:d5",
+    ),
+    I(
+      "Then ...Nbc6 and ...O-O",
+      "...Nbc6 and ...O-O. Your king is safe behind f6, and the e7 knight can go to g6 or f5 later.",
+      "b:b8c6 b:e7g6",
+    ),
+    I(
+      "White's ideas: Bd3 and e4",
+      "White wants Bd3 and e4 to open the centre before your pieces are out, or c4 against d5. Finish developing first; keep an eye on Bb5+ while the b8 knight is home.",
+      "r:f1d3 r:e3e4",
+    ),
+  ],
+  "London System: Jobava-style 4.Nc3 a6": [
+    I(
+      "...a6 took b5 away",
+      "Nc3 with Bf4 wants Nb5, hitting c7. ...a6 stops it for good, and ...b5 can follow to gain queenside space.",
+      "r:c3b5 y:a6 g:b7b5",
+    ),
+    I(
+      "Develop and trade bishops",
+      "...Nf6, ...Bd6 to trade the London bishop, and castle. If White takes on c5, take back with the bishop.",
+      "b:g8f6 b:f8d6",
+    ),
+    I(
+      "White's break: e4",
+      "With the knight on c3, White's main idea is e4. Keep d5 covered with ...Nf6 so you're ready when it comes.",
+      "r:e3e4 y:d5",
+    ),
+  ],
+  "London System: ...c5, 4.Nd2? cxd4 and ...Nxd4": [
+    I(
+      "A clean pawn",
+      "4.Nd2 put the knight between the queen and d4, so after 4...cxd4 5.exd4 nothing guarded the pawn and 5...Nxd4 took it. You're a pawn up with an extra centre pawn.",
+      "y:d1d4 r:d2 y:d5",
+    ),
+    I(
+      "Finish developing",
+      "...Nf6, ...e6, ...Bd6 and ...O-O. Your d5 pawn controls e4 and c4, and the d6 bishop offers to trade the London bishop.",
+      "b:g8f6 b:f8d6",
+    ),
+    I(
+      "White's comp: development",
+      "White is a bit ahead in development: Bb5 pins the c6 knight, then castling and a rook to the open e-file. ...Bd7 and ...e6 deal with it.",
+      "r:f1b5 r:c6",
+    ),
+  ],
+  "London System: ...c5 and ...Qb6 with Nf3, 8.Qxf5? Qxb2": [
+    I(
+      "The rook is lost",
+      "8.Qxf5 took a bishop, but ...Qxb2 hits the a1 rook and the b1 knight, and the rook has nowhere to go. The f6 knight made it work: it guards d5, so White's queen has nothing to take or check with.",
+      "y:b2a1 r:a1 r:b1 y:f6d5",
+    ),
+    I(
+      "Take the rook, then untangle",
+      "Take the rook with ...Qxa1 next. Then get the queen out of the corner and play ...e6 to shut out the f5 queen; you're the exchange and a pawn up.",
+      "g:b2a1 g:e7e6",
+    ),
+  ],
+  "London System: 3.Nf3 cxd4 4.Nxd4 Nd7 5.e3?": [
+    I(
+      "...e5 forked bishop and knight",
+      "4...Nd7 got ready for ...e5, and 5.e3 didn't stop it: 5...e5 hit the f4 bishop and the d4 knight at once. You're a piece up for a pawn.",
+      "y:d4 y:g3",
+    ),
+    I(
+      "Develop with tempo",
+      "White's queen on d4 is a target: ...Bc5 hits it, then castle. Every move that comes with a threat makes the extra piece count sooner.",
+      "b:f8c5 r:d4",
+    ),
+    I(
+      "White's play: Nc3, long castling and Bb5",
+      "White wants Nc3, long castling and Bb5 to pin your d7 knight, with the d-file and the open e-file against your king. Castle quickly.",
+      "r:f1b5 r:d7",
+    ),
+  ],
+  "London System: 3.Nf3 cxd4 4.Qxd4 Nc6 5.Qa4 Bd7 6.e3?": [
+    I(
+      "The discovered attack",
+      "6...e5 kicked the bishop, and 7...Nd4 uncovered the d7 bishop on White's queen while hitting c2 and f3. White had to give the queen for the bishop.",
+      "y:d7a4 y:d4",
+    ),
+    I(
+      "Queen against two pieces: open lines",
+      "Your queen is worth more than White's two minor pieces, and it gets stronger as the board opens. ...Bb4+ develops with check, then ...Nf6 and castle.",
+      "b:f8b4 b:g8f6",
+    ),
+    I(
+      "White's knights want d4",
+      "White will take on d4 and look for outposts for the knights. ...Bc5 can hold the d4 pawn; if it falls, trade pieces anyway.",
+      "r:f3d4 b:f8c5",
+    ),
+  ],
+  "London System: 3.c3 Qb6 4.Qc2 cxd4 and 7.Bd3?": [
+    I(
+      "The rook is lost",
+      "7.Bd3 Bxd3 8.Qxd3 pulled White's queen off the second rank, and 8...e5 9.Bxe5 took the bishop far from home. Now ...Qxb2 hits the a1 rook and the b1 knight.",
+      "y:b2a1 r:a1 r:b1",
+    ),
+    I(
+      "Take, and get the queen out",
+      "Take the rook with ...Qxa1, then get the queen out of the corner before Nc3 traps it. ...Nxe5 picks up the bishop too if White leaves it there.",
+      "g:b2a1 b:c6e5",
+    ),
+  ],
+  "London System: 3.c3 Qb6 4.b3 and 8.Nd2?": [
+    I(
+      "The knight blocked the queen",
+      "8.Nd2 answered the check but cut the d1 queen off from the d3 bishop, so ...Bxd3 won a piece. A knight on d2 in front of the queen is a London habit: always check what it stops guarding.",
+      "y:d1d3 r:d2",
+    ),
+    I(
+      "Keep the bishop",
+      "The d3 bishop is deep in White's camp and stops kingside castling. ...Nd7 and ...Ne7, then castling, finish developing; if White chases the bishop, ...Bg6 brings it home.",
+      "y:d3 b:b8d7",
+    ),
+    I(
+      "White's play: a3 and b4",
+      "a3 and b4 chase your queen. ...Qa6 keeps it on the a6-f1 diagonal, still guarding the d3 bishop.",
+      "r:a2a3 r:b3b4 b:a5a6",
+    ),
+  ],
+  "London System: 3.dxc5 e6 4.b4? Qf6": [
+    I(
+      "The long diagonal",
+      "4.b4 took the b-pawn off the long diagonal, so 4...Qf6 hit the a1 rook and the f4 bishop together. After 5.Bxb8 Qxa1 6.Bg3 Qxa2 you have a rook and a pawn for a knight.",
+      "y:f6a1 y:a2",
+    ),
+    I(
+      "Trade queens",
+      "Your queen is deep in White's camp. ...Qa4 offers a queen trade on d1; with queens off, the extra exchange wins easily.",
+      "b:a2a4 y:a4d1",
+    ),
+    I(
+      "Then win c5",
+      "The c5 pawn is weak: ...b6 and ...a5 break up b4-c5, and then ...Bxc5.",
+      "g:b7b6 g:a7a5 r:c5",
+    ),
+  ],
+  "London System: 3.dxc5 e6 and 8.Nxe5?": [
+    I(
+      "A piece for two pawns",
+      "8.Nxe5 fxe5 9.Qh5+ g6 10.Qxe5 got two pawns for the knight. Your rook on f8 already looks at f2 down the open f-file.",
+      "y:f8f2 r:f2",
+    ),
+    I(
+      "Develop with threats",
+      "...Nbc6 hits the queen, then ...Bf5 trades off White's d3 bishop, and every piece joins the f-file.",
+      "b:b8c6 b:c8f5 r:e5",
+    ),
+    I(
+      "Mind the dark squares",
+      "White's queen and f4 bishop aim at the dark squares around your king (h6, g7, h8). Trade queens, or bring a bishop to f6, when you can.",
+      "r:e5h8 r:f4h6",
+    ),
+  ],
+
   // ---- Queen's Gambit Declined (Black) ----
   "Queen's Gambit Declined: Tartakower": [
     I(
@@ -1281,7 +1663,7 @@ export const PLANS: Record<string, PlanIdea[]> = {
     ),
     I(
       "The isolated d-pawn",
-      "If cxd5 exd5, you get an isolated d-pawn: play actively with ...Ne4 and ...Bg4.",
+      "If cxd5 exd5, ...Bg4 and ...Ne4 are your active moves: with an isolated d-pawn, play for the initiative.",
       "y:d5 b:f6e4",
     ),
   ],

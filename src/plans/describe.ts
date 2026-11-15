@@ -116,7 +116,8 @@ export function describePlan(fen: string, pv: string[], color: Color): PlanText 
     return { title: `Gain space with ${mv(first)}`, text: `${mv(first)} takes squares away from the opponent's pieces and gives yours room behind it.${follow}`, shapes };
   }
 
-  if (first.piece === "r" || (first.piece === "q" && first.from[0] !== first.to[0])) {
+  // Only a move onto the file: a rook sliding along a file it was already on (Re1-e3) isn't "to the e-file".
+  if ((first.piece === "r" || first.piece === "q") && first.from[0] !== first.to[0]) {
     const file = first.to[0];
     const mineOn = fileHasPawn(after, file, side(color));
     const theirsOn = fileHasPawn(after, file, side(color) === "w" ? "b" : "w");

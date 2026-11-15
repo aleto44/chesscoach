@@ -119,7 +119,7 @@ CREATE TABLE observations (
 
 -- Spaced-repetition cards. Separate from games: drill answers are never counted as game moves.
 --   'mistake': a position from one of the student's games where they went wrong; find a good move.
---   'opening': a repertoire line to play from memory (line holds the SAN moves from fen).
+--   'opening': an opening line to play from memory (line holds the SAN moves from fen).
 --   'coach':   a position the coach set as an exercise.
 CREATE TABLE drills (
     id             INTEGER PRIMARY KEY,
@@ -152,7 +152,8 @@ CREATE TABLE drill_attempts (
     ms         INTEGER                      -- thinking time
 );
 
--- The openings the student wants to play, per color.
+-- The openings the student wanted to play, per color. No longer used (the repertoire feature was
+-- removed); kept so existing databases and this migration stay as they were.
 CREATE TABLE repertoire (
     id         INTEGER PRIMARY KEY,
     color      TEXT NOT NULL CHECK (color IN ('white', 'black')),

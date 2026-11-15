@@ -236,14 +236,17 @@ function sacrificed(fenBefore: string, fenAfter: string, played: string): string
  * chess.com-style verdict, refining the severity class. `drops` holds lossPoints for every move
  * up to this one.
  * - book: still on a line of the opening book.
- * - brilliant: a sound sacrifice: gives up a piece, not losing, and best or nearly (only the best
- *   move when already winning, where any sensible move would do).
+ * - brilliant: a sound sacrifice: gives up a piece, not losing, and best or nearly, by a side not
+ *   already clearly winning (BRILLIANT_MAX_CP), where giving material back is just tidying up.
  * - great: the only good move (the engine's second choice is a blunder), not a plain recapture,
  *   a mate or taking a piece the opponent just blundered.
  * - excellent / good: not the engine's move, losing under 2 / 5 points.
  * - miss: a mistake or blunder that fails to punish the opponent's own mistake (leaving you about
  *   where you were before it), or lets a forced mate slip while still winning.
  */
+/** From this far ahead (centipawns, the mover's view) a sacrifice is no longer brilliant. */
+const BRILLIANT_MAX_CP = 300;
+
 function labelFor(g: GameInput, evals: Eval[], i: number, cls: MoveClass, drops: number[], played: string): MoveLabel {
   const { fens, sans, lastMoves } = g.line;
   const mover = sideToMove(fens[i]);
@@ -259,8 +262,12 @@ function labelFor(g: GameInput, evals: Eval[], i: number, cls: MoveClass, drops:
     return unpunished || slipped ? "miss" : cls;
   }
   if (cls === "inaccuracy") return cls;
-  const sound = cls === "best" || (drop < 2 && winBefore < 97);
-  if (sound && winAfter >= 50 && isSacrifice(fens[i], fens[i + 1], played)) return "brilliant";
+  // Winning chances flatten out once a game is decided, so at +7 handing back a queen for a rook
+  // "costs" a point or two and looked like a sound sacrifice. Like chess.com, a side already
+  // clearly winning gets no brilliant at all.
+  const sound = cls === "best" || drop < 2;
+  const decided = before.mate || pov(before, mover) >= BRILLIANT_MAX_CP;
+  if (sound && !decided && winAfter >= 50 && isSacrifice(fens[i], fens[i + 1], played)) return "brilliant";
   if (cls === "best" && before.second) {
     const gap = winBefore - winPct(before.second, mover);
     const recapture = i > 0 && lastMoves[i][1] === lastMoves[i - 1][1] && sans[i - 1].includes("x");
@@ -445,12 +452,12 @@ const evalFor = (cp: number, side: Color) => {
   return Math.abs(v) >= 9000 ? (v > 0 ? "a forced mate" : "mate against you") : (v >= 0 ? "+" : "") + (v / 100).toFixed(1);
 };
 
-/** How a bad move changed the game, from the mover's winning chances (or the eval, once decided). */
+/** How a bad move changed the game. Winning chances pick the words; the text gives the eval. */
 function lossSwing(before: number, after: number, side: Color): string {
   const [wb, wa] = [winAt(before, side), winAt(after, side)];
-  const chances = `winning chances ${wb}% → ${wa}%`;
+  const chances = `eval ${evalFor(before, side)} → ${evalFor(after, side)}`;
   if (wa === 0 && Math.abs(after) >= 9000) return `After this the game was lost (${chances}).`;
-  if (wb - wa < 10) return `You were already ${wb < 50 ? "worse" : "winning"}, but it gave away more (eval ${evalFor(before, side)} → ${evalFor(after, side)}).`;
+  if (wb - wa < 10) return `You were already ${wb < 50 ? "worse" : "winning"}, but it gave away more (${chances}).`;
   if (wb >= 65 && wa < 55) return `You were winning, and this threw the advantage away (${chances}).`;
   if (wa <= 15 && wb >= 30) return `After this the game was as good as lost (${chances}).`;
   if (wb >= 35 && wa < 35) return `The game was level, and after this you were clearly worse (${chances}).`;
@@ -505,11 +512,11 @@ function goodReason(game: Line, anns: Anns, i: number, punished: boolean): strin
     parts.push(
       `${moveLabel(game.fens[i - 1], game.sans[i - 1])} was a ${prev.class} by your opponent, and you made them pay` +
         (took && took !== "p" ? `, taking the ${PIECE[took]} on ${played.slice(2, 4)}` : "") +
-        ` (winning chances ${winAt(evalBeforeAt(anns, i - 1), mover)}% → ${winAt(a.evalAfter, mover)}%).`,
+        ` (eval ${evalFor(evalBeforeAt(anns, i - 1), mover)} → ${evalFor(a.evalAfter, mover)}).`,
     );
   } else {
     const w = winAt(a.evalAfter, mover);
-    parts.push(`It kept you ${w >= 60 ? "on top" : "in the game"} (winning chances ${w}%).`);
+    parts.push(`It kept you ${w >= 60 ? "on top" : "in the game"} (eval ${evalFor(a.evalAfter, mover)}).`);
   }
   return parts.join(" ");
 }

@@ -17,6 +17,32 @@ export interface GuideNote {
 
 type Notes = Record<number, string | [text: string, draw: string]>;
 
+// London from Black's side: the notes its lines share.
+const LON_BF4: [string, string] = ["2.Bf4 is the London. Hit d4 at once with the c-pawn, before White's setup is ready: the bishop on f4 has left b2 without its defender.", "r:d4 r:b2"];
+const LON_E3: [string, string] = ["3.e3 props up d4. Develop the queen's knight to its natural square, a second attacker on d4.", "r:d4"];
+const LON_NF3: [string, string] = ["4.Nf3. Develop the king's knight: it guards d5, which will matter in a moment.", "y:d5"];
+const LON_C3: [string, string] = ["3.c3 holds d4 before e3. The queen still has a target: b2 has no bishop behind it any more.", "r:b2"];
+const lonQb3 = (n: number): [string, string] => [
+  `${n}.Qb3 offers a queen trade. Don't take on b3 (that opens the a-file for White's rook): push the c-pawn past d4, gaining space with tempo on the queen.`,
+  "r:b3",
+];
+const LON_DXC5: [string, string] = ["3.dxc5 grabs the pawn. Don't hurry to win it back: open the f8 bishop's diagonal first; the c5 pawn isn't going anywhere.", "r:c5 y:f8c5"];
+// The London from White's side (punishing Black): the notes its lines share.
+const LW_BF4: [string, string] = ["The London: bring the dark-squared bishop out before e3 shuts it in.", "y:c1h6"];
+const LW_E6: [string, string] = ["3...e6. Develop the king's knight: it covers e5 and backs up d4.", "y:e5 y:d4"];
+const LW_NC6: [string, string] = ["3...Nc6. Develop the king's knight: it covers e5 and d4.", "y:e5 y:d4"];
+const LW_C5: [string, string] = ["3...c5 hits d4. Support it with the c-pawn and keep the pyramid whole.", "r:d4"];
+const lwBd6 = (n: number): [string, string] => [
+  `${n}...Bd6 offers to trade your London bishop. Keep it: drop it back on the same diagonal. If Black takes, the h-pawn takes back and your rook gets the h-file.`,
+  "r:d6 y:h1h8",
+];
+const lwCastled = (n: number): [string, string] => [`${n}...O-O. Black's king is on g8 now: aim your light bishop at h7.`, "y:d3h7 r:h7"];
+const lwBxg3 = (n: number): [string, string] => [
+  `${n}...Bxg3. Take back toward the edge: the h-file opens for your rook, aimed at h7 together with the d3 bishop.`,
+  "y:h1h7 r:h7",
+];
+const LON_NF3_3: [string, string] =["3.Nf3. Trade on d4: White has to take back with a piece, and a piece on d4 can be hit.", "r:d4"];
+
 const GUIDES: Record<string, Notes> = {
   // Orthodox 7.O-O Nc6: main lines to know.
   "King's Indian Defense: Mar del Plata, 10.f3 and the ...g5 storm": {
@@ -53,7 +79,7 @@ const GUIDES: Record<string, Notes> = {
   "King's Indian Defense: Orthodox, 8.Be3 Ng4 9.Bc1?": {
     8: ["8.Be3 guards d4 a third time. Hit the bishop with your f6 knight: White has to decide about it now, and the knight on g4 also eyes f2.", "r:e3 r:f2"],
     9: ["9.Bc1? retreats: the bishop no longer covers d4 or the diagonal to g1. With your f6 knight gone, a trade on d4 opens the g7 bishop's diagonal.", "y:g7d4 r:f2"],
-    10: ["Look along the diagonal from d4 to g1: once the d4 knight goes, your bishop lands there aimed straight at the king. Take on f2 first; Rxf2 walks into it.", "y:g7d4 y:d4g1 r:f2"],
+    10: ["Look along the diagonal from d4 to g1: once the d4 knight goes, your bishop lands there aimed straight at the king. Take on f2 first: after ...Nxf2 Rxf2, the rook stands on that diagonal too.", "y:g7d4 y:d4g1 r:f2"],
     11: ["The shot: take the d4 knight with the bishop. It wins the piece back and pins the f2 rook to the king.", "y:g7d4 y:d4g1 r:f2"],
     12: ["12.Qe1 holds the pinned rook. You're a pawn up: hit e4 with the f-pawn and open the f-file toward f2.", "y:f7f5 r:e4 r:f2"],
   },
@@ -62,7 +88,7 @@ const GUIDES: Record<string, Notes> = {
     8: ["8.Bg5 pins the f6 knight to the queen. Ask the bishop right away.", "r:g5 y:g5d8"],
     9: ["9.Bh4 keeps the pin. Break it for good with a pawn: it gains space too.", "r:h4 y:h4d8"],
     10: ["10.Bg3? looks natural, but now only the c3 knight guards e4. Trade on d4 first: then a knight capture on e4 also uncovers the g7 bishop.", "r:e4 y:g7d4"],
-    11: ["Now take on e4: the f6 knight leaves, and the g7 bishop hits the d4 knight. Nxe4 drops it to Bxd4.", "r:e4 r:d4 y:g7d4"],
+    11: ["Now take on e4: the f6 knight leaves, and the g7 bishop hits the d4 knight. If White takes back, ...Nxe4 Nxe4 Bxd4 leaves you a pawn up.", "r:e4 r:d4 y:g7d4"],
     12: ["12.Nxc6 hits your queen, but first take the c3 knight: your knight hits the queen and the e2 bishop, so White has to take back.", "r:c3 r:d8"],
     13: ["Now take back on c6. You're a pawn up, White's queenside pawns are split, and the g7 bishop looks straight at c3.", "y:g7c3 r:c3"],
   },
@@ -100,7 +126,7 @@ const GUIDES: Record<string, Notes> = {
     8: ["8.Be3 again: hit the bishop with your f6 knight, as in the Orthodox. White can't keep the bishop on e3 without giving something.", "r:e3"],
     9: ["9.Bg5 hits your queen. Step out of the pin to e8: from there the queen still guards e5 and doesn't block the f-pawn.", "r:g5 y:d8g5"],
     10: ["10.dxe5 opens the d-file. Take back with the pawn: e5 is your strong point, and d4 becomes a square for your pieces.", "r:e5 y:d4"],
-    11: ["11.h3 hits the g4 knight. Before it moves, kick the g5 bishop: if hxg4, then hxg5, and White has gained nothing.", "r:g5 r:g4"],
+    11: ["11.h3 hits the g4 knight. Before it moves, kick the g5 bishop: if White then takes on g4, you take on g5, and White has gained nothing.", "r:g5 r:g4"],
     12: ["12.Bd2 drops back. The knight goes back to f6, hitting e4. It's about equal, with the structure you want: the e5 pawn, the g7 bishop behind it, and ...Nc5 to come.", "r:e4 y:c5"],
   },
   "King's Indian Defense: Glek, 8.d5 Nc5": {
@@ -159,6 +185,219 @@ const GUIDES: Record<string, Notes> = {
     7: ["7.c3. With the bishop gone to f4, nothing guards b2: your queen can hit b2 and d4 at once.", "r:b2 r:d4"],
     8: ["8.Qb3 offers a queen trade. Don't take on b3 (that opens the a-file for White's rook): develop the bishop with tempo on the queen instead.", "r:b3"],
     9: ["9.Qxb6. Take back with the a-pawn: your rook gets the open a-file against a2. The position is equal and easy to play.", "y:a8a2 r:a2"],
+  },
+  // London System: punishing Black (White).
+  "London System: ...Bd6 and ...Nbd7?, Nxf7": {
+    4: LW_E6,
+    5: ["4...Nf6. Offer to trade light bishops on d3: your queen takes back and comes out.", "r:f5 y:d3"],
+    6: ["5...Bxd3. Take back with the queen.", "r:d3"],
+    7: ["6...c6. Develop the queen's knight behind the e5 square; the c-pawn stays free to back up d4.", "y:e5"],
+    8: ["7...Bd6 offers to trade your London bishop. Put the f3 knight on e5 first: it hits f7 and d7, and it stands between your f4 bishop and the d6 bishop.", "y:f4d6 r:f7"],
+    9: ["8...Nbd7? blocks Black's queen from guarding d6. Your e5 knight is all that stands between the f4 bishop and d6: move it with a capture.", "r:d6 y:f4d6 y:d8d6"],
+    10: ["9...Kxf7. Now take the d6 bishop: nothing can take back.", "r:d6"],
+  },
+  "London System: Queen's Indian, ...Nbd7? and Nxf7": {
+    2: LW_BF4,
+    3: ["2...e6. Build the pyramid: the e-pawn backs up d4 and opens the f1 bishop.", "y:d4"],
+    4: ["3...b6 heads for b7, aimed at e4. Develop the king's knight, which also covers e5.", "y:a8h1 y:e5"],
+    5: ["4...Bb7. Make a home for your f4 bishop first: without one, a black knight on h5 could take it.", "y:h5 r:f4"],
+    6: ["5...d5. Develop the light bishop to its best diagonal, aimed at h7.", "y:d3h7"],
+    7: ["6...c5 hits d4. Support it with the c-pawn and keep the pyramid whole.", "r:d4"],
+    8: ["7...Bd6 offers to trade your London bishop. Put the f3 knight on e5 first: it hits f7 and d7, and it stands between your f4 bishop and the d6 bishop.", "y:f4d6 r:f7"],
+    9: ["8...c4 hits your d3 bishop. Keep it on the b1-h7 diagonal.", "r:d3 y:b1h7"],
+    10: ["9...Nbd7? blocks Black's queen from guarding d6. Your e5 knight is all that stands between the f4 bishop and d6: move it with a capture.", "r:d6 y:f4d6 y:d8d6"],
+    11: ["10...Kxf7. Now take the d6 bishop: nothing can take back.", "r:d6"],
+  },
+  "London System: hxg3, ...Nxe5? and Bxh7+": {
+    5: lwBd6(4),
+    6: lwCastled(5),
+    7: ["6...Nc6. Develop the queen's knight to a square that backs up e4 and e5.", "y:e4 y:e5"],
+    8: lwBxg3(7),
+    9: ["8...Re8 gets ready for ...e5. Jump into e5 first: the knight blocks the e-pawn and eyes f7.", "y:e5 r:f7"],
+    10: ["9...Nxe5? Take back with the pawn: it hits the f6 knight, the piece that guards h7.", "r:f6 r:h7"],
+    11: ["10...Nd7. With the f6 knight gone, only the king guards h7, and your rook stands behind it on the h-file. Take with check.", "r:h7 y:h1h7"],
+    12: ["11...Kf8. Bring the queen to the h-file: the h7 bishop is safe, and queen, rook and bishop all aim at Black's king.", "y:h1h8 r:f8"],
+  },
+  "London System: hxg3, ...Nxd2? and Bxh7+": {
+    4: LW_NC6,
+    5: ["4...e6. Build the pyramid with the c-pawn: it backs up d4.", "y:d4"],
+    6: lwBd6(5),
+    7: lwCastled(6),
+    8: lwBxg3(7),
+    9: ["8...Ne4 sits on a strong square, hitting g3 and f2. Challenge it with the queen's knight.", "y:e4"],
+    10: ["9...Nxd2? took the knight, but the e4 knight was what blocked your d3 bishop from h7. Before taking back, take on h7 with check: your rook is behind it on h1.", "r:h7 y:h1h7 y:d3h7"],
+    11: ["10...Kh8. Now take back on d2. The h7 bishop is safe, guarded by the rook, and Black's king sits in line for a discovered check.", "y:h1h8 r:d2"],
+  },
+  "London System: hxg3, g4-g5 and ...hxg5?": {
+    5: lwBd6(4),
+    6: lwBxg3(5),
+    7: lwCastled(6),
+    8: ["7...Nbd7. The f6 knight is h7's best defender. Push the g-pawn at it: from g5 it would kick the knight away.", "r:f6 y:g5"],
+    9: ["8...h6 guards g5, but your g-pawn is backed by the f3 knight. Push it anyway: if Black takes, the h-file opens wider.", "r:h6 y:h1h8"],
+    10: ["9...hxg5? opens the h-file. Take back with the knight: it eyes h7 and e6, and your rook, bishop and queen all point at Black's king.", "y:h1h8 r:h7"],
+  },
+  "London System: ...Qb6 and ...c4, 6...Bf5? Qxf5": {
+    4: LW_C5,
+    5: ["4...Qb6 hits b2, which your f4 bishop no longer guards. Meet it queen to queen: if Black trades, the a-file opens for your rook.", "r:b2"],
+    6: ["5...c4 hits your queen. Keep it on the b1-h7 diagonal, where it still guards b2 along the second rank.", "r:c4 y:b1h7"],
+    7: ["6...Bf5? attacks your queen, but nothing guards it: take it. If Black then grabs b2, your queen checks on c8, where the b8 knight stops the a8 rook from covering.", "r:f5 y:f5c8"],
+    8: ["7...e5 tries to open lines. Take: you're a piece up, and the pawn on e5 hits the f6 knight.", "r:e5 r:f6"],
+  },
+  "London System: ...Qb6 and ...Qxc5?, Qxb7": {
+    4: LW_C5,
+    5: ["4...Nc6 adds to d4. Develop the queen's knight where it backs up e4; the c-pawn already holds d4.", "y:e4"],
+    6: ["5...Qb6 hits b2. Meet it queen to queen: if Black trades, the a-file opens for your rook.", "r:b2"],
+    7: ["6...Bf5. Take on c5: it's the base of Black's pressure, and if the queen takes back, look at b7.", "r:c5 r:b7"],
+    8: ["7...Qxc5? left b7 with no defender. Take it: your queen hits the a8 rook and the c6 knight.", "r:b7 r:a8"],
+    9: ["8...Rc8 saves the rook. Kick Black's queen with the d2 knight: it can't stay on c5.", "r:c5"],
+    10: ["9...Qb6 offers a trade. Take: you're a clean pawn up, and the endgame is easy.", "r:b6"],
+  },
+  "London System: King's Indian, ...e5? and the e5 pawn": {
+    2: LW_BF4,
+    3: ["2...g6 heads for a King's Indian. Build the pyramid: the e-pawn backs up d4 and opens the f1 bishop.", "y:d4"],
+    4: ["3...Bg7 aims at d4 and b2. Develop the king's knight, which also covers e5.", "y:g7b2 y:e5"],
+    5: ["4...O-O. Develop the light bishop modestly: on d3 it would be hit by ...e5-e4.", "y:d3"],
+    6: ["5...d6 prepares ...e5, which will hit your f4 bishop. Make it a retreat square first.", "r:f4 y:h2"],
+    7: ["6...Nc6 backs up ...e5. Castle: your king is safe and you're ready for the break.", "y:e5"],
+    8: ["7...e5? comes before Black can hold it. Count the attackers on e5 after a trade there: your knight, your bishop, and your queen against Black's on the d-file.", "r:e5 y:d1d8"],
+    9: ["8...dxe5. Only the c6 knight guards e5, and the queens face each other on the d-file. Take the pawn.", "r:e5 y:d1d8"],
+    10: ["9...Nxe5. Trade queens first, so Black has no queen trade of its own to save the e5 knight with.", "y:d1d8 r:e5"],
+    11: ["10...Rxd8. Now take the e5 knight: you've won a pawn.", "r:e5"],
+  },
+  "London System: Bb5 and Ne5, ...bxc6? Bxc6+": {
+    4: LW_NC6,
+    5: ["4...Bf5 copies your setup. Pin the c6 knight: a knight on e5 can then pile up on it.", "r:c6 y:b5e8"],
+    6: ["5...e6. Jump into e5: the knight hits c6 a second time, and the pin keeps it there.", "r:c6"],
+    7: ["6...Bd6 offers to trade your London bishop. Take on c6 first: Black has to take back, and look at the long diagonal to a8.", "r:c6 y:c6a8"],
+    8: ["7...bxc6? opened the diagonal: your b5 bishop takes c6 with check, and the a8 rook is behind it.", "r:c6 y:c6a8"],
+    9: ["8...Ke7. Take the rook.", "r:a8"],
+  },
+  "London System: Mirror, ...c5 Bb5+ and ...a6?": {
+    4: LW_E6,
+    5: ["4...c5 hits d4. Check from b5 first: Black has to block, and a piece on d7 gets in the way.", "y:b5e8"],
+    6: ["5...Nd7 blocks. Hit d5 with the c-pawn: Black's pieces are tangled, so open the centre.", "r:d5"],
+    7: ["6...a6? asks the bishop, but taking on d7 brings Black's queen there, and your knight comes to e5 with tempo.", "r:d7 y:e5"],
+    8: ["7...Qxd7. Hit the queen with the f3 knight: from e5 it also eyes f7.", "r:d7 r:f7"],
+    9: ["8...Qd8. Check on the a4-e8 diagonal: nothing can block, so Black's king has to move.", "y:a4e8"],
+    10: ["9...Ke7. Open the centre at Black's king: take on d5.", "r:d5 r:e7"],
+  },
+  // London System: punishing White. Main lines to know.
+  "London System: ...c5 and ...Qb6, 6.Qc2 e5": {
+    2: LON_BF4,
+    3: LON_E3,
+    4: ["4.c3 holds d4 a third time. Now the queen: b2 has no bishop behind it, and from the right square the queen hits b2 and d4 together.", "r:b2 r:d4"],
+    5: lonQb3(5),
+    6: ["6.Qc2 watches f5, and with d5 unguarded your light bishop can't go there yet. Strike in the centre instead: a pawn offer that hits the f4 bishop and opens the c8 bishop's diagonal.", "r:f4 y:c2h7"],
+    7: ["7.dxe5 takes the pawn. Now the bishop comes out with tempo on the c2 queen.", "r:c2 y:c8h3"],
+    8: ["8.Qc1 steps back to guard b2. Hit the e5 pawn with the f-pawn: you win it back, or White spends more time holding it.", "r:e5"],
+  },
+  "London System: ...c5 and ...Qb6, 6.Qxb6 axb6": {
+    2: LON_BF4,
+    3: LON_E3,
+    4: ["4.c3 holds d4 a third time. Now the queen: b2 has no bishop behind it, and from the right square the queen hits b2 and d4 together.", "r:b2 r:d4"],
+    5: lonQb3(5),
+    6: ["6.Qxb6 trades queens. Take back with the pawn: your rook gets the a-file, aimed at a2.", "y:a8a2 r:a2"],
+  },
+  "London System: ...c5 and ...Qb6 with Nf3, 7.Qc2 Bf5": {
+    2: LON_BF4,
+    3: LON_E3,
+    4: LON_NF3,
+    5: ["5.c3 holds d4. The queen goes after b2, which the f4 bishop no longer guards.", "r:b2"],
+    6: lonQb3(6),
+    7: ["7.Qc2 watches f5. But your f6 knight guards d5, so the light bishop can go there anyway: if the queen takes it, your queen takes b2 and the a1 rook goes too.", "y:f6d5 r:b2 y:c2h7"],
+    8: ["8.Qc1 drops back to guard b2. Shore up d5 with the e-pawn, which also opens the f8 bishop.", "y:d5"],
+  },
+  "London System: ...c5, 5.Nbd2 cxd4 and ...Bf5": {
+    2: LON_BF4,
+    3: LON_E3,
+    4: LON_NF3,
+    5: ["5.Nbd2 skips c3. Trade on d4 first: once the e-pawn takes back, the London bishop loses its e3 support.", "r:d4"],
+    6: ["6.exd4. With White's e-pawn gone, your light bishop's diagonal is open: develop it before ...e6 shuts it in.", "y:b1h7"],
+  },
+  "London System: 3.dxc5 e6 and ...f6": {
+    2: LON_BF4,
+    3: LON_DXC5,
+    4: ["4.e3. Take the pawn back with the bishop: developed, with the pawn regained.", "r:c5"],
+    5: ["5.c3 keeps your bishop off b4 and d4. Develop the king's knight where it doesn't block the f-pawn: you want the f-pawn to support a big centre.", "y:f6 y:e5"],
+    6: ["6.Nf3 watches e5. Support the e5 square with the f-pawn; then the e-pawn can go forward and hit the f4 bishop.", "y:e5 r:f4"],
+  },
+  "London System: Jobava-style 4.Nc3 a6": {
+    2: LON_BF4,
+    3: LON_E3,
+    4: ["4.Nc3 is the Jobava setup: Nb5 next would hit c7, where the f4 bishop also aims. Take b5 away from the knight.", "y:b5 r:c7"],
+    5: ["5.Nf3. A solid pawn move: it holds d5 and opens the f8 bishop.", "y:d5"],
+  },
+  // London System: punishing White. Natural moves that lose something.
+  "London System: ...c5, 4.Nd2? cxd4 and ...Nxd4": {
+    2: LON_BF4,
+    3: LON_E3,
+    4: ["4.Nd2? looks like normal London development, but the knight stands between the queen and d4. Count the defenders of d4 after a trade there.", "y:d1d4 r:d4"],
+    5: ["5.exd4. Now d4 has no defender: the queen can't see through the d2 knight. Take it.", "r:d4 r:d2"],
+    6: ["6.Ngf3 hits your knight. Bring it back to its first square; you're a clean pawn up.", "r:d4"],
+  },
+  "London System: ...c5 and ...Qb6 with Nf3, 8.Qxf5? Qxb2": {
+    2: LON_BF4,
+    3: LON_E3,
+    4: LON_NF3,
+    5: ["5.c3 holds d4. The queen goes after b2, which the f4 bishop no longer guards.", "r:b2"],
+    6: lonQb3(6),
+    7: ["7.Qc2 watches f5. But your f6 knight guards d5, so the light bishop can go there anyway: if the queen takes it, your queen takes b2 and the a1 rook goes too.", "y:f6d5 r:b2 y:c2h7"],
+    8: ["8.Qxf5? takes the bishop. Now the point: b2 is unguarded, with the a1 rook and the b1 knight behind it.", "r:b2 r:a1 r:b1"],
+  },
+  "London System: 3.Nf3 cxd4 4.Nxd4 Nd7 5.e3?": {
+    2: LON_BF4,
+    3: LON_NF3_3,
+    4: ["4.Nxd4. The knight on d4 and the bishop on f4 stand side by side, one pawn push from a fork. Get ready for it with a knight move that guards e5.", "y:e5 r:d4 r:f4"],
+    5: ["5.e3? does nothing against your idea: fork the bishop and the knight with the e-pawn.", "r:d4 r:f4"],
+    6: ["6.Bg3 saves the bishop. Take the knight.", "r:d4"],
+    7: ["7.Qxd4. You're a piece up for a pawn: develop the last knight, and keep your d5 pawn guarded.", "y:d5"],
+  },
+  "London System: 3.Nf3 cxd4 4.Qxd4 Nc6 5.Qa4 Bd7 6.e3?": {
+    2: LON_BF4,
+    3: LON_NF3_3,
+    4: ["4.Qxd4 takes back with the queen. Develop with tempo: a knight that hits it.", "r:d4"],
+    5: ["5.Qa4 pins your c6 knight to the king. Break the pin with the light bishop, which then lines up on the queen behind the knight.", "y:a4e8"],
+    6: ["6.e3? lets your e-pawn come with tempo on the f4 bishop. Remember the c6 knight is all that screens your d7 bishop from the a4 queen.", "r:f4 y:d7a4"],
+    7: ["7.Bg3. Now move the knight with a threat of its own: it uncovers the d7 bishop on the queen, and from the centre it hits c2 and f3.", "y:d7a4 r:c2 r:f3"],
+    8: ["8.Qxd7+ gives the queen for the bishop. Take back.", "r:d7"],
+    9: ["9.exd4 takes the knight. Take back with the pawn: queen against two minor pieces.", "r:d4"],
+  },
+  "London System: 3.c3 Qb6 4.Qc2 cxd4 and 7.Bd3?": {
+    2: LON_BF4,
+    3: LON_C3,
+    4: ["4.Qc2 guards b2 along the second rank. Trade on d4 first, opening the c-file toward the c2 queen.", "y:c8c2"],
+    5: ["5.cxd4. Develop the knight, adding to d4.", "r:d4"],
+    6: ["6.e3. The queen on c2 shares a diagonal with f5: develop the light bishop there with tempo. If the queen takes it, b2 falls with the a1 rook behind.", "y:c2h7 r:b2"],
+    7: ["7.Bd3? offers a trade, but trading on d3 pulls White's queen off the second rank, away from b2.", "y:f5d3 r:b2"],
+    8: ["8.Qxd3. b2 is loose, but taking it at once lets White's queen come to c3 and offer a trade. Push the e-pawn first, with tempo on the f4 bishop.", "r:f4 r:b2"],
+    9: ["9.Bxe5 takes the pawn. Now take b2: the queen hits the a1 rook and the b1 knight.", "r:b2 r:a1 r:b1"],
+  },
+  "London System: 3.c3 Qb6 4.b3 and 8.Nd2?": {
+    2: LON_BF4,
+    3: LON_C3,
+    4: ["4.b3 stops the queen taking b2 for good, but it loosens c3 and the a5-e1 diagonal. Trade on d4.", "y:a5e1 r:d4"],
+    5: ["5.cxd4. The light bishop comes out before ...e6 shuts it in.", "y:b1h7"],
+    6: ["6.e3. Now hold d5 with the e-pawn, which also opens the f8 bishop.", "y:d5"],
+    7: ["7.Bd3 offers a bishop trade. Look at the a5-e1 diagonal that b3 opened: a check there makes White block.", "y:a5e1"],
+    8: ["8.Nd2? blocks the check but cuts the d1 queen off from the d3 bishop. Take it.", "y:d1d3 r:d3"],
+  },
+  "London System: 3.dxc5 e6 4.b4? Qf6": {
+    2: LON_BF4,
+    3: LON_DXC5,
+    4: ["4.b4? holds the c5 pawn but takes the b-pawn off the long diagonal. Look at the a1 rook and the f4 bishop: one queen move hits both.", "r:a1 r:f4 y:f6a1"],
+    5: ["5.Bxb8 grabs your knight. Take the rook first.", "r:a1"],
+    6: ["6.Bg3 saves the bishop. Pick up the a-pawn too; your queen is safe there for now.", "r:a2"],
+  },
+  "London System: 3.dxc5 e6 and 8.Nxe5?": {
+    2: LON_BF4,
+    3: LON_DXC5,
+    4: ["4.e3. Take the pawn back with the bishop: developed, with the pawn regained.", "r:c5"],
+    5: ["5.c3 keeps your bishop off b4 and d4. Develop the king's knight where it doesn't block the f-pawn: you want the f-pawn to support a big centre.", "y:f6 y:e5"],
+    6: ["6.Nf3 watches e5. Support the e5 square with the f-pawn; then the e-pawn can go forward and hit the f4 bishop.", "y:e5 r:f4"],
+    7: ["7.Bd3. Now the e-pawn goes forward: it hits the f4 bishop, and the f6 pawn guards it.", "r:f4 y:e5"],
+    8: ["8.Nxe5? gives the knight for pawns. Take it: the check that follows only wins a second pawn.", "r:e5"],
+    9: ["9.Qh5+. Block with the g-pawn.", "r:h5 y:h5e8"],
+    10: ["10.Qxe5 hits your e7 knight. Castle: the king is safe and the rook comes to the open f-file.", "r:e7 y:f8f2"],
   },
 };
 

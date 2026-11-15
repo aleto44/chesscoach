@@ -1,5 +1,5 @@
 // Opening book: the common named lines, used to name games, steer the opponent into an opening the
-// student wants to practice, answer the coach's book_lookup and build repertoire drills.
+// student wants to practice, and answer the coach's book_lookup.
 // Every line is checked for legality by scripts/check-book.mjs.
 import { TRAINING_SETS } from "./training";
 

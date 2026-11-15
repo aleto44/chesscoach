@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { loadAccounts, useAccounts } from "../games/import";
 import { startDrills } from "../analysis/drillSession";
 import { useBacklog } from "../analysis/review";
-import { go, useNav } from "../nav";
+import { go } from "../nav";
 import { startPuzzles } from "../puzzles/session";
 import { themeLabel, usePuzzleDb } from "../puzzles/puzzles";
 import { fromLichess, POOL_LABEL, RATING_POOLS, signed, type RatingPool } from "../rating";
@@ -15,16 +15,13 @@ import { BarRows, Meter, StackBar, scoreColor } from "./Bars";
 import { LineChart, Legend, type ChartSeries } from "./Chart";
 import { BLOCKED, Tile, useRead, useSessionsBlocked } from "./Home";
 import { ImportDialog } from "./ImportDialog";
-import { GamesDialog } from "./GameDialogs";
 
 const OFFLINE = "Your games are on the computer; open the app there or from the home server.";
 
 // ---- The menu ----
 
 export function ProfileMenu() {
-  // Back from a saved game reopens the list it was picked from.
-  const [dialog, setDialog] = useState<"import" | "saved" | null>(() => (useNav.getState().openSaved ? "saved" : null));
-  useEffect(() => void (useNav.getState().openSaved && useNav.setState({ openSaved: false })), []);
+  const [importing, setImporting] = useState(false);
   const backlog = useBacklog();
   const accounts = useAccounts((s) => s.list?.filter((a) => a.account).length ?? 0);
   useEffect(() => void loadAccounts().catch(() => undefined), []);
@@ -63,7 +60,7 @@ export function ProfileMenu() {
           onClick={() => go("weaknesses")}
         />
         <Tile icon="↗" title="Rating history" sub="Bullet, blitz, rapid, puzzle, chess.com and Lichess ratings over time" onClick={() => go("ratings")} />
-        <Tile icon="☰" title="Saved games" sub="Every game: open, review or delete" onClick={() => setDialog("saved")} />
+        <Tile icon="☰" title="Saved games" sub="Every game, filtered by site and type, with games and results over time" onClick={() => go("saved-games")} />
         <Tile
           icon="⇩"
           title="Import games"
@@ -74,11 +71,10 @@ export function ProfileMenu() {
                 ? `${accounts} account${accounts > 1 ? "s" : ""}: get new games, add or remove`
                 : "Your games from chess.com and Lichess"
           }
-          onClick={() => setDialog("import")}
+          onClick={() => setImporting(true)}
         />
       </div>
-      {dialog === "import" && <ImportDialog onClose={() => setDialog(null)} />}
-      {dialog === "saved" && <GamesDialog onClose={() => setDialog(null)} />}
+      {importing && <ImportDialog onClose={() => setImporting(false)} />}
     </>
   );
 }

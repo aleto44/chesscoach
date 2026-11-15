@@ -1,4 +1,4 @@
-/* Coaching features: repertoire, quizzes, nudges, promotion picker. */
+/* Coaching features: quizzes, nudges, promotion picker. */
 
 button.link {
   border: none;
@@ -17,27 +17,6 @@ button.link {
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--text);
-}
-
-.rep-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-
-.rep-add {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.rep-add select {
-  flex: 1;
-  min-width: 0;
 }
 
 /* ask_move quizzes */
@@ -1012,26 +991,135 @@ button.link {
   resize: vertical;
 }
 
-/* Opening training: side, then opening. Wraps on phones. */
-.opening-pick {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.opening-pick .segmented {
+/* Opening training: side, then an opening card, then the opening's own panel with its ways to train. */
+.opening-side {
   flex-wrap: wrap;
 }
-/* The ways to train the picked opening sit under it, indented and smaller, so they read as its sub-choice. */
-.opening-pick .opening-modes {
-  align-items: center;
-  margin-left: 14px;
-  padding-left: 10px;
-  border-left: 2px solid var(--border);
+.opening-side button {
+  padding: 8px 18px;
+  font-weight: 600;
 }
-.opening-pick .opening-modes button {
-  font-size: 0.9em;
-  padding: 4px 10px;
+.opening-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+.opening-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  text-align: left;
+}
+.opening-card:hover {
+  border-color: var(--accent);
+}
+.opening-card.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.opening-card-name {
+  font-weight: 600;
+  font-size: 15px;
+}
+.mode-chip {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+/* The picked opening's panel: everything below is about this opening. */
+.opening-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.opening-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.opening-detail-title {
+  margin: 0;
+  font-size: 18px;
+}
+.opening-modes {
+  flex-wrap: wrap;
+}
+.opening-mode-help {
+  margin: -4px 0 0;
+}
+/* The main action, with the one setting that shapes it beside it. */
+.opening-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+.opening-start > button {
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.opening-mistakes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 220px;
+}
+.opening-mistakes input {
+  flex: 1;
+}
+/* Lines as plain buttons: a dot for how common, the name, and "new" until tried. */
+.opening-lines {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px;
+}
+.opening-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  border-radius: 8px;
+}
+.opening-line:hover {
+  border-color: var(--accent);
+}
+.opening-line-name {
+  flex: 1;
+  min-width: 0;
+}
+/* How often a line comes up, where the eye ends each row. */
+.rarity {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.rarity.occasional {
+  background: transparent;
+  border: 1px solid var(--accent);
+}
+.rarity.rare {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
 }
 
 /* Trainers whose status can run to more lines under the board (the opening trainer's engine numbers,
@@ -2468,4 +2556,154 @@ button.link {
   .leak-table td:nth-child(2) {
     display: none;
   }
+}
+
+/* ---- Profile › Saved games ---- */
+.saved-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.source-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.source-chips button {
+  border-radius: 999px;
+  padding: 5px 12px 5px 8px;
+}
+.source-chips button.on {
+  border-color: var(--accent);
+}
+.source-chips button.off {
+  opacity: 0.6;
+}
+.chip-check {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  border-radius: 4px;
+  border: 1.5px solid var(--muted);
+  font-size: 11px;
+  vertical-align: -3px;
+}
+.source-chips button.on .chip-check {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.saved-search {
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  min-width: 0;
+  flex: 1 1 200px;
+  max-width: 320px;
+}
+.link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+}
+.link-button:hover {
+  text-decoration: underline;
+}
+.saved-list {
+  overflow: visible;
+}
+
+.columns-chart {
+  margin: 4px 0 8px;
+}
+.columns-plot {
+  position: relative;
+  height: 170px;
+  margin-left: 30px;
+  border-bottom: 1px solid var(--border);
+}
+.columns-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--border);
+  opacity: 0.7;
+}
+.columns-grid span {
+  position: absolute;
+  right: calc(100% + 6px);
+  top: -7px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.columns-bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+.columns-bar {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+.columns-bar:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.columns-bar:not(:disabled):hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.columns-bar:hover .bar-tip {
+  display: block;
+  white-space: nowrap;
+}
+.columns-bar.dim .columns-stack {
+  opacity: 0.35;
+}
+.columns-bar.picked {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.columns-stack {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1px;
+  max-width: 28px;
+  width: 100%;
+  margin: 0 auto;
+  border-radius: 3px 3px 0 0;
+  overflow: hidden;
+}
+.columns-stack > div {
+  min-height: 2px;
+}
+.columns-axis {
+  display: flex;
+  gap: 2px;
+  margin-left: 30px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.columns-axis span {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: visible;
+  white-space: nowrap;
 }

@@ -315,7 +315,7 @@ function NudgeNote({ signedIn }: { signedIn: boolean }) {
       <div>
         <strong>{n.severity === "blunder" ? "That looks like a blunder." : "That might be a mistake."}</strong>{" "}
         <span className="muted">
-          {n.san}: your chances went from {Math.round(n.before)}% to {Math.round(n.after)}%.
+          {n.san}: the eval went from {n.evalBefore} to {n.evalAfter} for you.
         </span>
         {n.showBest && best && <span> Better was {best}.</span>}
       </div>

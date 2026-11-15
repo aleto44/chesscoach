@@ -28,7 +28,7 @@ import { analysisPlay, openAnalysis } from "../analysis/layer";
 import { MaterialStrip } from "./Material";
 import { ModeBadge } from "./ModeBadge";
 import { PlayerCard } from "./Clock";
-import { GameReportPanel, LabelIcon, listLabel, ReviewBar, useGameReport, useMoment, useVerdict, VerdictLine } from "./Review";
+import { GameReportPanel, KeyMoments, LabelIcon, listLabel, ReviewBar, useGameReport, useMoment, useVerdict, VerdictLine } from "./Review";
 import { WhyButton } from "./Why";
 import { SquareText } from "./SquareText";
 import { RatingResult } from "./RatingResult";
@@ -36,6 +36,7 @@ import type { MoveLabel } from "../analysis/review";
 import { bestShape, useNudge } from "../coach/nudge";
 import { saveSetting, useSettings } from "../settings";
 import { signed } from "../rating";
+import { usePhone } from "../phone";
 
 /**
  * The board, with a side column like lichess's: the player at the top of the board, the moves and
@@ -82,6 +83,42 @@ export function BoardPanel() {
     // The review's badge on the square the last move went to.
     return verdict ? [...(drawn ?? []), verdict.badge] : drawn;
   }, [moment, nudge, nudgeShapes, tangent, line, ply, arrows, verdict, scenario]);
+
+  // The review's word on the move on screen: its verdict, then what went wrong and why (or the
+  // line's note). In the side column on desktop, under the board on phones.
+  const phone = usePhone();
+  // The student's own last move keeps its explanation over the opponent's slip that follows
+  // (the arrows still show the slip).
+  const ownFirst = moment && "opponent" in moment &&(verdict?.explain || verdict?.reason);
+  const why = fork ? null : moment && !ownFirst ? (
+    <div className="note moment">
+      <SquareText text={moment.text} at={game.fens[gamePly]} game={game} />
+      {moment.reason && (
+        <p className="moment-reason">
+          <SquareText text={moment.reason} at={game.fens[gamePly]} game={game} />
+        </p>
+      )}
+      <WhyButton i={gamePly} />
+    </div>
+  ) : verdict?.explain || verdict?.reason ? (
+    <div className="note moment">
+      {verdict.reason && (
+        <p className="moment-reason">
+          <SquareText text={verdict.reason} at={game.fens[gamePly - 1]} game={game} />
+        </p>
+      )}
+      <WhyButton i={gamePly - 1} />
+    </div>
+  ) : (
+    note && <div className="note">{note}</div>
+  );
+  const hasExplain = !!verdict || !!why;
+  const explain = (
+    <>
+      {verdict && <VerdictLine v={verdict} />}
+      {why}
+    </>
+  );
 
   const confirmResign = async () => {
     if (await askConfirm({ title: "Resign this game?", body: `${opponentLabel(meta)} wins.`, confirmLabel: "Resign", danger: true }))
@@ -152,6 +189,13 @@ export function BoardPanel() {
         </BoardSteps>
       </div>
 
+      {/* Phones: the key-moment arrows just under the board's own move buttons, above the note (whose
+          height changes from move to move), so they stay put under the thumb. */}
+      {phone && !tangent && <KeyMoments className="moments board-moments" />}
+
+      {/* Phones: right under the board, so the text and the squares it names are both on screen. */}
+      {phone && hasExplain && !(reportOpen && report && !tangent) && <div className="review-note">{explain}</div>}
+
       <aside className="game-side">
         <div className="game-head">
           {vsOpponent ? <ModeBadge mode={meta.mode} /> : <strong>Free play</strong>}
@@ -198,29 +242,7 @@ export function BoardPanel() {
                   <button onClick={() => goto(gamePly)}>Back to the game</button>
                 </div>
               )}
-              {verdict && <VerdictLine v={verdict} />}
-              {fork ? null : moment ? (
-                <div className="note moment">
-                  <SquareText text={moment.text} at={game.fens[gamePly]} game={game} />
-                  {moment.reason && (
-                    <p className="moment-reason">
-                      <SquareText text={moment.reason} at={game.fens[gamePly]} game={game} />
-                    </p>
-                  )}
-                  <WhyButton i={gamePly} />
-                </div>
-              ) : verdict?.explain || verdict?.reason ? (
-                <div className="note moment">
-                  {verdict.reason && (
-                    <p className="moment-reason">
-                      <SquareText text={verdict.reason} at={game.fens[gamePly - 1]} game={game} />
-                    </p>
-                  )}
-                  <WhyButton i={gamePly - 1} />
-                </div>
-              ) : (
-                note && <div className="note">{note}</div>
-              )}
+              {!phone && explain}
             </>
           )}
           <ReviewBar />
@@ -302,8 +324,14 @@ export function MoveList({
     const el = list.current;
     const current = el?.querySelector<HTMLElement>(".mv.current");
     if (!el) return;
-    if (current) current.scrollIntoView({ block: "nearest" });
-    else if (ply === 0) el.scrollTop = 0;
+    // Scrolls the list only: scrollIntoView would also scroll the phone's page, dragging the board
+    // off screen a little more with every move.
+    if (current) {
+      const r = current.getBoundingClientRect();
+      const box = el.getBoundingClientRect();
+      if (r.top < box.top) el.scrollTop += r.top - box.top;
+      else if (r.bottom > box.bottom) el.scrollTop += r.bottom - box.bottom;
+    } else if (ply === 0) el.scrollTop = 0;
   }, [ply, sans.length]);
 
   if (sans.length === 0) return <div className="moves empty">No moves yet. Drag a piece to play.</div>;
