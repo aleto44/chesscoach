@@ -180,7 +180,15 @@ async function reconcile() {
     const rec = byKind[kind];
     const here = STORES[kind].getState();
     const mine = saved.joined[kind];
-    if (mine === undefined && !ALWAYS.includes(kind)) continue;
+    if (mine === undefined && !ALWAYS.includes(kind)) {
+      // A session this device brought back on its own (from before a restart) is offered to the
+      // others, unless one of them has something going in that kind: then theirs stays.
+      if (here !== null && !rec?.state) {
+        saved.joined[kind] = rec?.version ?? 0;
+        void push(kind);
+      }
+      continue;
+    }
     if (here === null && !ALWAYS.includes(kind)) {
       // In it when this device last ran, but the session didn't come back here: offer it instead.
       if (mine !== undefined) saved.left[kind] = mine;
