@@ -194,6 +194,7 @@ async fn events(State(app): State<AppHandle>, headers: HeaderMap, Query(q): Quer
         .get("last-event-id")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<u64>().ok());
+    app.state::<Relay>().saw(&client, &via(&headers));
     let (missed, latest, rx) = app.state::<Relay>().subscribe(&client, after);
     let last = missed.last().map_or(latest, |m| m.seq).max(after.unwrap_or(0));
 
@@ -223,6 +224,7 @@ async fn invoke(State(app): State<AppHandle>, Path(cmd): Path<String>, headers: 
         .filter(|c| !c.is_empty())
         .unwrap_or("remote")
         .to_string();
+    app.state::<Relay>().saw(&client, &via(&headers));
     if cmd == "custom_sound" {
         return match arg::<String>(&args, "name").and_then(|name| sounds::read_sound(&app, &name)) {
             Ok(bytes) => ([(header::CONTENT_TYPE, "application/octet-stream")], bytes).into_response(),
@@ -233,6 +235,15 @@ async fn invoke(State(app): State<AppHandle>, Path(cmd): Path<String>, headers: 
         Ok(v) => Json(v).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
     }
+}
+
+/// How a client reached the server: its Tailscale address through `tailscale serve` (which says so
+/// in X-Forwarded-For), else plain http.
+fn via(headers: &HeaderMap) -> String {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .map_or_else(|| "http".to_string(), |ip| format!("https from {ip}"))
 }
 
 fn arg<T: DeserializeOwned>(args: &Value, key: &str) -> Result<T, String> {
@@ -247,6 +258,7 @@ fn out<T: Serialize>(r: Result<T, String>) -> Result<Value, String> {
 pub async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result<Value, String> {
     let st = || app.state::<db::Db>();
     match cmd {
+        "clients" => out(Ok(app.state::<Relay>().clients())),
         "server_info" => out(Ok(json!({
             "apiVersion": API_VERSION,
             "version": env!("CARGO_PKG_VERSION"),

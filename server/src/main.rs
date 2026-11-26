@@ -2,6 +2,7 @@
 //! `chesscoach-server backup DEST.db [--data DIR]` writes a consistent copy of the database (for the
 //! server's daily snapshot), safe while the server runs.
 //! `chesscoach-server pairing-code [--data DIR]` prints the code a new device pairs with.
+//! Which devices have talked to it since it started: the `clients` command (POST /api/invoke/clients).
 
 use std::path::PathBuf;
 

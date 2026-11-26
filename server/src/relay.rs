@@ -29,6 +29,8 @@ pub struct Relay {
     tx: broadcast::Sender<Msg>,
     log: Mutex<(u64, VecDeque<Msg>)>,
     owner: Mutex<String>,
+    /// Paired clients the server heard from: id -> (last call or stream open, ms; how they reached it).
+    seen: Mutex<std::collections::HashMap<String, (i64, String)>>,
 }
 
 impl Default for Relay {
@@ -40,11 +42,29 @@ impl Default for Relay {
             // nothing until the new count passes its old one.
             log: Mutex::new((crate::live::now_ms().max(0) as u64, VecDeque::new())),
             owner: Mutex::new(String::new()),
+            seen: Mutex::default(),
         }
     }
 }
 
 impl Relay {
+    /// Notes that a paired client called or opened its event stream (`clients`, for "is my phone connected?").
+    pub fn saw(&self, client: &str, via: &str) {
+        if !client.is_empty() {
+            self.seen.lock().unwrap().insert(client.to_string(), (crate::live::now_ms(), via.to_string()));
+        }
+    }
+
+    /// Clients heard from since the server started, most recent first.
+    pub fn clients(&self) -> Vec<serde_json::Value> {
+        let mut all: Vec<_> = self.seen.lock().unwrap().iter().map(|(c, (at, via))| (c.clone(), *at, via.clone())).collect();
+        all.sort_by_key(|(_, at, _)| -at);
+        let now = crate::live::now_ms();
+        all.into_iter()
+            .map(|(client, at, via)| serde_json::json!({ "client": client, "secondsAgo": (now - at) / 1000, "via": via }))
+            .collect()
+    }
+
     pub fn owner(&self) -> String {
         self.owner.lock().unwrap().clone()
     }
