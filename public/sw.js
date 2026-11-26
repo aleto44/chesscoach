@@ -1,18 +1,18 @@
-// Service worker for the phone app (installed as a PWA from the home server). Games and the coach
-// need the computer; this makes the shell load fast and lets the app open without it, where
+// Service worker for the phone app (installed as a PWA from Chess Coach's server). Games and the coach
+// need the server; this makes the shell load fast and lets the app open without it, where
 // puzzles and drills run from the pack the phone keeps (src/offline.ts) with the engine files
 // cached here.
 const CACHE = "chesscoach-v1";
 
 /**
- * A response from the computer worth using. With the app down, Tailscale serve still answers
+ * A response from the server worth using. With the app down, Tailscale serve still answers
  * (502/503/504), and handing that to the page instead of the kept copy left a blank screen.
  */
 const usable = (res) => res.ok;
-/** Fetches from the computer, failing when it can't really answer, so callers fall back. */
+/** Fetches from the server, failing when it can't really answer, so callers fall back. */
 async function reach(req) {
   const res = await fetch(req);
-  if (res.status >= 500) throw new Error(`computer answered ${res.status}`);
+  if (res.status >= 500) throw new Error(`server answered ${res.status}`);
   return res;
 }
 
@@ -31,9 +31,9 @@ self.addEventListener("fetch", (e) => {
 
 /**
  * The page itself: the one kept from last time, at once, so reopening the app after the phone
- * dropped it doesn't wait on the computer. The computer's current page is fetched alongside and
+ * dropped it doesn't wait on the server. The server's current page is fetched alongside and
  * kept for next time; if it changed (the app was updated), the page is told so it can reload
- * while it's in the background (pwa.ts). With nothing usable kept, it waits for the computer.
+ * while it's in the background (pwa.ts). With nothing usable kept, it waits for the server.
  */
 async function page(e) {
   const fresh = reach(e.request).then(async (res) => {
@@ -56,7 +56,7 @@ async function page(e) {
 
 /**
  * Whether the build files a kept page loads are all kept too. An old page whose files were
- * dropped can't load them from the computer any more (a newer build replaced them).
+ * dropped can't load them from the server any more (a newer build replaced them).
  */
 async function assetsKept(res) {
   const html = await res.text();
@@ -86,8 +86,8 @@ async function networkFirst(req) {
 }
 
 /**
- * Shown when the computer can't answer and the phone has no copy of the app yet (first open, or
- * the copy was cleared). Tries again by itself, so it turns into the app once the computer is back.
+ * Shown when the server can't answer and the phone has no copy of the app yet (first open, or
+ * the copy was cleared). Tries again by itself, so it turns into the app once the server is back.
  */
 function unreachablePage() {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -98,8 +98,8 @@ main{height:100%;display:grid;place-content:center;gap:14px;text-align:center;pa
 .mark{font-size:56px;color:#6fbf7f}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#d9534f;margin-right:6px}
 button{font:inherit;padding:10px 20px;border-radius:8px;border:0;background:#6fbf7f;color:#1b1a18}
 small{color:#9a968f}</style></head><body><main>
-<div class="mark">♞</div><div><span class="dot"></span><b>Can't reach your computer</b></div>
-<small>Chess Coach isn't running on it, or it's asleep or off the network.<br>This page opens the app as soon as it answers.</small>
+<div class="mark">♞</div><div><span class="dot"></span><b>Can't reach the Chess Coach server</b></div>
+<small>Is Tailscale on? The server (laptop-server) may also be restarting or off the network.<br>This page opens the app as soon as it answers.</small>
 <div><button onclick="location.reload()">Try again</button></div>
 </main><script>
 setInterval(()=>fetch("/api/ping",{cache:"no-store"}).then(r=>r.status<500&&location.reload()).catch(()=>{}),5000);

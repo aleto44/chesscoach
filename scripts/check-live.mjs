@@ -2,12 +2,15 @@
 // phase 3): an update from one reaches the other within 500 ms, an update made from a stale version
 // (both acting at once, or a device back from offline) is refused and answered with the server's
 // state, and ending a session reaches the other too.
-// usage: node scripts/check-live.mjs <server url> <token> [--test-kinds]
+// usage: node scripts/check-live.mjs <server url> <token> [--test-kinds | --kinds=a,b]
 // --test-kinds uses "check-puzzle", "check-drill", ...: the same server code, but no device in a real
 // session is touched, so it's safe against the server in use.
 const [base = "http://localhost:8765", token, flag] = process.argv.slice(2);
 if (!token) throw new Error("usage: node scripts/check-live.mjs <server url> <token> [--test-kinds]");
-const KINDS = ["puzzle", "drill", "opening", "endgame", "guess", "plan", "trainer"].map((k) => (flag === "--test-kinds" ? `check-${k}` : k));
+// --kinds=drill,opening runs only those (e.g. the ones no device has open right now).
+const ALL = ["puzzle", "drill", "opening", "endgame", "guess", "plan", "trainer"];
+const only = flag?.startsWith("--kinds=") ? flag.slice(8).split(",") : null;
+const KINDS = (only ?? ALL).map((k) => (flag === "--test-kinds" ? `check-${k}` : k));
 const LIMIT_MS = 500;
 
 const call = async (client, cmd, args) => {
