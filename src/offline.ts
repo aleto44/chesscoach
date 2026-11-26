@@ -115,6 +115,22 @@ export function flushOutbox(): Promise<void> {
   return flushing;
 }
 
+/**
+ * PACK_PUZZLES around the student's rating. The server hands out at most 50 per call (a bigger
+ * random pick would hold the database longer), so the pack is filled in batches.
+ */
+async function packOfPuzzles(rating: number): Promise<Puzzle[]> {
+  const got: Puzzle[] = [];
+  while (got.length < PACK_PUZZLES) {
+    const batch = await invoke<Puzzle[]>("puzzle_find", {
+      filter: { themes: [], exclude: got.map((p) => p.id), opening: null, minRating: rating - 300, maxRating: rating + 300, limit: 50 },
+    });
+    got.push(...batch);
+    if (batch.length < 50) break;
+  }
+  return got.slice(0, PACK_PUZZLES);
+}
+
 /** Renews the pack while the server is reachable (at most every half hour). */
 export async function refreshPack(force = false) {
   if (!isRemote || (!force && Date.now() - pack.at < PACK_EVERY_MS)) return;
@@ -122,11 +138,7 @@ export async function refreshPack(force = false) {
     const { usePuzzleDb } = await import("./puzzles/puzzles");
     const db = usePuzzleDb.getState();
     const [puzzles, drills] = await Promise.all([
-      db.installed
-        ? invoke<Puzzle[]>("puzzle_find", {
-            filter: { themes: [], exclude: [], opening: null, minRating: db.rating - 300, maxRating: db.rating + 300, limit: PACK_PUZZLES },
-          })
-        : Promise.resolve([] as Puzzle[]),
+      db.installed ? packOfPuzzles(db.rating) : Promise.resolve([] as Puzzle[]),
       invoke<Drill[]>("db_due_drills", { limit: 200, all: true, tag: null, category: null }),
     ]);
     pack = { at: Date.now(), puzzles, drills };
