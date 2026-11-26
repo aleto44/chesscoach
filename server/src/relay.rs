@@ -35,7 +35,10 @@ impl Default for Relay {
     fn default() -> Self {
         Self {
             tx: broadcast::channel(256).0,
-            log: Mutex::new((0, VecDeque::new())),
+            // Numbered from the start time (ms), not 0, so ids keep growing across a restart: a
+            // client reconnecting with an id from before it gets everything since, instead of
+            // nothing until the new count passes its old one.
+            log: Mutex::new((crate::live::now_ms().max(0) as u64, VecDeque::new())),
             owner: Mutex::new(String::new()),
         }
     }

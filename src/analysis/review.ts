@@ -346,7 +346,7 @@ export async function analyzeGame(
         tags: a.tags,
       })),
     };
-    // A phone can lose the computer for a moment; the review shouldn't go with it.
+    // A device can lose the server for a moment; the review shouldn't go with it.
     await reliably("saving the analysis", () => invoke("db_save_analysis", args));
     // The other device then shows the review too, without analyzing the game again.
     notifyChanged(g.gameId);

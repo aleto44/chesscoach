@@ -1,5 +1,5 @@
 // The coach's read-only tools on the student's data: query_data (SQL over the database, run read-only
-// by src-tauri/src/coach_data.rs), opening_lines (the trainer's built-in lines, plans, move notes and
+// by server/src/coach_data.rs), opening_lines (the trainer's built-in lines, plans, move notes and
 // traps, which live in code) and training_progress (results the School trainers keep on this device).
 import { Chess } from "chess.js";
 import { invoke } from "../backend";

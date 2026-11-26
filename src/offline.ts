@@ -16,7 +16,7 @@ import type { NodeProgress } from "./openings/progress";
 
 const PACK_KEY = "cc-offline-pack";
 const OUTBOX_KEY = "cc-offline-outbox";
-/** How often the pack is renewed while the computer is reachable. */
+/** How often the pack is renewed while the server is reachable. */
 const PACK_EVERY_MS = 30 * 60_000;
 /** Puzzles kept for offline use: the desktop has room for more. */
 const PACK_PUZZLES = isShell ? 400 : 150;
@@ -50,7 +50,7 @@ function keep(key: string, value: unknown) {
 let pack: Pack = load(PACK_KEY, { at: 0, puzzles: [], drills: [] });
 let outbox: Sent[] = load(OUTBOX_KEY, []);
 
-/** Results waiting for the computer, for the offline note in the top bar. */
+/** Results waiting for the server, for the offline note in the top bar. */
 export const useOutbox = create<{ pending: number }>(() => ({ pending: outbox.length }));
 const saveOutbox = () => {
   keep(OUTBOX_KEY, outbox);
@@ -58,7 +58,7 @@ const saveOutbox = () => {
 };
 
 /**
- * Course answers given offline and not yet sent, by decision: kept on top of the map the computer
+ * Course answers given offline and not yet sent, by decision: kept on top of the map the server
  * sends (at boot, or merged from the other device) until they're through.
  */
 export function pendingCourse(): Record<string, NodeProgress> {
@@ -72,11 +72,11 @@ const usedPuzzles = new Set<string>(outbox.filter((s) => s.cmd === "puzzle_recor
 const usedDrills = new Set<number>(outbox.filter((s) => s.cmd === "db_grade_drill" || s.cmd === "db_retire_drill").map((s) => Number(s.args.id)));
 
 /**
- * Calls the computer; when it's out of reach (phones only), `offline` answers instead and, if
+ * Calls the server; when it's out of reach, `offline` answers instead and, if
  * the call changes something, it's queued for later.
  */
 export async function orOffline<T>(cmd: string, args: Record<string, unknown>, offline: () => T, queue = false): Promise<T> {
-  // Earlier offline writes go first, so the computer sees things in the order they happened.
+  // Earlier offline writes go first, so the server sees things in the order they happened.
   if (queue && outbox.length) {
     outbox.push({ cmd, args });
     saveOutbox();
@@ -96,7 +96,7 @@ export async function orOffline<T>(cmd: string, args: Record<string, unknown>, o
 }
 
 let flushing: Promise<void> | null = null;
-/** Sends the outbox, oldest first, stopping as soon as the computer is out of reach again. */
+/** Sends the outbox, oldest first, stopping as soon as the server is out of reach again. */
 export function flushOutbox(): Promise<void> {
   if (!isRemote || !outbox.length) return Promise.resolve();
   flushing ??= (async () => {
@@ -115,7 +115,7 @@ export function flushOutbox(): Promise<void> {
   return flushing;
 }
 
-/** Renews the pack while the computer is reachable (at most every half hour). */
+/** Renews the pack while the server is reachable (at most every half hour). */
 export async function refreshPack(force = false) {
   if (!isRemote || (!force && Date.now() - pack.at < PACK_EVERY_MS)) return;
   try {
@@ -171,7 +171,7 @@ export function packDrills(limit: number, all: boolean, tag: string | null, cate
     .filter((d) => !usedDrills.has(d.id))
     .filter((d) => !category || (d.category ?? d.kind) === category)
     .filter((d) => (tag ? d.kind === "mistake" && `, ${d.note ?? ""},`.includes(`, ${tag},`) : all || d.dueAt <= now));
-  // Due drills come shuffled, the way the computer gives them.
+  // Due drills come shuffled, the way the server gives them.
   if (!all && !tag) shuffle(picked);
   return picked.slice(0, limit);
 }
@@ -189,7 +189,7 @@ export function packDrillCounts() {
   return { total: left.length, due: left.filter((d) => d.dueAt <= now).length };
 }
 
-/** A graded drill's next date, guessed the way the computer schedules it (it decides on sync). */
+/** A graded drill's next date, guessed the way the server schedules it (it decides on sync). */
 export function gradedOffline(id: number, correct: boolean): string {
   usedDrills.add(id);
   const d = pack.drills.find((x) => x.id === id);

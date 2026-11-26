@@ -96,7 +96,7 @@ const DEFAULTS: Settings = {
   openingSeen: {},
 };
 
-/** The setting each rating pool lives in (rating_key in src-tauri/src/db.rs). */
+/** The setting each rating pool lives in (rating_key in server/src/db.rs). */
 export const RATING_KEYS = {
   bullet: "playerRatingBullet",
   blitz: "playerRatingBlitz",

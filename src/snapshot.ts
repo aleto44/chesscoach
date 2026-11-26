@@ -57,7 +57,7 @@ function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify(snap));
   } catch (e) {
-    // Full storage: the next launch just waits for the computer, as before.
+    // Full storage: the next launch just waits for the server, as before.
     console.warn("snapshot not saved", e);
   }
 }
@@ -147,6 +147,6 @@ export function keepRead(key: string, value: unknown) {
   try {
     localStorage.setItem(readKey(key), JSON.stringify(value));
   } catch {
-    // Full storage: the screen just waits for the computer.
+    // Full storage: the screen just waits for the server.
   }
 }

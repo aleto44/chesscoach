@@ -1,4 +1,4 @@
-// SQLite access (src-tauri/src/db.rs) and the store subscription that keeps it up to date.
+// SQLite access (server/src/db.rs) and the store subscription that keeps it up to date.
 import { hasBackend, invoke, Unreachable } from "./backend";
 import type { MoveAnnotation } from "./analysis/review";
 import type { Line } from "./chess/line";
@@ -83,7 +83,7 @@ export const db = {
     openingFocus: string[];
   }) =>
     invoke<number>("db_create_game", { game }).then((id) => (notifyChanged(id), id)),
-  /** Resolves once the change is saved, retrying while the computer is out of reach. */
+  /** Resolves once the change is saved, retrying while the server is out of reach. */
   updateGame: (id: number, patch: GamePatch) => {
     // A game played offline keeps its changes with it until it's sent (game/local.ts).
     if (isLocalGame(id)) return Promise.resolve(patchLocalGame(id, patch));
@@ -107,7 +107,7 @@ export type GamePatch = {
 };
 
 // ---- Writes that must not get lost ----
-// A phone's connection to the computer drops now and then (screen off, Wi-Fi or Tailscale
+// A device's connection to the server drops now and then (screen off, Wi-Fi or Tailscale
 // hiccup). A request lost then used to be gone for good: a resignation or a finished review
 // stayed on the phone, the desktop never heard of it, and a reload showed the game as before.
 
@@ -135,7 +135,7 @@ function pause(ms: number) {
   });
 }
 
-/** Runs a backend write, trying again with backoff while the computer can't be reached. */
+/** Runs a backend write, trying again with backoff while the server can't be reached. */
 export async function reliably<T>(what: string, write: () => Promise<T>): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -322,7 +322,7 @@ export async function flush() {
     dirtyChat.clear();
     return;
   }
-  // Each write with what to mark dirty again if it doesn't reach the computer.
+  // Each write with what to mark dirty again if it doesn't reach the server.
   const writes: { write: Promise<unknown>; redo: () => void }[] = [];
   if (dirtyMoves)
     writes.push({
@@ -348,7 +348,7 @@ export async function flush() {
   results.forEach((r, i) => {
     if (r.status === "fulfilled") return;
     console.error("save failed", r.reason);
-    // Only worth another try while it's still the open game and the computer was just out of reach.
+    // Only worth another try while it's still the open game and the server was just out of reach.
     if (r.reason instanceof Unreachable && useStore.getState().gameId === gameId) {
       writes[i].redo();
       retry = true;

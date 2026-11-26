@@ -34,6 +34,9 @@ pub struct Coach(Mutex<Option<(String, Box<dyn CoachBackend>)>>);
 /// Opens the database in `data` and starts the coach's tool server; the HTTP API is `remote::serve`.
 pub async fn start(data: PathBuf, web: Option<PathBuf>) -> Result<Ctx, String> {
     std::fs::create_dir_all(&data).map_err(|e| e.to_string())?;
+    // Absolute, since the coach runs with the data folder as its working folder and is handed
+    // paths inside it (`--data data` would otherwise point it at data/data/...).
+    let data = std::path::absolute(&data).map_err(|e| e.to_string())?;
     let db = db::Db::open(&data.join("chesscoach.db")).map_err(|e| format!("could not open the database: {e}"))?;
     let ctx = Ctx::new(Inner {
         remote: remote::Remote::load(&data, web),

@@ -333,7 +333,7 @@ export const useRatingResult = create<{ shown: { gameId: number; before: number;
   shown: null,
 }));
 
-/** The computer rated the game as it saved the result (db.rs rate_game): show what changed. */
+/** The server rated the game as it saved the result (db.rs rate_game): show what changed. */
 async function showRatingChange(gameId: number) {
   const record = await db.loadGame(gameId).catch(() => null);
   const g = record?.game;

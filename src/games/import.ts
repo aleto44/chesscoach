@@ -1,5 +1,5 @@
 // Importing the student's own games from chess.com and Lichess. The computer fetches them (both
-// sites' public APIs, src-tauri/src/import.rs); here each one is read from its PGN, given the
+// sites' public APIs, server/src/import.rs); here each one is read from its PGN, given the
 // student's side and both ratings on the chess.com scale, and saved as a finished rated game. The
 // review backlog then analyzes them like games played in the app, and mistakes become drills.
 import { create } from "zustand";

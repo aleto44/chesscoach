@@ -24,12 +24,12 @@ export const toLichess = (chessCom: number) => Math.round(convert(chessCom, 0, 1
 /** A Lichess rating (a puzzle's, the student's puzzle rating) as the chess.com rating shown to the student. */
 export const fromLichess = (lichess: number) => Math.round(convert(lichess, 1, 0));
 
-/** The student's game rating before they set one (Settings); START_RATING in src-tauri/src/db.rs. */
+/** The student's game rating before they set one (Settings); START_RATING in server/src/db.rs. */
 export const START_RATING = 1200;
 
 /**
  * Elo for a rated game: score 1 / 0.5 / 0. The computer applies it when the game ends
- * (elo_change in src-tauri/src/db.rs); this copy previews it in the new-game dialog.
+ * (elo_change in server/src/db.rs); this copy previews it in the new-game dialog.
  */
 export function eloChange(player: number, opponent: number, score: number, gamesSoFar: number): number {
   const expected = 1 / (1 + 10 ** ((opponent - player) / 400));
@@ -37,7 +37,7 @@ export function eloChange(player: number, opponent: number, score: number, games
   return Math.round(k * (score - expected));
 }
 
-/** The student has a rating per clock, like chess.com (RATING_POOLS in src-tauri/src/db.rs). */
+/** The student has a rating per clock, like chess.com (RATING_POOLS in server/src/db.rs). */
 export type RatingPool = "bullet" | "blitz" | "rapid";
 export const RATING_POOLS: RatingPool[] = ["bullet", "blitz", "rapid"];
 export const POOL_LABEL: Record<RatingPool, string> = { bullet: "Bullet", blitz: "Blitz", rapid: "Rapid" };
@@ -45,7 +45,7 @@ export const POOL_LABEL: Record<RatingPool, string> = { bullet: "Bullet", blitz:
 /**
  * Which rating a clock counts toward: chess.com's split by expected length (base + 40 moves of
  * increment), under 3 minutes bullet, under 10 blitz, else rapid. No clock counts as rapid.
- * Mirrors rating_pool in src-tauri/src/db.rs, which does the rating.
+ * Mirrors rating_pool in server/src/db.rs, which does the rating.
  */
 export function ratingPool(tc: { initial: number; increment: number } | null): RatingPool {
   if (!tc) return "rapid";

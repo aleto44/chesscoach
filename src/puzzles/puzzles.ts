@@ -1,4 +1,4 @@
-// Lichess puzzles (src-tauri/src/puzzles.rs): the downloaded set, the student's puzzle rating, and
+// Lichess puzzles (server/src/puzzles.rs): the downloaded set, the student's puzzle rating, and
 // the tag names shown in the UI and accepted from the coach.
 import { create } from "zustand";
 import { hasBackend, invoke, listen } from "../backend";

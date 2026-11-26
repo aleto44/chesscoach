@@ -1,4 +1,4 @@
-// Handlers for the tools declared in src-tauri/src/tools.rs.
+// Handlers for the tools declared in server/src/tools.rs.
 import { invoke } from "../backend";
 import { Chess } from "chess.js";
 import { buildLine, formatMoves, sideToMove, type Line } from "../chess/line";

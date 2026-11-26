@@ -1,4 +1,4 @@
-// Spaced-repetition drills (SM-2 scheduling lives in src-tauri/src/stats.rs). Mistake drills come
+// Spaced-repetition drills (SM-2 scheduling lives in server/src/stats.rs). Mistake drills come
 // from post-game analysis, coach drills from ask_move, puzzle drills from missed Lichess puzzles.
 // (Opening-line drills are gone: the old ones are retired.)
 import { gradedOffline, orOffline, packDrillCounts, packDrills, retiredOffline } from "../offline";

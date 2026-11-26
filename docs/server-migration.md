@@ -23,6 +23,11 @@ described in `/srv/README.md` on laptop-server (read it first: layout, snapshots
 - **The coach's Claude sign-in** lives in `/srv/services/chesscoach/claude` (the container's
   `CLAUDE_CONFIG_DIR`). Sign in from Settings in the app; server-watch warns (`coach_login`) when it's
   signed out or ends within 7 days.
+- **Checks** (against a running server, with its token from `remote.json`):
+  `node scripts/check-live.mjs <url> <token>` (two clients, every live-synced kind: delivery within
+  500 ms, stale and late-from-offline updates refused, ending) and
+  `node scripts/check-coach.mjs <url> <token>` (a coach turn with a tool call, through the server; needs
+  the server's Claude sign-in).
 - **Offline packs** stay in localStorage: 150 puzzles on phones, 400 on the desktop, plus the due
   drills, well under the 5 MB limit, so IndexedDB wasn't needed.
 

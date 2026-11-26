@@ -1,4 +1,4 @@
-// Claude sign-in state, backed by `claude auth` (src-tauri/src/auth.rs).
+// Claude sign-in state, backed by `claude auth` (server/src/auth.rs).
 import { invoke, listen, Unreachable } from "../backend";
 import { create } from "zustand";
 import { hasBackend } from "../db";

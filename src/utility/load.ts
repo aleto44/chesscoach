@@ -33,7 +33,7 @@ export interface LoadState {
   historyId: number | null;
 }
 
-/** One load (src-tauri/src/loads.rs), enough to show it again without reading the picture twice. */
+/** One load (server/src/loads.rs), enough to show it again without reading the picture twice. */
 export interface HistoryEntry {
   id: number;
   at: number;
