@@ -1,5 +1,5 @@
 diff --git a/node_modules/chessground/dist/drag.js b/node_modules/chessground/dist/drag.js
-index 2745f75..924932a 100644
+index 2745f75..86d8122 100644
 --- a/node_modules/chessground/dist/drag.js
 +++ b/node_modules/chessground/dist/drag.js
 @@ -20,11 +20,14 @@ export function start(s, e) {
@@ -21,63 +21,57 @@ index 2745f75..924932a 100644
      const hadPremove = !!s.premovable.current;
      const hadPredrop = !!s.predroppable.current;
      s.stats.ctrlKey = e.ctrlKey;
-diff --git a/node_modules/chessground/dist/draw.js b/node_modules/chessground/dist/draw.js
-index b0baae6..6f5592b 100644
---- a/node_modules/chessground/dist/draw.js
-+++ b/node_modules/chessground/dist/draw.js
-@@ -19,6 +19,24 @@ export function start(state, e) {
-     };
-     processDraw(state);
+@@ -47,6 +50,8 @@ export function start(s, e) {
+             previouslySelected,
+             originTarget: e.target,
+             keyHasChanged: false,
++            // chesscoach patch: a touch drag follows its own finger, never another one on the screen.
++            touchId: e.changedTouches ? e.changedTouches[0].identifier : undefined,
+         };
+         element.cgDragging = true;
+         element.classList.add('dragging');
+@@ -134,14 +139,25 @@ function processDrag(s) {
  }
-+/** Two-finger drawing: this touch draws; it is followed by its identifier, not as the first touch. */
-+export function startTouch(state, e, touch) {
-+    if (e.cancelable)
-+        e.preventDefault();
-+    cancelMove(state);
-+    const pos = [touch.clientX, touch.clientY], orig = getKeyAtDomPos(pos, whitePov(state), state.dom.bounds());
-+    if (!orig)
-+        return;
-+    state.drawable.current = {
-+        orig,
-+        pos,
-+        brush: 'green',
-+        snapToValidMove: state.drawable.defaultSnapToValidMove,
-+        touchId: touch.identifier,
-+    };
-+    processDraw(state);
-+}
+ export function move(s, e) {
+     // support one finger touch only
+-    if (s.draggable.current && (!e.touches || e.touches.length < 2)) {
+-        s.draggable.current.pos = util.eventPosition(e);
++    const cur = s.draggable.current;
++    if (cur && (!e.touches || e.touches.length < 2)) {
++        if (cur.touchId === undefined || !e.touches)
++            cur.pos = util.eventPosition(e);
++        else {
++            const t = findTouch(e.touches, cur.touchId);
++            if (t)
++                cur.pos = [t.clientX, t.clientY];
++        }
+     }
+ }
 +const findTouch = (list, id) => list && Array.prototype.find.call(list, t => t.identifier === id);
- export function processDraw(state) {
-     requestAnimationFrame(() => {
-         const cur = state.drawable.current;
-@@ -40,11 +58,22 @@ export function processDraw(state) {
-     });
- }
- export function move(state, e) {
--    if (state.drawable.current)
--        state.drawable.current.pos = eventPosition(e);
-+    const cur = state.drawable.current;
-+    if (!cur)
+ export function end(s, e) {
+     const cur = s.draggable.current;
+     if (!cur)
+         return;
++    // chesscoach patch: another finger lifting doesn't drop the piece being dragged.
++    if (e.changedTouches && cur.touchId !== undefined && !findTouch(e.changedTouches, cur.touchId))
 +        return;
-+    if (cur.touchId === undefined)
-+        cur.pos = eventPosition(e);
-+    else {
-+        const t = findTouch(e.touches, cur.touchId);
-+        if (t)
-+            cur.pos = [t.clientX, t.clientY];
-+    }
- }
--export function end(state) {
-+export function end(state, e) {
-     const cur = state.drawable.current;
-+    // Two-finger drawing: the holding finger lifting doesn't end the drawing.
-+    if (cur && cur.touchId !== undefined && e && !findTouch(e.changedTouches, cur.touchId))
-+        return;
-     if (cur) {
-         if (cur.mouseSq)
-             addShape(state.drawable, cur);
+     // create no corresponding mouse event
+     if (e.type === 'touchend' && e.cancelable !== false)
+         e.preventDefault();
+@@ -153,8 +169,9 @@ export function end(s, e) {
+     }
+     board.unsetPremove(s);
+     board.unsetPredrop(s);
+-    // touchend has no position; so use the last touchmove position instead
+-    const eventPos = util.eventPosition(e) || cur.pos;
++    // touchend has no position; so use the last touchmove position instead (chesscoach patch: a
++    // touchend's targetTouches are the fingers still down, so never read the drop square from them)
++    const eventPos = (e.changedTouches ? undefined : util.eventPosition(e)) || cur.pos;
+     const dest = board.getKeyAtDomPos(eventPos, board.whitePov(s), s.dom.bounds());
+     if (dest && cur.started && cur.orig !== dest) {
+         if (cur.newPiece)
 diff --git a/node_modules/chessground/dist/events.js b/node_modules/chessground/dist/events.js
-index 1ea7318..929da52 100644
+index 1ea7318..6eaa8fe 100644
 --- a/node_modules/chessground/dist/events.js
 +++ b/node_modules/chessground/dist/events.js
 @@ -2,6 +2,7 @@ import * as drag from './drag.js';
@@ -100,25 +94,10 @@ index 1ea7318..929da52 100644
  }
  // returns the unbind function
  export function bindDocument(s, onResize) {
-@@ -35,6 +41,43 @@ export function bindDocument(s, onResize) {
+@@ -35,6 +41,28 @@ export function bindDocument(s, onResize) {
              unbinds.push(unbindable(document, ev, onmove));
          for (const ev of ['touchend', 'mouseup'])
              unbinds.push(unbindable(document, ev, onend));
-+        const onTouchEnd = e => {
-+            const lifted = Array.prototype.map.call(e.changedTouches, t => t.identifier);
-+            // A finger that lifted wasn't holding for a drawing; phones reuse touch ids, so a later
-+            // finger with the same id must not bring back the drawings this one erased.
-+            if (s.drawable.held && lifted.includes(s.drawable.held.touchId))
-+                s.drawable.held = undefined;
-+            const holding = s.drawable.holding;
-+            if (!holding || !holding.length)
-+                return;
-+            if (lifted.some(id => holding.includes(id)) && e.cancelable)
-+                e.preventDefault();
-+            s.drawable.holding = holding.filter(id => !lifted.includes(id));
-+        };
-+        for (const ev of ['touchend', 'touchcancel'])
-+            unbinds.push(unbindable(document, ev, onTouchEnd, { capture: true, passive: false }));
 +        // A cancelled touch ends no move: drop the drag or drawing it started, so it can't swallow
 +        // the next touch.
 +        unbinds.push(unbindable(document, 'touchcancel', () => {
@@ -131,7 +110,7 @@ index 1ea7318..929da52 100644
 +                    setSelected(s, cur.orig);
 +            }
 +            if (s.drawable.current)
-+                draw.cancel(s);
++                draw.cancel(s, 'touchcancel');
 +        }, { passive: true }));
 +        // Holding a piece still mustn't open the phone's long-press menu, text selection or a
 +        // native drag: any of them cancels the touch, and the piece drops.
@@ -144,7 +123,7 @@ index 1ea7318..929da52 100644
          const onScroll = () => s.dom.bounds.clear();
          unbinds.push(unbindable(document, 'scroll', onScroll, { capture: true, passive: true }));
          unbinds.push(unbindable(window, 'resize', onScroll, { passive: true }));
-@@ -45,12 +88,44 @@ function unbindable(el, eventName, callback, options) {
+@@ -45,12 +73,29 @@ function unbindable(el, eventName, callback, options) {
      el.addEventListener(eventName, callback, options);
      return () => el.removeEventListener(eventName, callback, options);
  }
@@ -164,25 +143,9 @@ index 1ea7318..929da52 100644
 +    // The board can move without resizing (a column next to it collapses), which neither the
 +    // ResizeObserver nor scroll/resize catches: measure afresh on every press.
 +    s.dom.bounds.clear();
-+    // Touch screens, as on lichess: with one finger held anywhere, the next finger draws.
-+    if (e.touches && e.touches.length > 1) {
-+        if (s.drawable.enabled && !s.drawable.current) {
-+            if (s.draggable.current)
-+                drag.cancel(s);
-+            // The first finger's touch erased the drawings; it was only holding.
-+            const held = s.drawable.held;
-+            if (held && !s.drawable.shapes.length && Array.prototype.some.call(e.touches, t => t.identifier === held.touchId))
-+                s.drawable.shapes = held.shapes;
-+            s.drawable.held = undefined;
-+            const touch = e.changedTouches[e.changedTouches.length - 1];
-+            // The holding fingers' lifts are not taps on whatever they rest on (see bindDocument).
-+            s.drawable.holding = Array.prototype.map.call(e.touches, t => t.identifier).filter(id => id !== touch.identifier);
-+            draw.startTouch(s, e, touch);
-+        }
++    // chesscoach patch: a second finger does nothing; phones draw with the draw-mode button.
++    if (e.touches && e.touches.length > 1)
 +        return;
-+    }
-+    if (e.touches)
-+        s.drawable.held = { touchId: e.changedTouches[0].identifier, shapes: s.drawable.shapes };
 +    // A lone finger can't be continuing anything: a drag or drawing still open is left over from a
 +    // touch the phone cancelled (a long press it took for itself), so drop it and start afresh.
 +    const fresh = e.touches && e.touches.length === 1;
@@ -190,7 +153,8 @@ index 1ea7318..929da52 100644
 +        return;
 +    if (s.drawable.current && (draw.cancel(s), !fresh))
 +        return;
-+    if (e.shiftKey || isRightButton(e)) {
++    // chesscoach patch: in draw mode (the top bar's pencil, set by the app) a plain press draws.
++    if (e.shiftKey || isRightButton(e) || s.drawable.drawMode) {
          if (s.drawable.enabled)
              draw.start(s, e);
      }

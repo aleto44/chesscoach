@@ -13,6 +13,7 @@ import { db } from "../db";
 import { getReviewEngine, type EngineLine } from "../engine/stockfish";
 import { getPuzzle } from "../puzzles/puzzles";
 import { dueDrills, gradeDrill, lostAnyway, retireDrill, type Drill } from "./drills";
+import type { DrillCategory } from "./drillCategory";
 import { explainCached, type Explanation } from "./explain";
 import { unpackLesson } from "./lesson";
 import { lossFromEvals } from "./review";
@@ -41,10 +42,12 @@ export interface LeadIn {
   label: string;
 }
 
-/** Which drills a session works through: the due ones or all, optionally one review tag's. */
+/** Which drills a session works through: the due ones or all, optionally one category's or one review tag's. */
 export interface DrillSource {
   all: boolean;
   tag: string | null;
+  /** Missing in sessions saved before categories: every sort. */
+  category?: DrillCategory | null;
 }
 
 export interface DrillState {
@@ -130,7 +133,7 @@ function resume(saved: DrillState) {
     const at = saved.status === "loading" && line ? saved.index + 1 : saved.index;
     // Before the drill's position was shown (or while the queue loaded): open it again.
     if (saved.queue.length) begin(at);
-    else if (saved.status === "loading") startDrills(source.all, source.tag);
+    else if (saved.status === "loading") startDrills(source.all, source.tag, source.category ?? null);
     return;
   }
   const drill = saved.queue[saved.index];
@@ -232,7 +235,7 @@ function emptyAt(fen: string): Line {
  */
 const PARK_KEY = "cc-drill-parked";
 type Parked = Record<string, DrillState & { parkedAt: number }>;
-const sourceKey = (s: DrillSource) => `${s.all ? "all" : "due"}${s.tag ? `:${s.tag}` : ""}`;
+const sourceKey = (s: DrillSource) => `${s.all ? "all" : "due"}${s.category ? `@${s.category}` : ""}${s.tag ? `:${s.tag}` : ""}`;
 function readParked(): Parked {
   try {
     return JSON.parse(localStorage.getItem(PARK_KEY) ?? "{}") ?? {};
@@ -251,7 +254,8 @@ useParkedDrills.subscribe((p) => {
 });
 
 /** The parked session for these drills, if any (for the menu). */
-export const parkedFor = (p: Parked, all = false, tag: string | null = null) => p[sourceKey({ all, tag })] ?? null;
+export const parkedFor = (p: Parked, all = false, tag: string | null = null, category: DrillCategory | null = null) =>
+  p[sourceKey({ all, tag, category })] ?? null;
 
 function park(s: DrillState | null) {
   if (!s?.source) return;
@@ -294,18 +298,21 @@ const blank = (queue: Drill[], source: DrillSource): DrillState => ({
   quiz: null,
 });
 
-/** `tag`: drill the mistakes with that review tag (the weakness dashboard), due or not. */
-export async function startDrills(all = false, tag: string | null = null) {
+/**
+ * `category`: only that sort of drill (the drills menu's categories). `tag`: drill the mistakes
+ * with that review tag (the weakness dashboard), due or not.
+ */
+export async function startDrills(all = false, tag: string | null = null, category: DrillCategory | null = null) {
   stopEndgame();
   stopOpening();
   stopGuess();
   stopPlans();
   park(useDrill.getState());
-  const source = { all, tag };
+  const source = { all, tag, category };
   const parked = unpark(source);
   if (parked) return resume(parked);
   useDrill.setState(blank([], source), true);
-  const queue = await dueDrills(30, all, tag);
+  const queue = await dueDrills(30, all, tag, category);
   if (!useDrill.getState()) return;
   useDrill.setState({ ...blank(queue, source), status: queue.length ? "loading" : "done" }, true);
   if (queue.length) begin(0);
@@ -657,7 +664,10 @@ export function drillContext(): {
           : `A position the coach asked about before${lead}: the drill asks for ${side}'s best move.`;
   const answered = s.status === "right" || s.status === "wrong";
   const tried = s.line.sans[s.base];
-  const attempt = tried ? `The student played ${tried} in the drill${answered ? `: ${s.status}. ${s.message}` : "."}`.trim() : null;
+  const played = tried ? `The student played ${tried} in the drill${answered ? `: ${s.status}. ${s.message}` : "."}`.trim() : null;
+  // The hint names the piece to move, so the coach may talk about that piece once it's shown.
+  const hint = s.hint ? `The student asked for a hint, shown under the board: "${s.hint}"` : null;
+  const attempt = [played, hint].filter(Boolean).join(" ") || null;
   return { title, fen: s.line.fens[viewedPly(s.line.sans.length, s.view)], startFen, color: drill.color, asks, attempt, answered };
 }
 

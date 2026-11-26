@@ -149,7 +149,9 @@ export function positionalCost(start: string, end: string, alt: string | null, m
   }
 
   // The king stuck in the middle.
-  if (castles(s, mover) && !castles(e, mover) && (!a || castles(a, mover))) {
+  // Only when it could still castle: a king that already castled and then walks (Kxh2) loses nothing.
+  const rights = s.getCastlingRights(side(mover));
+  if ((rights.k || rights.q) && !castles(e, mover) && (!a || castles(a, mover))) {
     const king = e.findPiece({ type: "k", color: side(mover) })[0];
     out.facts.push(`your king can't castle any more`);
     if (king) out.marks.push({ orig: king as Key, brush: "red" });

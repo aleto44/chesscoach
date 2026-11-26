@@ -19,15 +19,19 @@ import { play } from "../sound";
 import { saveSetting, useSettings } from "../settings";
 import {
   AUTO_NEXT_MS,
+  backToCurrent,
   endRush,
+  reviewMove,
+  reviewResult,
+  shownPuzzle,
   holdPuzzle,
   nextPuzzle,
   puzzleMove,
-  puzzleQuestion,
   setChoice,
   setSummary,
   puzzleHint,
   showSolution,
+  undoMiss,
   RUSH_LIVES,
   startPuzzles,
   startRatedPuzzles,
@@ -36,6 +40,7 @@ import {
   usePuzzle,
   viewStep,
   type Difficulty,
+  type PuzzleSession,
   BANDS,
 } from "../puzzles/session";
 import { useStore } from "../store";
@@ -43,6 +48,7 @@ import { moveLabel, START_FEN } from "../chess/line";
 import { Board } from "./Board";
 import { MasteryGains } from "./Mastery";
 import { BoardSteps, StepButtons } from "./StepButtons";
+import { askConfirm } from "./Confirm";
 import { viewedPly } from "../chess/view";
 import { fromLichess } from "../rating";
 
@@ -63,6 +69,18 @@ export function PuzzlePanel() {
   const opponent = s.color === "white" ? "Black" : "White";
   // The opponent's move that sets the puzzle up ("23...Nxe4"), once it's played.
   const leadIn = line && line.sans.length > 0 ? moveLabel(line.fens[0], line.sans[0]) : null;
+  /** Holding ◀ for three seconds, after a wrong move: voids it as a misclick (no button for it, on purpose). */
+  const recall =
+    s.voidable && s.status === "solving" && !s.rush
+      ? async () => {
+          const ok = await askConfirm({
+            title: "Fat-finger recall",
+            body: "Void your wrong move? For a misclick only: the puzzle goes back to a clean, rated try, with no rating loss and no drill.",
+            confirmLabel: "Void it",
+          });
+          if (ok) undoMiss();
+        }
+      : undefined;
 
   useEffect(() => {
     if (!pdb.loaded) refreshPuzzleDb();
@@ -79,6 +97,12 @@ export function PuzzlePanel() {
   const filters = !s.set.fromCoach && (s.set.mode ?? "custom") === "custom";
   const rushOver = !!s.rush && s.rush.lives <= 0 && over;
   const fen = line ? line.fens[ply] : START_FEN;
+  // A finished puzzle of the run opened from the history, shown instead of the current one.
+  const rv = s.review;
+  const shown = shownPuzzle(s);
+  const rvColor = shown.result?.color ?? s.color;
+  const rvFen = rv ? rv.x.line.fens[rv.x.ply] : fen;
+  const info = rv ? shown.puzzle : puzzle;
   return (
     <main className="board-panel play puzzles">
       <nav className="crumbs">
@@ -96,14 +120,23 @@ export function PuzzlePanel() {
       </nav>
 
       <CueFrame
-        status={s.status}
-        orientation={s.color}
-        fen={fen}
-        rating={s.change ? { before: fromLichess(s.change.before), after: fromLichess(s.change.after) } : null}
+        status={rv ? (shown.result?.correct ? "solved" : "failed") : s.status}
+        orientation={rv ? rvColor : s.color}
+        fen={rvFen}
+        rating={!rv && s.change ? { before: fromLichess(s.change.before), after: fromLichess(s.change.after) } : null}
         // Always there (disabled until a puzzle is up), so nothing shifts when it loads.
-        after={<BoardSteps onStep={viewStep} disabled={!line || line.sans.length === 0} />}
+        after={<BoardSteps onStep={viewStep} disabled={!rv && (!line || line.sans.length === 0)} onHoldBack={rv ? undefined : recall} />}
       >
-        <Board
+        {rv ? (
+          <Board
+            key="review"
+            fen={rvFen}
+            lastMove={rv.x.ply > 0 ? rv.x.line.lastMoves[rv.x.ply - 1] : undefined}
+            orientation={rvColor}
+            onMove={reviewMove}
+          />
+        ) : (
+          <Board
           fen={fen}
           lastMove={line && ply > 0 ? line.lastMoves[ply - 1] : undefined}
           orientation={s.color}
@@ -113,6 +146,7 @@ export function PuzzlePanel() {
           premoveColor={(s.status === "intro" || s.status === "solving") && s.view === null && !s.message ? s.color : undefined}
           shapes={past ? undefined : shapes}
         />
+        )}
       </CueFrame>
 
       <aside className="game-side">
@@ -138,6 +172,19 @@ export function PuzzlePanel() {
         {filters && <ChoiceSummary />}
 
         <div className="side-body puzzle-body">
+          {/* First, so opening an old one (more text below) never moves the tiles. */}
+          {s.rush && <RushHistory s={s} />}
+          {rv && shown.result && (
+            <div className={`puzzle-status ${shown.result.correct ? "solved" : "failed"}`}>
+              <div className="muted">Puzzle {(shown.result.at ?? 0) + 1} of this run</div>
+              {shown.result.correct ? <strong className="solved-line">✓ Solved</strong> : <strong>✗ Missed</strong>}
+              <div className="muted small">
+                Step through it, try other moves on the board, or open the analysis board.
+                {rv.x.forkAt !== null && " Step back to where you left the line to bring it back."}
+              </div>
+            </div>
+          )}
+          {!rv && (
           <div className={`puzzle-status ${s.status}`}>
             {s.status === "loading" && "Finding puzzles…"}
             {s.status === "intro" && `Watch ${opponent}'s move…`}
@@ -191,18 +238,19 @@ export function PuzzlePanel() {
               ))}
             {s.status === "error" && "Couldn't load puzzles."}
           </div>
+          )}
 
-          {puzzle && over && (
+          {info && (rv || over) && (
             <div className="puzzle-info">
               <div>
-                Puzzle rating <strong>{fromLichess(puzzle.rating)}</strong> · played {puzzle.plays.toLocaleString()} times
+                Puzzle rating <strong>{fromLichess(info.rating)}</strong> · played {info.plays.toLocaleString()} times
               </div>
-              {s.mastery ? (
+              {!rv && s.mastery ? (
                 <MasteryGains gains={s.mastery} />
               ) : (
                 <>
                   <div className="puzzle-tags">
-                    {puzzle.themes
+                    {info.themes
                       .filter((t) => !META_THEMES.has(t))
                       .map((t) => (
                         <span key={t} className="chip">
@@ -211,17 +259,24 @@ export function PuzzlePanel() {
                       ))}
                   </div>
                   {/* Rated, but none of its tags earns XP (only length tags, say): no theme to give it to. */}
-                  {s.change && <div className="muted small">None of this puzzle's tags earn theme XP.</div>}
+                  {!rv && s.change && <div className="muted small">None of this puzzle's tags earn theme XP.</div>}
                 </>
               )}
-              {puzzle.openings[0] && <div className="muted">{openingLabel(puzzle.openings[puzzle.openings.length - 1])}</div>}
+              {info.openings[0] && <div className="muted">{openingLabel(info.openings[info.openings.length - 1])}</div>}
             </div>
           )}
           <div className="puzzle-credit muted">Puzzles from the Lichess open database (CC0).</div>
         </div>
 
-        {line && <StepButtons onStep={viewStep} disabled={line.sans.length === 0} />}
+        {(rv || line) && <StepButtons onStep={viewStep} disabled={!rv && line!.sans.length === 0} onHoldBack={rv ? undefined : recall} />}
 
+        {rv ? (
+          <div className="side-actions">
+            <button className="primary" onClick={backToCurrent}>
+              Back to puzzle {s.index + 1}
+            </button>
+          </div>
+        ) : (
         <div className="side-actions">
           {!s.rush && (s.status === "solving" || s.status === "intro" || s.status === "loading") && (
             <button onClick={puzzleHint} disabled={s.status !== "solving"} title="Shows which piece to move. The puzzle counts as missed.">
@@ -240,11 +295,6 @@ export function PuzzlePanel() {
           )}
           {over && (
             <>
-              {signedIn && (
-                <button onClick={() => (holdPuzzle(), sendToCoach(puzzleQuestion()))} disabled={busy} title="One message to the coach">
-                  Ask the coach
-                </button>
-              )}
               {rushOver ? (
                 <button className="primary" onClick={() => startRush()}>
                   Play again
@@ -267,8 +317,52 @@ export function PuzzlePanel() {
             </>
           )}
         </div>
+        )}
       </aside>
     </main>
+  );
+}
+
+/**
+ * The run so far, one tile per puzzle (a check or a cross with its rating), then the one on the
+ * board. A finished one opens again for a look; the current one (or "Back to puzzle") returns to it.
+ */
+function RushHistory({ s }: { s: PuzzleSession }) {
+  const box = useRef<HTMLDivElement>(null);
+  const count = s.results.length;
+  // New tiles come in at the end: keep the latest in view.
+  useEffect(() => {
+    const el = box.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [count]);
+  const currentDone = s.results.some((r) => r.at === s.index);
+  const puzzle = s.queue[s.index];
+  if (!count && !puzzle) return null;
+  return (
+    <div ref={box} className="rush-history" aria-label="This run's puzzles">
+      {s.results.map((r, i) => {
+        const current = r.at === s.index;
+        const on = s.review ? s.review.result === i : current;
+        return (
+          <button
+            key={i}
+            className={`rush-tile ${r.correct ? "good" : "bad"}${on ? " on" : ""}`}
+            onClick={() => (current ? backToCurrent() : reviewResult(i))}
+            disabled={!r.line}
+            title={`Puzzle ${(r.at ?? i) + 1}: ${r.correct ? "solved" : "missed"}${current ? " (on the board)" : r.line ? ". Click to look at it again." : ""}`}
+          >
+            <span className="rush-mark">{r.correct ? "✓" : "✗"}</span>
+            <span className="rush-rating">{fromLichess(r.rating)}</span>
+          </button>
+        );
+      })}
+      {puzzle && !currentDone && s.status !== "empty" && (!s.rush || s.rush.lives > 0) && (
+        <button className={`rush-tile now${s.review ? "" : " on"}`} onClick={backToCurrent} title={`Puzzle ${s.index + 1}: the one on the board`}>
+          <span className="rush-mark">{s.index + 1}</span>
+          <span className="rush-rating">{fromLichess(puzzle.rating)}</span>
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -279,15 +373,21 @@ const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").match
  * the position moves on), the puzzle rating counting up over the board on a solve, a shake on a
  * wrong move, and the frame itself turning green or red once the puzzle is over.
  */
-function CueFrame({
+export function CueFrame({
   status,
   orientation,
   fen,
   rating,
   after,
+  frameClass = "puzzle",
+  burst = true,
   children,
 }: {
+  /** The big ✓ over the board on a solve; the course leaves it out (the badge on the square is enough). */
+  burst?: boolean;
   status: string;
+  /** The frame's look: the puzzle's, or a trainer's own ("drill"). */
+  frameClass?: string;
   orientation: "white" | "black";
   fen: string;
   /** The student's puzzle rating before and after this puzzle (chess.com scale), once it's saved. */
@@ -337,13 +437,14 @@ function CueFrame({
   // No puzzle on the board yet: an empty board, not the starting position flashing up first.
   const waiting = status === "loading" || status === "error" || status === "empty" ? " waiting" : "";
   return (
-    <div ref={frame} className={`board-frame puzzle${over}${waiting}`}>
+    <div ref={frame} className={`board-frame ${frameClass}${over}${waiting}`}>
       <div ref={board} className="cue-board">
         {children}
         {shown && (
           <div className="cue-layer" aria-hidden>
             {shown.square && <SquareCue key={shown.id} kind={shown.kind} square={shown.square} orientation={orientation} />}
             {shown.kind === "solved" &&
+              burst &&
               (rating ? (
                 <RatingBurst key={`r${shown.id}`} before={rating.before} after={rating.after} />
               ) : (

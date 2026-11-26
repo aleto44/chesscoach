@@ -1,6 +1,6 @@
 // Practice-game nudges: after each of the student's moves, a quick local Stockfish check. A clear
 // mistake gets a small note offering a takeback, the better move, or the coach. Nothing reaches
-// the AI unless the student clicks "Ask the coach".
+// the AI unless the student clicks "Ask the coach why".
 import type { Key } from "chessground/types";
 import { create } from "zustand";
 import { Chess } from "chess.js";
@@ -99,7 +99,7 @@ export function initNudges() {
   });
 }
 
-/** One message for "Ask the coach", with the numbers already computed. */
+/** One message for "Ask the coach why", with the numbers already computed. */
 export function nudgeQuestion(n: Nudge): string {
   const [, turn, , , , full] = n.fenBefore.split(" ");
   const best = bestSan(n);

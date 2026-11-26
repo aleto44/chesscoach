@@ -241,10 +241,10 @@ pub fn db_drill_overview(db: State<Db>, limit: i64) -> Result<Value, String> {
     let conn = db.conn();
     let kinds = rows(
         &conn,
-        "SELECT kind, count(*) AS cards, sum(due_at <= datetime('now')) AS due,
+        "SELECT coalesce(category, kind) AS category, count(*) AS cards, sum(due_at <= datetime('now')) AS due,
                 (SELECT round(100.0 * avg(correct)) FROM drill_attempts a JOIN drills d2 ON d2.id = a.drill_id
-                 WHERE d2.kind = d.kind) AS pctCorrect
-         FROM drills d WHERE retired = 0 GROUP BY kind",
+                 WHERE d2.retired = 0 AND coalesce(d2.category, d2.kind) = coalesce(d.category, d.kind)) AS pctCorrect
+         FROM drills d WHERE retired = 0 GROUP BY 1",
         [],
     )?;
     let recent = rows(
@@ -526,6 +526,8 @@ pub struct NewDrill {
     source_ply: Option<i64>,
     #[serde(default)]
     lesson: Option<String>,
+    #[serde(default)]
+    category: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -546,11 +548,19 @@ pub struct Drill {
     lapses: i64,
     /// What the drill teaches (JSON, see src/analysis/lesson.ts); None until worked out.
     lesson: Option<String>,
+    /// What sort of position it is (src/analysis/drillCategory.ts); None until worked out.
+    category: Option<String>,
 }
 
 /// Adds drills, skipping ones that already exist. Returns how many were new.
 #[tauri::command]
-pub fn db_add_drills(db: State<Db>, drills: Vec<NewDrill>) -> Result<usize, String> {
+pub fn db_add_drills(app: tauri::AppHandle, db: State<Db>, drills: Vec<NewDrill>) -> Result<usize, String> {
+    let r = add_drills(&db, drills);
+    crate::notify_data_changed(&app, "drills");
+    r
+}
+
+fn add_drills(db: &Db, drills: Vec<NewDrill>) -> Result<usize, String> {
     let mut conn = db.conn();
     let tx = conn.transaction().map_err(err)?;
     let mut added = 0;
@@ -558,9 +568,9 @@ pub fn db_add_drills(db: State<Db>, drills: Vec<NewDrill>) -> Result<usize, Stri
         let line = if d.line.is_empty() { String::new() } else { serde_json::to_string(&d.line).map_err(err)? };
         added += tx
             .execute(
-                "INSERT OR IGNORE INTO drills (kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply, lesson)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                params![d.kind, d.title, d.fen, d.color, d.answer_uci, line, d.note, d.source_game_id, d.source_ply, d.lesson],
+                "INSERT OR IGNORE INTO drills (kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply, lesson, category)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                params![d.kind, d.title, d.fen, d.color, d.answer_uci, line, d.note, d.source_game_id, d.source_ply, d.lesson, d.category],
             )
             .map_err(err)?;
     }
@@ -568,22 +578,25 @@ pub fn db_add_drills(db: State<Db>, drills: Vec<NewDrill>) -> Result<usize, Stri
     Ok(added)
 }
 
-/// Drills due now (or all of them with `all`), most overdue first. `tag` picks the mistake drills
-/// with that review tag (e.g. "hung-piece"), due or not: the weakness dashboard's "drill these".
+/// Drills due now, shuffled so a session mixes the kinds (or all of them with `all`, most overdue
+/// first). `category` keeps one sort ('hung', 'puzzle', ...): the drills menu's categories. `tag`
+/// picks the mistake drills with that review tag (e.g. "hung-piece"), due or not: the weakness
+/// dashboard's "drill these".
 #[tauri::command]
-pub fn db_due_drills(db: State<Db>, limit: i64, all: Option<bool>, tag: Option<String>) -> Result<Vec<Drill>, String> {
+pub fn db_due_drills(db: State<Db>, limit: i64, all: Option<bool>, tag: Option<String>, category: Option<String>) -> Result<Vec<Drill>, String> {
     let conn = db.conn();
     let mut stmt = conn
         .prepare(
-            "SELECT id, kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply, due_at, reps, lapses, lesson
+            "SELECT id, kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply, due_at, reps, lapses, lesson, category
              FROM drills WHERE retired = 0
                AND (CASE WHEN ?3 IS NULL THEN ?2 OR due_at <= datetime('now')
                          ELSE kind = 'mistake' AND (', ' || coalesce(note, '') || ',') LIKE '%, ' || ?3 || ',%' END)
-             ORDER BY due_at, id LIMIT ?1",
+               AND (?4 IS NULL OR coalesce(category, kind) = ?4)
+             ORDER BY CASE WHEN ?2 OR ?3 IS NOT NULL THEN 0 ELSE random() END, due_at, id LIMIT ?1",
         )
         .map_err(err)?;
     let drills = stmt
-        .query_map(params![limit, all.unwrap_or(false), tag], |r| {
+        .query_map(params![limit, all.unwrap_or(false), tag, category], |r| {
             let line: String = r.get(6)?;
             Ok(Drill {
                 id: r.get(0)?,
@@ -600,6 +613,7 @@ pub fn db_due_drills(db: State<Db>, limit: i64, all: Option<bool>, tag: Option<S
                 reps: r.get(11)?,
                 lapses: r.get(12)?,
                 lesson: r.get(13)?,
+                category: r.get(14)?,
             })
         })
         .map_err(err)?
@@ -610,9 +624,18 @@ pub fn db_due_drills(db: State<Db>, limit: i64, all: Option<bool>, tag: Option<S
 
 /// Stores what a drill teaches (worked out after the drill was made, for drills from before lessons).
 #[tauri::command]
-pub fn db_set_drill_lesson(db: State<Db>, id: i64, lesson: String) -> Result<(), String> {
+pub fn db_set_drill_lesson(db: State<Db>, id: i64, lesson: String, category: Option<String>) -> Result<(), String> {
     db.conn()
-        .execute("UPDATE drills SET lesson = ?2 WHERE id = ?1", params![id, lesson])
+        .execute("UPDATE drills SET lesson = ?2, category = coalesce(?3, category) WHERE id = ?1", params![id, lesson, category])
+        .map_err(err)?;
+    Ok(())
+}
+
+/// Stores what sort of position a drill is (for drills stored before categories).
+#[tauri::command]
+pub fn db_set_drill_category(db: State<Db>, id: i64, category: String) -> Result<(), String> {
+    db.conn()
+        .execute("UPDATE drills SET category = ?2 WHERE id = ?1", params![id, category])
         .map_err(err)?;
     Ok(())
 }
@@ -624,7 +647,7 @@ pub fn db_drills_without_lesson(db: State<Db>, limit: i64, version: Option<i64>)
     let conn = db.conn();
     let mut stmt = conn
         .prepare(
-            "SELECT id, kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply, due_at, reps, lapses, lesson
+            "SELECT id, kind, title, fen, color, answer_uci, line, note, source_game_id, source_ply, due_at, reps, lapses, lesson, category
              FROM drills WHERE retired = 0 AND kind = 'mistake'
                AND (lesson IS NULL OR coalesce(json_extract(lesson, '$.v'), 0) < ?2) ORDER BY due_at, id LIMIT ?1",
         )
@@ -647,6 +670,7 @@ pub fn db_drills_without_lesson(db: State<Db>, limit: i64, version: Option<i64>)
                 reps: r.get(11)?,
                 lapses: r.get(12)?,
                 lesson: r.get(13)?,
+                category: r.get(14)?,
             })
         })
         .map_err(err)?
@@ -671,7 +695,13 @@ pub fn db_drill_counts(db: State<Db>) -> Result<Value, String> {
 /// Records an attempt and schedules the next review (SM-2: a miss starts the card over tomorrow;
 /// a hit multiplies the interval by the card's ease).
 #[tauri::command]
-pub fn db_grade_drill(db: State<Db>, id: i64, correct: bool, played: String, ms: Option<i64>) -> Result<String, String> {
+pub fn db_grade_drill(app: tauri::AppHandle, db: State<Db>, id: i64, correct: bool, played: String, ms: Option<i64>) -> Result<String, String> {
+    let r = grade_drill(&db, id, correct, played, ms);
+    crate::notify_data_changed(&app, "drills");
+    r
+}
+
+fn grade_drill(db: &Db, id: i64, correct: bool, played: String, ms: Option<i64>) -> Result<String, String> {
     let mut conn = db.conn();
     let tx = conn.transaction().map_err(err)?;
     let (interval, ease, reps): (f64, f64, i64) = tx
@@ -709,6 +739,8 @@ pub fn db_grade_drill(db: State<Db>, id: i64, correct: bool, played: String, ms:
 }
 
 #[tauri::command]
-pub fn db_retire_drill(db: State<Db>, id: i64) -> Result<(), String> {
-    db.conn().execute("UPDATE drills SET retired = 1 WHERE id = ?1", [id]).map(|_| ()).map_err(err)
+pub fn db_retire_drill(app: tauri::AppHandle, db: State<Db>, id: i64) -> Result<(), String> {
+    let r = db.conn().execute("UPDATE drills SET retired = 1 WHERE id = ?1", [id]).map(|_| ()).map_err(err);
+    crate::notify_data_changed(&app, "drills");
+    r
 }

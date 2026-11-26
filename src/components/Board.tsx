@@ -14,6 +14,8 @@ import { hearMove, pickMove, promotionPiece, sayMove, type VoiceMove } from "../
 import { needsConfirm } from "../voice/confirm";
 import { useSettings } from "../settings";
 import { useStore } from "../store";
+import { touchNote } from "../touchLog";
+import { useDrawMode } from "./DrawMode";
 
 interface Props {
   fen: string;
@@ -84,6 +86,33 @@ function listenForTyping() {
   );
 }
 
+/** Full-size boards that are mounted, for telling the coach what's drawn on the screen (boardsOnScreen). */
+const mounted = new Set<{ el: () => HTMLElement | null; api: () => Api | null; fen: () => string }>();
+
+/**
+ * What the boards on screen show besides the pieces: the app's arrows (hints, the coach's, plans)
+ * and the student's own drawings. Boards inside the chat column and hidden ones are left out.
+ */
+export function boardsOnScreen(): { fen: string; app: DrawShape[]; student: DrawShape[] }[] {
+  const out: { fen: string; app: DrawShape[]; student: DrawShape[] }[] = [];
+  for (const b of mounted) {
+    const el = b.el();
+    const cg = b.api();
+    if (!cg || !el?.isConnected || !el.getClientRects().length || el.closest("aside.chat")) continue;
+    out.push({ fen: b.fen(), app: cg.state.drawable.autoShapes.slice(), student: cg.state.drawable.shapes.slice() });
+  }
+  return out;
+}
+
+/** A position being set up (Utility › Load game) can be one chess.js rejects, e.g. with no king yet. */
+function inCheck(fen: string): boolean {
+  try {
+    return new Chess(fen).inCheck();
+  } catch {
+    return false;
+  }
+}
+
 /** Thin React wrapper around Chessground; chess.js supplies legal destinations. */
 export function Board({
   fen,
@@ -112,6 +141,7 @@ export function Board({
    */
   const peek = useRef<{ fen: string | null; drawings: DrawShape[]; drawnOn: string } | null>(null);
   const [peeking, setPeeking] = useState(false);
+  const drawing = useDrawMode((s) => s.on);
   // A move being typed on the keyboard; `shake` counts rejected Enters so the box shakes each time.
   const [typed, setTypedState] = useState("");
   const typedRef = useRef("");
@@ -164,7 +194,7 @@ export function Board({
       orientation: p.orientation,
       lastMove: p.lastMove,
       turnColor: turn,
-      check: new Chess(p.fen).inCheck(),
+      check: inCheck(p.fen),
       movable: { color: live ? turn : premove, dests: live ? legalDests(p.fen) : new Map() },
     };
     cg.set(config);
@@ -215,6 +245,7 @@ export function Board({
         showDests: true,
         events: {
           after: (from, to) => {
+            touchNote(`MOVE ${from}${to}`);
             // Chessground already moved the piece: the next sync must set the position again.
             shown.current = null;
             setTyped("");
@@ -232,7 +263,19 @@ export function Board({
     // A new Chessground starts from the initial position, whatever an earlier one showed.
     shown.current = null;
     sync();
-    return () => api.current?.destroy();
+    const entry = { el: () => el.current, api: () => api.current, fen: () => props.current.fen };
+    if (!preview) mounted.add(entry);
+    // Draw mode (the top bar's pencil): a plain press draws (patched into Chessground's events.js).
+    const drawMode = (on: boolean) => {
+      if (api.current) (api.current.state.drawable as { drawMode?: boolean }).drawMode = !preview && on;
+    };
+    drawMode(useDrawMode.getState().on);
+    const unsubDraw = useDrawMode.subscribe((s) => drawMode(s.on));
+    return () => {
+      unsubDraw();
+      mounted.delete(entry);
+      api.current?.destroy();
+    };
   }, []);
 
   useEffect(sync, [fen, orientation, lastMove, viewOnly, canMove, premoveColor, shapes]);
@@ -549,7 +592,7 @@ export function Board({
   // Thumbnails can't promote; keep them a single element for their layouts.
   if (preview) return <div ref={el} className={className ?? "cg-board-wrap"} />;
   return (
-    <div className={`board-holder ${peeking ? "peeking" : ""}`}>
+    <div className={`board-holder ${peeking ? "peeking" : ""} ${drawing ? "draw-mode" : ""}`}>
       <div ref={el} className={className ?? "cg-board-wrap"} />
       {typed && (
         <div
@@ -564,8 +607,10 @@ export function Board({
               ? premoving(props.current)
                 ? "Enter ↵ to premove"
                 : "Enter ↵"
-              : reading
-                ? "Esc to cancel"
+              : reading?.options && reading.options.length > 1
+                ? `${reading.options.join(" or ")}?`
+                : reading
+                  ? "Esc to cancel"
                 : "not your move"}
           </span>
         </div>

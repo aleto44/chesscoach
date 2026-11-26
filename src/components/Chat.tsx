@@ -102,7 +102,7 @@ export function Chat() {
       <div className="messages">
         {locked && (
           <div className="locked-note">
-            <strong>Rated game: the coach is off.</strong> No engine, coach or takebacks until it ends, so this game
+            <strong>Rated game: the coach is off.</strong> No engine or coach until it ends, so this game
             shows how you really play. Afterwards the coach can go through it with you.
           </div>
         )}

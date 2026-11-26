@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { hasBackend, importedFrom, opponentElo, type GameSummary } from "../db";
 import { OPPONENT_RATING } from "../game/opponent";
 import { deleteGame, loadGame, newGame, parseTimeControl } from "../game/session";
@@ -21,22 +21,26 @@ export function Modal({
   className = "",
 }: {
   title: string;
-  onClose: () => void;
+  /** `how` says what closed it (for the debug log). */
+  onClose: (how?: string) => void;
   children: ReactNode;
   className?: string;
 }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose("escape");
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+  // A dialog opened by a held finger (the fat-finger recall) appears under it: the mouse events a
+  // phone makes up when that finger lifts are not a tap on the backdrop.
+  const openedAt = useRef(performance.now());
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
+    <div className="modal-backdrop" onMouseDown={() => performance.now() - openedAt.current > 700 && onClose("backdrop")}>
       <div className={`modal ${className}`} onMouseDown={(e) => e.stopPropagation()}>
         <header>
           <strong>{title}</strong>
           <span className="spacer" />
-          <button onClick={onClose}>✕</button>
+          <button onClick={() => onClose("x")}>✕</button>
         </header>
         {children}
       </div>
@@ -81,7 +85,7 @@ export function NewGameDialog({ onClose, mode: initialMode, withOpponent }: { on
         <div className="mode-choice">
           <button className={mode === "rated" ? "on" : ""} onClick={() => setMode("rated")}>
             <ModeBadge mode="rated" />
-            <span>No engine, no coach, no takebacks. Shows how you really play, and counts toward your profile.</span>
+            <span>No engine, no coach. Shows how you really play, and counts toward your profile.</span>
           </button>
           <button className={mode === "practice" ? "on" : ""} onClick={() => setMode("practice")}>
             <ModeBadge mode="practice" />
@@ -250,7 +254,7 @@ export function PlayRatedDialog({ onClose }: { onClose: () => void }) {
           </div>
           <p className="muted small">
             Your {POOL_LABEL[pool].toLowerCase()} rating {mine}. You'll be paired with Maia, a bot that plays like a person, near your rating: beating a stronger opponent gains more,
-            losing to a weaker one costs more. No engine, no coach, no takebacks.
+            losing to a weaker one costs more. No engine, no coach.
           </p>
           <footer>
             <button className="primary" onClick={find}>

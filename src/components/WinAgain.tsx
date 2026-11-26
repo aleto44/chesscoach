@@ -1,6 +1,7 @@
 import { gamePositions } from "../convert/positions";
 import type { Endgame } from "../endgames/positions";
-import { endgameRecords, startCustomEndgame } from "../endgames/session";
+import { startCustomEndgame } from "../endgames/session";
+import { useSettings } from "../settings";
 import { useFromGames } from "../training/games";
 
 /** School › Win it again: positions from the student's games to convert, or to hold, against Stockfish. */
@@ -34,7 +35,7 @@ export function WinAgainMenu() {
 }
 
 function PositionList({ title, empty, list }: { title: string; empty: string; list: Endgame[] }) {
-  const records = endgameRecords();
+  const records = useSettings((st) => st.endgameRecords);
   const done = list.filter((e) => records[e.id]?.wins).length;
   return (
     <div>

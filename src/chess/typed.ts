@@ -13,6 +13,8 @@ export interface Typed {
   /** Set when the text names the promotion piece; a promotion without one asks for it. */
   promotion?: string;
   needsPromotion?: boolean;
+  /** When the text names more than one move (Rf1 with both rooks able to go), their SAN, to show which to type. */
+  options?: string[];
 }
 
 /** Characters a typed move can start with: a file, a piece letter, or castling. */
@@ -76,7 +78,7 @@ export function readTyped(fen: string, text: string, selected?: Key): Typed {
   const input = clean(text);
   if (!input) return { status: "partial" };
   const lower = input.toLowerCase();
-  const exact: { spelling: string; from: Key; to: Key; promotion?: string; needsPromotion?: boolean }[] = [];
+  const exact: { spelling: string; san: string; from: Key; to: Key; promotion?: string; needsPromotion?: boolean }[] = [];
   let prefix = false;
   for (const m of new Chess(fen).moves({ verbose: true })) {
     const from = m.from as Key;
@@ -91,9 +93,11 @@ export function readTyped(fen: string, text: string, selected?: Key): Typed {
     // Nd7 for Nbd7: leaving the disambiguation off still names the move, just not always one piece.
     const bare = m.piece.toUpperCase() + m.to;
     if (m.piece !== "p" && bare !== san && !san.startsWith("O")) spellings.push([bare, false]);
+    // aRf1 for Raf1: the file of the piece said first, the way people say "the a-rook to f1".
+    if (m.piece !== "p" && m.piece !== "k") spellings.push([m.from[0] + bare, false]);
     for (const [spelling, needsPromotion] of spellings) {
       const sl = spelling.toLowerCase();
-      if (sl === lower) exact.push({ spelling, from, to, promotion: needsPromotion ? undefined : m.promotion, needsPromotion });
+      if (sl === lower) exact.push({ spelling, san: m.san.replace(/[+#]/g, ""), from, to, promotion: needsPromotion ? undefined : m.promotion, needsPromotion });
       else if (sl.startsWith(lower)) prefix = true;
     }
   }
@@ -112,7 +116,7 @@ export function readTyped(fen: string, text: string, selected?: Key): Typed {
     const { from, to, promotion, needsPromotion } = hits[0];
     return { status: "ok", from, to, promotion, needsPromotion };
   }
-  if (hits.length) return { status: "partial" };
+  if (hits.length) return { status: "partial", options: [...new Set(hits.map((h) => h.san))] };
   if (!prefix) return { status: "bad" };
   // Two characters that are one of the mover's pieces: that's where the move starts.
   const sq = /^[a-h][1-8]/.test(lower) ? (lower.slice(0, 2) as Key) : undefined;

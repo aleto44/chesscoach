@@ -71,7 +71,15 @@ export function initPuzzles() {
     usePuzzleDb.setState({ importing: e.payload });
     if (e.payload.phase === "done") refreshPuzzleDb();
   });
-  // The status itself comes with the boot call (boot.ts).
+  // The status itself comes with the boot call (boot.ts); a puzzle solved on another device moves
+  // the rating, so take it again then (debounced: the computer announces every attempt).
+  let timer: number | undefined;
+  listen("resync", () => refreshPuzzleDb().catch(() => {}));
+  listen<{ kind: string }>("data-changed", ({ payload }) => {
+    if (payload.kind !== "puzzles") return;
+    clearTimeout(timer);
+    timer = window.setTimeout(() => refreshPuzzleDb().catch(() => {}), 300);
+  });
   // A download may already be running (started from the other device, or before a reload).
   invoke<ImportProgress | null>("puzzle_import_progress")
     .then((p) => p && !usePuzzleDb.getState().importing && usePuzzleDb.setState({ importing: p }))
@@ -120,6 +128,15 @@ export async function recordAttempt(p: Puzzle, correct: boolean, ms: number) {
   );
   if (r.rated) usePuzzleDb.setState((s) => ({ rating: r.after, attempts: s.attempts + 1 }));
   return r;
+}
+
+/**
+ * Voids the latest try at a puzzle (a misclick): the rating goes back to `before`, and the miss's
+ * drill (starting at `drillFen`) is dropped. Queued behind the try itself when offline.
+ */
+export async function voidAttempt(p: Puzzle, drillFen: string, before: number | null) {
+  await orOffline("puzzle_void", { id: p.id, fen: drillFen }, () => null, true);
+  if (before !== null) usePuzzleDb.setState((s) => ({ rating: before, attempts: Math.max(0, s.attempts - 1) }));
 }
 
 /** A theme's XP and stars; `start`/`end` are the XP where the current star began and the next one lands. */

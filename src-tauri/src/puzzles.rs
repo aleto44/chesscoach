@@ -402,6 +402,7 @@ fn student_rating(conn: &Connection) -> Result<(i64, i64), String> {
 /// 30 rated puzzles, then 20). Returns the rating before and after.
 #[tauri::command]
 pub fn puzzle_record(
+    app: tauri::AppHandle,
     db: State<Db>,
     id: String,
     rating: i64,
@@ -409,6 +410,34 @@ pub fn puzzle_record(
     correct: bool,
     ms: Option<i64>,
 ) -> Result<Value, String> {
+    let r = record(&db, id, rating, themes, correct, ms);
+    crate::notify_data_changed(&app, "puzzles");
+    r
+}
+
+/// Takes back the latest try at a puzzle (a misclick the student voids): the rating and theme XP
+/// are replayed from the tries, so dropping the row undoes both, and the puzzle counts as unseen
+/// again. The drill the miss made goes too, unless it was already practised.
+#[tauri::command]
+pub fn puzzle_void(app: tauri::AppHandle, db: State<Db>, id: String, fen: String) -> Result<(), String> {
+    let r = void(&db, &id, &fen);
+    crate::notify_data_changed(&app, "puzzles");
+    crate::notify_data_changed(&app, "drills");
+    r
+}
+
+fn void(db: &Db, id: &str, fen: &str) -> Result<(), String> {
+    let conn = db.conn();
+    conn.execute(
+        "DELETE FROM puzzle_attempts WHERE id = (SELECT max(id) FROM puzzle_attempts WHERE puzzle_id = ?1)",
+        [id],
+    )
+    .map_err(err)?;
+    conn.execute("DELETE FROM drills WHERE kind = 'puzzle' AND fen = ?1 AND reps = 0", [fen]).map_err(err)?;
+    Ok(())
+}
+
+fn record(db: &Db, id: String, rating: i64, themes: Vec<String>, correct: bool, ms: Option<i64>) -> Result<Value, String> {
     let conn = db.conn();
     let (before, attempts) = student_rating(&conn)?;
     let seen: bool = conn

@@ -10,8 +10,9 @@ import { stopDrills } from "../analysis/drillSession";
 import { emptyLine, playAt, sideToMove, type Line } from "../chess/line";
 import { PIECE_NAMES, type PieceType } from "../chess/material";
 import { stepView, viewedPly, type Step } from "../chess/view";
+import { explore, exploreGoto, exploreMove, type Explore } from "../chess/explore";
 import type { Color } from "../store";
-import { findPuzzles, recordAttempt, themeLabel, usePuzzleDb, type Puzzle, type ThemeGain } from "./puzzles";
+import { findPuzzles, recordAttempt, themeLabel, voidAttempt, usePuzzleDb, type Puzzle, type ThemeGain } from "./puzzles";
 import { fromLichess, toLichess } from "../rating";
 import { stopEndgame } from "../endgames/session";
 import { stopGuess } from "../guess/session";
@@ -75,6 +76,8 @@ export interface PuzzleSession {
   status: "loading" | "intro" | "solving" | "solved" | "failed" | "empty" | "error";
   /** A wrong move was played (the puzzle counts as failed, but the student may keep going). */
   missed: boolean;
+  /** The miss came from a played move, which the student may void as a misclick (not a hint or the solution). */
+  voidable?: boolean;
   message: string;
   /** Arrows (orig + dest) and circles (orig only: a hint). */
   shapes: { orig: Key; dest?: Key; brush: string }[];
@@ -83,11 +86,24 @@ export interface PuzzleSession {
   change: { before: number; after: number } | null;
   /** Ply the student stepped back to (null = the latest position). Moves are played at the latest only. */
   view: number | null;
-  results: { id: string; correct: boolean; themes: string[]; rating: number }[];
+  results: PuzzleResult[];
+  /** A finished puzzle of this run opened again from the history (rush), over the current one; null = the current one. */
+  review: { result: number; x: Explore } | null;
   /** How the first try moved each of the puzzle's themes (XP and stars), when it was rated. */
   mastery: ThemeGain[] | null;
   /** When a solved puzzle goes on to the next by itself (ms timestamp); null = it waits. */
   autoNextAt: number | null;
+}
+
+export interface PuzzleResult {
+  id: string;
+  correct: boolean;
+  themes: string[];
+  rating: number;
+  /** Its place in the queue, and its moves as they ended (opponent's first move included), so it can be looked at again. */
+  at?: number;
+  line?: Line;
+  color?: Color;
 }
 
 /** How long a solve stays on screen before the next puzzle, with auto-advance on (the rating count-up fits in it). */
@@ -124,7 +140,7 @@ export function initPuzzleSession() {
 function resume(saved: PuzzleSession) {
   // Saved by an older version (a different shape): dropped.
   const mastery = saved.mastery?.every((g) => typeof g.after?.xp === "number") ? saved.mastery : null;
-  usePuzzle.setState({ ...saved, rush: saved.rush ?? null, mastery, autoNextAt: null }, true);
+  usePuzzle.setState({ ...saved, rush: saved.rush ?? null, review: saved.review ?? null, mastery, autoNextAt: null }, true);
   // Loading with a line on the board: on the way to the next puzzle, this one already counted.
   const at = saved.status === "loading" && saved.line ? saved.index + 1 : saved.index;
   const puzzle = saved.queue[at];
@@ -380,6 +396,7 @@ function blank(set: PuzzleSession["set"], choice: Choice): PuzzleSession {
     change: null,
     view: null,
     results: [],
+    review: null,
     mastery: null,
     autoNextAt: null,
   };
@@ -454,7 +471,7 @@ function begin(index: number) {
   const color: Color = sideToMove(puzzle.fen) === "white" ? "black" : "white";
   clearCue();
   stopReplay();
-  set({ index, line: emptyLine(puzzle.fen), solution, color, status: "intro", missed: false, message: "", shapes: [], change: null, view: null, mastery: null, autoNextAt: null });
+  set({ index, line: emptyLine(puzzle.fen), solution, color, status: "intro", missed: false, voidable: false, message: "", shapes: [], change: null, view: null, mastery: null, autoNextAt: null });
   window.setTimeout(() => {
     if (get()?.queue[get()!.index] !== puzzle) return;
     autoplay();
@@ -529,8 +546,8 @@ export async function puzzleMove(from: Key, to: Key) {
   set({ line: played.line, message: `${played.san} isn't it.` });
   cue("wrong", to, after);
   if (!s.missed) {
-    set({ missed: true });
-    await save(false);
+    set({ missed: true, voidable: !s.rush });
+    await (saving = save(false));
   }
   window.setTimeout(() => {
     if (get()?.line !== played.line) return;
@@ -554,10 +571,47 @@ export async function puzzleHint() {
   set({
     shapes: [{ orig: m.from as Key, brush: "green" }],
     message: `Hint: move your ${m.piece === "k" ? "king" : PIECE_NAMES[m.piece as PieceType]} on ${m.from}. The puzzle counts as missed.`,
+    voidable: false,
   });
   if (!s.missed) {
     set({ missed: true });
     await save(false);
+  }
+}
+
+/** The miss being saved, so a void can't overtake it. */
+let saving: Promise<void> = Promise.resolve();
+
+/**
+ * Voids a misclick: the wrong move comes off the board and the miss is taken back as if it never
+ * happened (rating, theme XP, the drill), so the puzzle is still a clean, rated try. The student
+ * polices this themselves; it's only offered while the puzzle is still being solved.
+ */
+export async function undoMiss() {
+  const s = get();
+  const puzzle = current();
+  if (!s?.line || !puzzle || !s.voidable || s.status !== "solving" || s.rush) return;
+  set({ voidable: false });
+  // The miss's own save sets the rating change: wait for it, so it's what gets undone.
+  await saving;
+  const now = get();
+  if (!now?.line || current() !== puzzle) return;
+  const before = now.change?.before ?? null;
+  let line = now.line;
+  // Within the moment the wrong move is still shown: take it off now.
+  const ply = line.sans.length;
+  if (ply > 0 && line.sans[ply - 1] !== now.solution[ply - 1]) {
+    const back = ply - 1;
+    line = { ...line, sans: line.sans.slice(0, back), fens: line.fens.slice(0, back + 1), lastMoves: line.lastMoves.slice(0, back), notes: line.notes.slice(0, back) };
+  }
+  set({ line, missed: false, change: null, mastery: null, shapes: [], view: null, message: "Misclick voided. The puzzle still counts as a clean try." });
+  clearCue();
+  const start = new Chess(puzzle.fen);
+  uciMove(start, puzzle.moves[0]);
+  try {
+    await voidAttempt(puzzle, start.fen(), before);
+  } catch (e) {
+    console.error("voiding the puzzle attempt failed", e);
   }
 }
 
@@ -624,7 +678,7 @@ async function finish(correct: boolean) {
     status: correct ? "solved" : "failed",
     message: correct ? "Solved." : `The solution: ${s.solution.slice(1).join(" ")}.`,
     view: null,
-    results: [...s.results, { id: puzzle.id, correct, themes: puzzle.themes, rating: puzzle.rating }],
+    results: [...s.results, { id: puzzle.id, correct, themes: puzzle.themes, rating: puzzle.rating, at: s.index, line: get()!.line ?? undefined, color: s.color }],
     rush,
   });
   if (rush) keepBest(rush);
@@ -702,10 +756,49 @@ async function save(correct: boolean) {
   }
 }
 
+/**
+ * Opens a finished puzzle of the run again (the rush's history): on its starting position, with
+ * what-if moves for both sides and the analysis board. The current puzzle waits underneath.
+ */
+export function reviewResult(result: number) {
+  const s = get();
+  const r = s?.results[result];
+  if (!s || !r?.line) return;
+  if (r.at === s.index && !s.review) return;
+  if (r.at === s.index) return backToCurrent();
+  stopReplay();
+  set({ review: { result, x: explore(r.line, Math.min(1, r.line.sans.length)) }, autoNextAt: null });
+}
+
+/** Leaves the history for the puzzle on the board. */
+export function backToCurrent() {
+  if (get()?.review) set({ review: null });
+}
+
+/** A move on a reviewed puzzle: the line's own next move, or a what-if. */
+export function reviewMove(from: Key, to: Key, promotion?: string) {
+  const r = get()?.review;
+  const x = r && exploreMove(r.x, from, to, promotion);
+  if (x) set({ review: { ...r, x } });
+}
+
+/** The puzzle on screen: the one under review, or the current one. */
+export function shownPuzzle(s: PuzzleSession): { puzzle: Puzzle | undefined; result: PuzzleResult | null } {
+  const r = s.review ? s.results[s.review.result] : null;
+  return r ? { puzzle: s.queue[r.at ?? -1], result: r } : { puzzle: s.queue[s.index], result: null };
+}
+
 /** Step back through the moves so far (back to before the opponent's first move) and forward again. */
 export function viewStep(delta: Step) {
   const s = get();
-  if (!s?.line) return;
+  if (!s) return;
+  if (s.review) {
+    const x = s.review.x;
+    const end = x.line.sans.length;
+    const to = delta === "start" ? 0 : delta === "end" ? end : x.ply + delta;
+    return set({ review: { ...s.review, x: exploreGoto(x, to) } });
+  }
+  if (!s.line) return;
   stopReplay();
   set({ view: stepView(s.line.sans.length, s.view, delta), autoNextAt: null });
 }
@@ -717,6 +810,16 @@ export function setChoice(choice: Partial<Choice>) {
 /** What the coach sees for a question asked from the puzzle board. */
 export function puzzleContext(): { title: string; fen: string; detail: string } | null {
   const s = get();
+  if (s?.review) {
+    const { puzzle, result } = shownPuzzle(s);
+    const x = s.review.x;
+    if (!puzzle || !result) return null;
+    return {
+      title: `Lichess puzzle ${puzzle.id} (earlier in this rush)`,
+      fen: x.line.fens[x.ply],
+      detail: `rating ${fromLichess(puzzle.rating)} (chess.com scale), student played ${result.color}, ${result.correct ? "solved" : "missed"}. Themes: ${puzzle.themes.join(", ")}. Solution from the puzzle start ${x.base.fens[1]}: ${toSan(puzzle.fen, puzzle.moves).slice(1).join(" ")}`,
+    };
+  }
   const puzzle = current();
   if (!s?.line || !puzzle) return null;
   const over = s.status === "solved" || s.status === "failed";
@@ -730,14 +833,6 @@ export function puzzleContext(): { title: string; fen: string; detail: string } 
         ? `, ${s.status}. Themes: ${puzzle.themes.join(", ")}. Solution from the puzzle start ${s.line.fens[1]}: ${s.solution.slice(1).join(" ")}`
         : ", not solved yet: don't give the answer away"),
   };
-}
-
-export function puzzleQuestion(): string {
-  const s = get()!;
-  const ctx = puzzleContext()!;
-  return s.status === "failed"
-    ? `I missed this puzzle (FEN ${s.line!.fens[1]}, I play ${s.color}). The solution was ${s.solution.slice(1).join(" ")}. What's the idea, and what should I have noticed? Keep it short.`
-    : `About this puzzle (${ctx.title}): explain the idea behind the solution, briefly.`;
 }
 
 /** "Pins: solved 3 of 5, missed …" for the coach after a set it picked. */

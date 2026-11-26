@@ -36,8 +36,8 @@ Rules:
 
 - The left/middle column shows the **home menu** (`src/components/Home.tsx`) or the screen picked from it:
   Games (Play rated: pick a clock and get paired with a Maia near your rating, `src/game/matchmaking.ts`;
-  Choose game: every option, rated or practice), School (drills, opening training (side,
-  then an opening, then Main lines or Punish mistakes), the endgame trainer, guess the move, win it again, find the plan, opening leaks), Puzzles, and Profile (weaknesses, rating history,
+  Choose game: every option, rated or practice), School (drills, opening training (a submenu: New opening training, the courses,
+  and the Legacy opening trainer: side, then an opening, then Main lines or Punish mistakes), the endgame trainer, guess the move, win it again, find the plan, opening leaks), Puzzles, and Profile (weaknesses, rating history,
   saved games, import from chess.com and Lichess). Saved games is its own screen
   (`src/components/SavedGames.tsx`): filters by source (chess.com, Lichess, rated or practice here),
   clock, color, result, date and opponent/opening, and a games-over-time chart with wins, draws and
@@ -55,10 +55,17 @@ Rules:
   were clearly better in and didn't win, or worse but holding and lost, played in the endgame session as a
   `spec` with its own bars), "Find the plan" (`src/plans/`: quiet, non-tactical middlegame slips; the
   engine grades the move and `describe.ts` names the plan) and "Opening leaks" (`src/openings/leaks.ts`:
-  real games only; repeated costly positions, fixed by drilling the engine's move as an opening
-  drill). There is no repertoire feature any more (removed on purpose; the old `repertoire` table is
+  real games only; repeated costly positions and the engine's move). There are no opening-line drills
+  any more (the old ones are retired), and no repertoire feature any more (removed on purpose; the old `repertoire` table is
   left unused). Endgame positions that Stockfish can't score as won without
   tablebases (bishop and knight mate) don't work in the endgame trainer, which judges by eval.
+  The trainer's "Surprise me" (`src/endgames/surprise.ts`) plays a random hand-written ending (pawns plus
+  at most one minor piece or a queen, to win or to hold) whose hints are its ideas, one card per hint
+  with drawings, in the opening plans' format; `node scripts/check-endgames.mjs` checks the results and
+  drawings. A "watch out" idea must name a move the engine really punishes. The written ideas speak from
+  the start position only; once the student has moved, hints are about the board as it is
+  (`src/endgames/now.ts`: the opponent's threat, loose pawns, passed pawns and the square, the kings, then
+  the engine's move and what it does).
 - The opening and endgame trainers are not games: they never create a game or show up in saved games, and
   they can start while a game is in progress (a rated game's clock pauses meanwhile, `src/game/clock.ts`).
   Opening sets live in `src/openings/training.ts`, checked by `node scripts/check-book.mjs`. Every
@@ -71,13 +78,40 @@ Rules:
   matches moves by what's left of the line, not by ply (`src/openings/order.ts`): a move the line plays
   later is fine when the engine says the order costs nothing, and an engine-equal move outside the line
   is marked "≈", not wrong.
+  Lines teach moves; structure cards (`src/openings/structures.ts`) teach what kind of game it is. They're
+  recognized from the pieces, not the line, so a transposition counts (1.d4 Nf6 2.Nc3 g6 3.Nf3 Bg7 4.e4
+  is a Pirc): when the board turns into one (a Pirc, a King's Indian, Bc4 or Be3 or f4 in the Pirc) its
+  button under the board lights up, and the card with the ideas opens only when clicked. Tactic
+  patterns (the fork trick) never show while the student has to find the move, only as "Missed: ..."
+  after a wrong one. `node scripts/check-structures.mjs` lists where each card opens along every line and
+  checks with Stockfish that each pattern really works wherever it fires.
   Now and then the opponent plays a mistake instead of the book move: one from `src/openings/traps.ts`,
   precomputed by `node scripts/find-traps.mjs` (Maia says players of a rating really make it, Stockfish
   says it loses at least a pawn). Run that again after adding or changing lines; nothing is searched live.
+  Then run `node scripts/explain-traps.mjs`: it writes `src/openings/trapNotes.ts`, what each trap and
+  detour is about, worked out from the board and Stockfish (what the mistake took away, what taking back
+  runs into, the threat). Hint shows that first (the arrow on a second press), and "Why" explains it once
+  the trap is punished. A trap with nothing concrete to find (`positional`) isn't played.
   Quiet openings hide most of their traps one step off the book, so the script also stores detours
   (`ROUTES`): a sound, common non-book move, the student's natural answer, then the mistake. To judge
   traps outside the app, `node scripts/trap-harness.mjs [--set london] [--detours]` writes
   `trap-preview.html` (open it at `localhost:1420/trap-preview.html`), each trap stepped through as a drill.
+- An opening can have a course (`src/openings/courses/`, listed in `index.ts`: the King's Indian and the London), shown in
+  New opening training (the `openings-course` screen: side, then a course, then its map,
+  `src/components/CourseMap.tsx`); the line sets stay in the Legacy opening trainer (`openings-legacy`)
+  until each opening gets its course. A course teaches decisions, not lines:
+  chapters are the opponent's setups, each node a position (`path`), the course's move, what the
+  opponent's last move means (`recognize`), why the answer, and a `watch` move that loses. A study run
+  (`src/openings/courseSession.ts`, on the opening trainer's store with `course` set, shown by
+  `CoursePanel.tsx`) starts each decision at its own position: new ones are taught (card and arrow
+  first), then asked from memory; a move players really make there that loses is played out against
+  the student ("Don't get caught"). A decision missed twice gets the coach's closer look
+  (`src/openings/courseMemo.ts`, one `coach_explain` call kept in the setting `openingCourseMemos`):
+  what to spot in the position (an extra Hint step, before the arrow) and a rule of thumb against the
+  moves the student keeps playing, written again from another angle after three more misses. Progress is spaced like drills (`src/openings/progress.ts`, setting
+  `openingCourse`). `node scripts/check-course.mjs` checks every answer against Stockfish, and
+  `node scripts/find-pitfalls.mjs` (Maia + Stockfish) writes `src/openings/pitfalls.ts`; run both after
+  editing a course.
 - Screens that aren't a game ask the coach one-off questions with `coach_explain` (`src/coach.rs` `explain`):
   no tools, no conversation, so it works during a rated game. Its answers show in the chat column through
   `src/coach/trainerChat.ts`, a thread of their own that is never saved into the game's chat. Hand it computed
@@ -86,18 +120,40 @@ Rules:
 - A mistake drill is a teaching moment, decided when it's captured: `addMistakeDrills` works out its
   lesson (`src/analysis/lesson.ts`: the game move against the best move, searched deeply, with its
   themes) and stores it in `drills.lesson`; a position with no concrete theme doesn't become a drill.
+  Each drill also gets a category (`src/analysis/drillCategory.ts`: hung material, walked into a tactic,
+  missed free material, missed tactics, mates, long-term, puzzles, coach), stored in `drills.category`
+  and worked out again with each new lesson. The Drills menu's "Due drills" is every due drill
+  shuffled; its "Focus on one kind" tiles start one category.
   A drill session only works out why a *different* wrong answer is bad; everything else it shows,
   right answer or wrong, comes from the lesson. Older drills get theirs from `backfillLessons`.
+- Fat-finger recall: no takeback button in rated games or puzzles, on purpose. Holding ◀ (the move-stepping
+  back arrow, `BackButton` in `StepButtons.tsx`) for three seconds opens a confirm: a rated game takes back the
+  student's last move (counted in `takebacks`), and a puzzle's first wrong move is voided (`undoMiss`, `puzzle_void`: the try and its drill are deleted,
+  so the rating and theme XP replay without it). Both are the student's own honesty.
 - "Real games" are rated games here plus imported ones (`games.source` set, stored as rated, never moving
   the in-app rating). The Profile and the coach's profile judge the student on those, never on practice.
-- Phones keep working offline for puzzles and drills (`src/offline.ts`): calls fall back to a pack kept on
+- Phones keep working offline for puzzles, drills and opening courses (`src/offline.ts`; a course
+  answer is saved per decision with `db_course_progress`, merged on the computer, later answer wins): calls fall back to a pack kept on
   the phone and writes wait in an outbox. A new puzzle or drill call should go through `orOffline`.
+- The phone and the computer share one database, and the student's progress must look the same on
+  both. Keep progress (results, scores, spaced-repetition state) in the database or a setting, never in
+  localStorage, which is per device (fine for UI choices like filters or the last screen). A device holds
+  what it loaded at startup, so every write that changes what another device shows is announced:
+  settings via `setting-changed` (`initSettingsSync` in `src/settings.ts`, including ratings moved by
+  `rate_game`), puzzle and drill progress via `data-changed` (`notify_data_changed` in `lib.rs`), games
+  via `game-changed`. A phone that may have missed them rereads on `resync` (`src/backend.ts`). A new
+  kind of shared progress needs the same.
 - Board sounds (`src/sound.ts`) follow whichever board is on screen: game, puzzle, drill, endgame or guess.
 
 ## Boards: the student can always draw
 
-Every chessboard on screen takes the student's drawings: right-click drag on desktop, the two-finger
-method on phones (one finger held, the other draws). That covers the game board, analysis and review,
+Every chessboard on screen takes the student's drawings: right-click drag on desktop, and on phones the
+top bar's pencil (`src/components/DrawMode.tsx`): draw mode, where a tap circles and a drag draws an
+arrow; a press off the boards or on the pencil ends it and keeps the drawings, and the next ordinary
+tap on the board clears them. There is no two-finger drawing any more (phones cancel held touches). That covers the game board, analysis and review,
+  Phone touch bugs can't be reproduced with scripted touches: set `SEND_FROM_PHONES` in `src/touchLog.ts`
+  (dev builds; phones reload by themselves) and each phone streams its touches, holds, dialogs and errors to
+  `phone-debug.log` in the project (`dev_log`, `src-tauri/src/devlog.rs`). `?touchlog` also shows it on screen.
 drills, puzzles, the why-screen, the coach's scenario boards and any board added later.
 
 - Use `src/components/Board.tsx` for every board. `viewOnly` there only stops piece moves; drawing still
@@ -112,7 +168,7 @@ drills, puzzles, the why-screen, the coach's scenario boards and any board added
   the device with a chess-words grammar (`src/voice/listen.ts`, model from `scripts/setup-vosk.mjs`),
   `src/voice/parse.ts` reads the words against the legal moves (checked by `node scripts/check-voice.mjs`),
   and they go to the same board typed moves do. A move waits for a yes per `needsConfirm`
-  (`src/voice/confirm.ts`): rated games and unsure readings by default. Phones need the https address.
+  (`src/voice/confirm.ts`): rated games, rated puzzles and unsure readings by default; a long-press (right-click on desktop) on the mic turns it off or on for the rated ones. Phones need the https address.
 - The student's drawings belong to the position: they clear when the position changes, not on re-renders.
 - Any text about a position on screen, not only the coach's chat, makes its squares and moves hoverable
   (desktop) and tappable (phones) so they show on the board: render it with `SquareText` / `SquareRef`

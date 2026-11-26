@@ -9,6 +9,7 @@ import { gamesText, profileText } from "./profile";
 import { continuations, openingName } from "../openings/book";
 import { START_FEN } from "../chess/line";
 import { askMove } from "./quiz";
+import { openingLines, queryData, trainingProgress } from "./data";
 import { findPuzzles, openingLabel, openingTag, refreshPuzzleDb, themeKey, themeLabel, usePuzzleDb } from "../puzzles/puzzles";
 import { puzzleContext, startCoachSet, usePuzzle } from "../puzzles/session";
 import { drillContext, useDrill } from "../analysis/drillSession";
@@ -17,6 +18,7 @@ import { endgameContext, endgameOf, useEndgame } from "../endgames/session";
 import { guessContext, useGuess } from "../guess/session";
 import { planContext, planOf, usePlan } from "../plans/session";
 import { peeking } from "../nav";
+import { useAnalysis } from "../analysis/layer";
 import { fromLichess, toLichess } from "../rating";
 import { evalWords, lineReport, materialChange, positionFacts, storedEval, topMoves } from "./insight";
 import { explainCached } from "../analysis/explain";
@@ -173,6 +175,8 @@ export function screenSide(): Color {
  * board, else the main board's. The tools' default when the coach gives no FEN.
  */
 function boardFen(): string {
+  const a = useAnalysis.getState();
+  if (a) return a.x.line.fens[a.x.ply];
   if (!peeking()) {
     const trainer = puzzleContext() ?? drillContext() ?? openingContext() ?? endgameContext() ?? guessContext() ?? planContext();
     if (trainer) return trainer.fen;
@@ -343,6 +347,10 @@ Object.assign(handlers, {
     return { text: await gamesText(mode, clamp(Number(args.limit ?? 5), 1, 20), gameId) };
   },
 
+  query_data: queryData,
+  opening_lines: openingLines,
+  training_progress: trainingProgress,
+
   async record_observation(args: Args) {
     const tag = String(args.tag ?? "").trim();
     const note = String(args.note ?? "").trim();
@@ -471,6 +479,8 @@ export function describeCall(name: string, args: Args): string {
   if (name === "setup_position") return `setup_position "${args.title ?? ""}"`;
   if (name === "ask_move") return `ask_move "${args.title ?? ""}"`;
   if (name === "evaluate_moves") return `evaluate_moves ${Array.isArray(args.moves) ? args.moves.join(", ") : ""}`;
+  if (name === "query_data") return typeof args.sql === "string" && args.sql.trim() ? "query_data" : "query_data schema";
+  if (name === "opening_lines") return `opening_lines${[args.set, args.line].filter(Boolean).map((v) => ` ${v}`).join("")}`;
   if (name === "find_puzzles") return `find_puzzles${Array.isArray(args.themes) && args.themes.length ? ` ${args.themes.join(", ")}` : ""}`;
   return name;
 }

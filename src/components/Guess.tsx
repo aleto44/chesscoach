@@ -1,3 +1,4 @@
+import { useSettings } from "../settings";
 import { useMemo, useState } from "react";
 import type { DrawShape } from "chessground/draw";
 import { sendToCoach } from "../coach/bridge";
@@ -7,7 +8,6 @@ import { hasBackend } from "../db";
 import { parsePgn } from "../games/pgn";
 import { MASTER_GAMES, type MasterGame } from "../guess/games";
 import {
-  bestScores,
   continueGuess,
   guessMove,
   guessQuestion,
@@ -40,7 +40,7 @@ function fromMaster(g: MasterGame): GuessGame {
 /** School › Guess the move: the classic games, or any game pasted as PGN. */
 export function GuessMenu() {
   const blocked = useSessionsBlocked();
-  const best = bestScores();
+  const best = useSettings((st) => st.guessBest);
   const [skip, setSkip] = useState(4);
   const [pgn, setPgn] = useState("");
   const [pgnSide, setPgnSide] = useState<Color>("white");
@@ -182,7 +182,7 @@ export function GuessPanel() {
             Back to the games
           </button>
         )}
-        {signedIn && s.results.length > 0 && (
+        {signedIn && last && last.guess !== last.master && (
           <button onClick={() => sendToCoach(guessQuestion())} disabled={busy || s.status === "checking"} title="One message to the coach">
             Ask the coach why
           </button>

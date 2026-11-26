@@ -16,6 +16,7 @@ import { endgameOf, useEndgame } from "../endgames/session";
 import { openingSetOf, useOpening } from "../openings/session";
 import { useGuess } from "../guess/session";
 import { answered as planAnswered, planOf, usePlan } from "../plans/session";
+import { loadedLine, useLoad } from "../utility/load";
 
 export interface AnalysisLayer {
   x: Explore;
@@ -50,6 +51,9 @@ export function analysisSource(): Source | null {
     return { line, ply, orientation: boardOrientation(), from: "scenario" };
   }
   const p = usePuzzle.getState();
+  // A finished puzzle opened again from the rush's history: answered, so always.
+  const pr = p?.review && p.results[p.review.result];
+  if (p?.review && pr) return { line: p.review.x.line, ply: p.review.x.ply, orientation: pr.color ?? p.color, from: "puzzle" };
   if (p) return p.line && (p.status === "solved" || p.status === "failed") ? { line: p.line, ply: at(p.line, p.view), orientation: p.color, from: "puzzle" } : null;
   const d = useDrill.getState();
   if (d) {
@@ -60,12 +64,19 @@ export function analysisSource(): Source | null {
   const e = useEndgame.getState();
   if (e) return e.status === "playing" || e.status === "thinking" ? null : { line: e.line, ply: at(e.line, e.view), orientation: endgameOf(e).side, from: "endgame" };
   const o = useOpening.getState();
+  // A course decision asked from memory: not before it's answered.
+  if (o?.course && !o.course.items[o.course.index]?.learn && (o.status === "playing" || o.status === "thinking")) return null;
   if (o) return { line: o.line, ply: at(o.line, o.view), orientation: openingSetOf(o).color, from: "opening trainer" };
   const g = useGuess.getState();
   if (g) return g.status === "reveal" || g.status === "done" ? { line: g.line, ply: at(g.line, g.view), orientation: g.side, from: "guess the move" } : null;
   const pl = usePlan.getState();
   const pos = pl && planOf(pl);
   if (pl) return pos && planAnswered(pl) ? { line: pl.line, ply: at(pl.line, pl.view), orientation: pos.color, from: "find the plan" } : null;
+  if (useNav.getState().view === "load-game") {
+    const line = loadedLine();
+    const l = useLoad.getState();
+    return line && l.loaded ? { line, ply: Math.min(l.ply, line.sans.length), orientation: l.loaded.orientation, from: "loaded game" } : null;
+  }
   if (useNav.getState().view !== "board") return null;
   const { line, ply, tangent } = screen();
   return { line, ply, orientation: boardOrientation(), from: tangent ? "scenario" : "game" };
@@ -79,11 +90,13 @@ export function useCanAnalyze(): boolean {
   useNav((n) => n.view);
   useNav((n) => n.peek);
   usePuzzle((p) => p?.status);
+  usePuzzle((p) => p?.review?.result);
   useDrill((d) => d?.status);
   useEndgame((e) => e?.status);
-  useOpening((o) => !!o);
+  useOpening((o) => (o ? `${o.status}` : null));
   useGuess((g) => g?.status);
   usePlan((p) => p?.status);
+  useLoad((l) => l.loaded);
   return analysisSource() !== null;
 }
 

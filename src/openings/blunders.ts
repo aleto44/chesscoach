@@ -3,7 +3,8 @@
 // scripts/find-traps.mjs (traps.ts): moves Maia says players of a rating really make in the line's
 // positions, which Stockfish says lose at least a pawn. So the opponent plays one at once, and only
 // where one exists. Some come after a detour (Route): a sound move off the book, the student's answer,
-// then the mistake.
+// then the mistake. What each one is about (the hint, and why it loses) is worked out ahead of time
+// too, by scripts/explain-traps.mjs (trapNotes.ts).
 import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
 import { storedEval } from "../coach/insight";
@@ -11,6 +12,7 @@ import { getReviewEngine } from "../engine/stockfish";
 import { useSettings } from "../settings";
 import type { TrainingLine } from "./training";
 import { ROUTES, TRAPS } from "./traps";
+import { DETOUR_NOTES, TRAP_NOTES } from "./trapNotes";
 
 /** A mistake Maia gives less than this chance at the student's rating isn't one people play there. */
 const MIN_P = 0.03;
@@ -32,6 +34,26 @@ export interface Trap {
 }
 
 /**
+ * What a trap is about, from explain-traps.mjs: `hint` before the student's first move (what the
+ * mistake took away, without naming the answer), `why` once the punishment is played, and a hint
+ * for each later move of it (keyed by its index in `cont`). Moves in the text are a line from the
+ * position before the mistake. A `positional` one has no tactic to find, so it isn't played.
+ */
+export interface TrapNote {
+  hint: string;
+  draw: string;
+  why: string;
+  steps: Record<string, [text: string, draw: string]>;
+  positional?: boolean;
+}
+
+/** The hint for the student's answer to a detour (explain-traps.mjs). */
+export interface DetourNote {
+  hint: string;
+  draw: string;
+}
+
+/**
  * A detour to a trap one step off the book: from a book position the opponent plays `lead` (sound, and
  * common at the bands in `p`), the student is expected to answer `reply`, and the position after that
  * has stored mistakes (TRAPS). Quiet openings hide most of their tactics there rather than on the line.
@@ -48,6 +70,7 @@ export interface Detour {
   reply: string;
   /** positionKey of the position after `reply`, where the opponent's mistake comes. */
   trapKey: string;
+  note?: DetourNote;
 }
 
 export interface Blunder {
@@ -64,16 +87,34 @@ export interface Blunder {
   cont: string[];
   /** The ply the punishment starts at (moves on the board once the mistake is played); set by the session. */
   at: number;
+  note?: TrapNote;
 }
 
 /** A position without the move counters, as traps.ts is keyed. */
 export const positionKey = (fen: string) => fen.split(" ").slice(0, 4).join(" ");
 
+/**
+ * The hint for the student's move now, while the opponent's mistake or detour is on the board: the
+ * trap's own note (what it took away, then a hint per later move of the punishment), or the detour's.
+ */
+export function trapHint(b: Blunder | null | undefined, d: Detour | null | undefined, ply: number): { text: string; draw: string } | null {
+  if (d?.note) return { text: d.note.hint, draw: d.note.draw };
+  if (!b?.note) return null;
+  const k = ply - b.at;
+  if (k === 0) return { text: b.note.hint, draw: b.note.draw };
+  const step = b.note.steps[String(k)];
+  return step ? { text: step[0], draw: step[1] } : null;
+}
+
 const bandOf = (rating: number) => String(BANDS.reduce((a, b) => (Math.abs(b - rating) < Math.abs(a - rating) ? b : a)));
 
 /** The traps a player of `rating` falls into in this position. */
-const trapsAt = (fen: string, rating: number) =>
-  (TRAPS[positionKey(fen)] ?? []).filter((t) => (t.p[bandOf(rating)] ?? 0) >= MIN_P);
+const trapsAt = (fen: string, rating: number) => playable(positionKey(fen)).filter((t) => (t.p[bandOf(rating)] ?? 0) >= MIN_P);
+
+/** A position's traps that teach a tactic: a positional one has nothing concrete to find or explain. */
+function playable(key: string) {
+  return (TRAPS[key] ?? []).filter((t) => !TRAP_NOTES[key]?.[t.san]?.positional);
+}
 
 /** One of `items`, the likelier ones more often. */
 function weighted<T>(items: T[], weight: (t: T) => number): T | null {
@@ -84,7 +125,7 @@ function weighted<T>(items: T[], weight: (t: T) => number): T | null {
 
 /** How often a player of `rating` falls into one of this position's traps. */
 const trapWeight = (key: string, rating: number) =>
-  (TRAPS[key] ?? []).reduce((n, t) => n + ((t.p[bandOf(rating)] ?? 0) >= MIN_P ? t.p[bandOf(rating)] : 0), 0);
+  playable(key).reduce((n, t) => n + ((t.p[bandOf(rating)] ?? 0) >= MIN_P ? t.p[bandOf(rating)] : 0), 0);
 
 /** The detours from this position a player of `rating` takes, each weighted by how often it ends in a mistake. */
 function routesAt(fen: string, rating: number): { detour: Detour; weight: number }[] {
@@ -97,7 +138,8 @@ function routesAt(fen: string, rating: number): { detour: Detour; weight: number
       chess.move(r.reply);
       const trapKey = positionKey(chess.fen());
       const weight = lead * trapWeight(trapKey, rating);
-      return weight ? [{ detour: { lead: r.lead, reply: r.reply, trapKey }, weight }] : [];
+      const note = DETOUR_NOTES[positionKey(fen)]?.[r.lead];
+      return weight ? [{ detour: { lead: r.lead, reply: r.reply, trapKey, note }, weight }] : [];
     } catch {
       return [];
     }
@@ -154,6 +196,7 @@ export function trapAt(fen: string, rating: number): Blunder | null {
     p: t.p[bandOf(rating)],
     cont: t.cont?.length ? t.cont : [t.best],
     at: 0,
+    note: TRAP_NOTES[positionKey(fen)]?.[t.san],
   };
 }
 

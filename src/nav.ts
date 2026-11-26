@@ -17,6 +17,8 @@ export type View =
   | "drills"
   | "drill-history"
   | "openings"
+  | "openings-course"
+  | "openings-legacy"
   | "puzzles"
   | "puzzle-history"
   | "profile"
@@ -30,6 +32,7 @@ export type View =
   | "leaks"
   | "utility"
   | "timer"
+  | "load-game"
   | "board";
 
 export const VIEW_TITLE: Record<View, string> = {
@@ -38,6 +41,8 @@ export const VIEW_TITLE: Record<View, string> = {
   school: "School",
   drills: "Drills",
   openings: "Opening training",
+  "openings-course": "Opening courses",
+  "openings-legacy": "Legacy opening trainer",
   "drill-history": "Drill history",
   puzzles: "Puzzles",
   "puzzle-history": "Puzzle history",
@@ -52,6 +57,7 @@ export const VIEW_TITLE: Record<View, string> = {
   leaks: "Opening leaks",
   utility: "Utility",
   timer: "Chess clock",
+  "load-game": "Load game",
   board: "Board",
 };
 
@@ -61,6 +67,8 @@ const PARENT: Partial<Record<View, View>> = {
   school: "home",
   drills: "school",
   openings: "school",
+  "openings-course": "openings",
+  "openings-legacy": "openings",
   puzzles: "home",
   "drill-history": "drills",
   "puzzle-history": "puzzles",
@@ -75,6 +83,7 @@ const PARENT: Partial<Record<View, View>> = {
   leaks: "school",
   utility: "home",
   timer: "utility",
+  "load-game": "utility",
 };
 
 /**

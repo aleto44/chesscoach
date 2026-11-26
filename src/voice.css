@@ -149,3 +149,30 @@
   display: grid;
   gap: 3px;
 }
+
+/* Draw mode (the pencil next to the mic): the boards are outlined while a press draws. */
+.topbar button.draw-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.board-holder.draw-mode::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+
+/* Phones: the top bar scrolls sideways, which clips anything hanging below it, so what the mic
+   hears (and its confirm on/off note) sits under the bar from the screen's edge instead. */
+@media (max-width: 760px) {
+  .voice-heard {
+    position: fixed;
+    top: calc(var(--topbar-h, 52px) + 6px);
+    right: 8px;
+    max-width: calc(100vw - 16px);
+  }
+}

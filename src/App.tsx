@@ -8,6 +8,7 @@ import { PuzzlePanel } from "./components/PuzzlePanel";
 import { Home } from "./components/Home";
 import { EndgamePanel } from "./components/Endgames";
 import { OpeningPanel } from "./components/OpeningPanel";
+import { CoursePanel } from "./components/CoursePanel";
 import { openingStep, useOpening } from "./openings/session";
 import { GuessPanel } from "./components/Guess";
 import { PlanPanel } from "./components/Plans";
@@ -23,6 +24,8 @@ import type { Step } from "./chess/view";
 import { goto, openTangent, screen, step, useStore } from "./store";
 import { AnalysisPanel } from "./components/Analysis";
 import { analysisStep, closeAnalysis, useAnalysis } from "./analysis/layer";
+import { useLoad } from "./utility/load";
+import { loadStep } from "./components/LoadGame";
 
 export default function App() {
   // A square or move tapped in any text stays on the board until a tap elsewhere.
@@ -31,6 +34,7 @@ export default function App() {
   const puzzling = usePuzzle((p) => p !== null);
   const endgame = useEndgame((e) => e !== null);
   const opening = useOpening((o) => o !== null);
+  const onCourse = useOpening((o) => !!o?.course);
   const guessing = useGuess((g) => g !== null);
   const planning = usePlan((p) => p !== null);
   const onBoard = useNav((n) => n.view === "board");
@@ -82,6 +86,15 @@ export default function App() {
         e.preventDefault();
         return;
       }
+      if (useNav.getState().view === "load-game" && useLoad.getState().loaded?.line.sans.length) {
+        // A loaded game: the arrow keys step through it, as on any board.
+        const keys: Record<string, Step> = { ArrowLeft: -1, ArrowRight: 1, Home: "start", End: "end" };
+        if (e.key in keys) {
+          loadStep(keys[e.key]);
+          e.preventDefault();
+          return;
+        }
+      }
       if (useNav.getState().view !== "board" && !peeking()) {
         // A menu: Escape goes up a level; the arrow keys would move a board that isn't showing.
         if (e.key !== "Escape") return;
@@ -119,7 +132,7 @@ export default function App() {
       ) : endgame ? (
         <EndgamePanel />
       ) : opening ? (
-        <OpeningPanel />
+        onCourse ? <CoursePanel /> : <OpeningPanel />
       ) : guessing ? (
         <GuessPanel />
       ) : planning ? (

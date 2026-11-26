@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useBacklog } from "../analysis/review";
 import { isTauri } from "../backend";
-import { accountKey, importGames, loadAccounts, refreshAccount, removeAccount, useAccounts, useImport, type ImportAccount } from "../games/import";
+import { accountKey, importGames, loadAccounts, refreshAccount, refreshAllAccounts, removeAccount, useAccounts, useImport, type ImportAccount } from "../games/import";
 import { saveSetting, useSettings } from "../settings";
 import { SITE_NAME, type ImportSite } from "../store";
 import { askConfirm } from "./Confirm";
@@ -25,9 +25,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
   }, []);
   const named = accounts?.filter((a): a is ImportAccount & { account: string } => a.account !== null) ?? [];
   const busy = useImport((s) => Object.values(s).some((x) => x?.running));
-  const refreshAll = async () => {
-    for (const a of named) await refreshAccount(a).catch(() => undefined);
-  };
+  const refreshAll = () => refreshAllAccounts().catch(() => undefined);
   return (
     <Modal title="Import games" onClose={onClose} className="import-dialog">
       <p className="muted small">

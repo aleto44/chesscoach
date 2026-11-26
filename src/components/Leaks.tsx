@@ -1,10 +1,6 @@
-import { useState } from "react";
 import { evalText } from "../openings/explain";
-import { addDrills } from "../analysis/drills";
-import { START_FEN } from "../chess/line";
 import { LEAK_PLIES, numbered, openingLeaks, type Leak } from "../openings/leaks";
 import { useFromGames } from "../training/games";
-import type { Color } from "../store";
 import { Board } from "./Board";
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -18,7 +14,7 @@ export function LeaksMenu() {
       <h2 className="section-title">Opening leaks</h2>
       <p className="section-lede muted">
         Your real games (rated here and imported), the first {LEAK_PLIES / 2} moves: how each opening goes for you, the
-        positions you keep reaching and misplaying. Drill a fix and the engine's move comes back under Drills until it sticks.
+        positions you keep reaching and misplaying, with the engine's move.
       </p>
       {error && <p className="muted">Couldn't load your games: {error}</p>}
       {!data && !error && <p className="muted">Looking through your games…</p>}
@@ -69,25 +65,6 @@ export function LeaksMenu() {
   );
 }
 
-/** Makes `moves` (from the start, ending on the fix) an opening drill: play the line from memory. */
-function AddFix({ color, name, moves, label }: { color: Color; name: string; moves: string[]; label: string }) {
-  const [state, setState] = useState<"idle" | "adding" | "added" | "failed">("idle");
-  return (
-    <button
-      disabled={state === "adding" || state === "added"}
-      onClick={() => {
-        setState("adding");
-        addDrills([{ kind: "opening", title: `${name} (${color})`, fen: START_FEN, color, line: moves }]).then(
-          () => setState("added"),
-          (e) => (console.error("adding the drill failed", e), setState("failed")),
-        );
-      }}
-    >
-      {state === "added" ? "✓ Added to your drills" : state === "failed" ? "Couldn't add it, try again" : label}
-    </button>
-  );
-}
-
 function LeakRow({ leak: l }: { leak: Leak }) {
   const played = l.played.map((p) => (p.count > 1 ? `${p.san} (${p.count}×)` : p.san)).join(", ");
   return (
@@ -107,11 +84,6 @@ function LeakRow({ leak: l }: { leak: Leak }) {
           ) : null}
           . Costs you {(l.avgLoss / 100).toFixed(1)} pawns on average{l.worst ? `, worst a ${l.worst}` : ""}.
         </div>
-        {l.best && (
-          <div className="controls">
-            <AddFix color={l.color} name={`${l.opening ?? "Opening"}: fix at move ${moveNo(l.path)}`} moves={[...l.path, l.best]} label={`Drill ${l.best}`} />
-          </div>
-        )}
       </div>
     </div>
   );

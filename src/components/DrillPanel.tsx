@@ -21,6 +21,7 @@ import {
   type DrillState,
 } from "../analysis/drillSession";
 import { THEME_NAMES, type Explanation } from "../analysis/explain";
+import { categoryLabel } from "../analysis/drillCategory";
 import { sendToCoach } from "../coach/bridge";
 import { useAuth } from "../coach/auth";
 import { hasBackend } from "../db";
@@ -39,6 +40,7 @@ const KIND_LABEL = {
   coach: "From the coach",
   puzzle: "Missed puzzle",
 } as const;
+
 
 /** Replaces the game board while a drill session runs. */
 export function DrillPanel() {
@@ -85,11 +87,12 @@ export function DrillPanel() {
       <div className="drill-body">
         <div className="game-bar">
           <span className="game-status">
-            <strong>Drills</strong>
+            <strong>{s.source.category ? categoryLabel(s.source.category) : "Drills"}</strong>
             {drill && (
               <span className="muted">
                 {" "}
-                · {s.index + 1} of {s.queue.length} · {KIND_LABEL[drill.kind]}
+                · {s.index + 1} of {s.queue.length}
+                {!s.source.category && <> · {drill.category ? categoryLabel(drill.category) : KIND_LABEL[drill.kind]}</>}
               </span>
             )}
           </span>
@@ -272,11 +275,11 @@ export function DrillPanel() {
             <p>
               {s.queue.length
                 ? `Done: ${s.correct} of ${s.queue.length} correct.`
-                : "Nothing is due right now. Drills come from mistakes in your analyzed games, missed puzzles and opening fixes."}
+                : "Nothing is due right now. Drills come from mistakes in your analyzed games, missed puzzles and the coach."}
             </p>
             <div className="controls">
-              <button onClick={() => startDrills(true)}>
-                Practice all drills anyway
+              <button onClick={() => startDrills(true, null, s.source.category ?? null)}>
+                {s.source.category ? `Practice all "${categoryLabel(s.source.category)}" anyway` : "Practice all drills anyway"}
               </button>
               <button className="primary" onClick={stopDrills}>
                 Back to drills

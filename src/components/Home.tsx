@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { parkedFor, startDrills, useParkedDrills } from "../analysis/drillSession";
-import { useDrillCounts } from "../analysis/drills";
+import { useDrillCategoriesVersion, useDrillCounts } from "../analysis/drills";
+import { CATEGORIES, type DrillCategory } from "../analysis/drillCategory";
 import { hasBackend, invoke, openUrl } from "../backend";
 import { cachedRead, keepRead } from "../snapshot";
 import { newGame } from "../game/session";
@@ -8,8 +9,10 @@ import { timeControlLabel } from "../game/clock";
 import { go, useNav } from "../nav";
 import { refreshPuzzleDb, themeLabel, usePuzzleDb, type ThemeMastery } from "../puzzles/puzzles";
 import { rushBest as bestRush, startPuzzles, startRatedPuzzles, startRush, useParkedPuzzles } from "../puzzles/session";
-import { commonness, familyOf, findSet, modesOf, pickLine, seenCounts, shortName, TRAINING_SETS, type Commonness, type TrainingLine } from "../openings/training";
+import { commonness, familyOf, findSet, modesOf, pickLine, shortName, TRAINING_SETS, type Commonness, type TrainingLine, type TrainingSet } from "../openings/training";
 import { startOpening } from "../openings/session";
+import { COURSES, counts, courseById } from "../openings/course";
+import { CourseMap } from "./CourseMap";
 import { fromLichess, POOL_LABEL, RATING_POOLS, signed, type PlayerRating } from "../rating";
 import { isLocked, opponentLabel, useStore } from "../store";
 import { NewGameDialog, PlayRatedDialog, usePoolRating } from "./GameDialogs";
@@ -23,6 +26,7 @@ import { PlansMenu } from "./Plans";
 import { LeaksMenu } from "./Leaks";
 import { MasteryRule, StarBadge, XpBar } from "./Mastery";
 import { TimerScreen } from "./Timer";
+import { LoadGame } from "./LoadGame";
 import { clockLabel, started as clockStarted, useTimer } from "../utility/timer";
 import { saveSetting, useSettings } from "../settings";
 
@@ -48,7 +52,9 @@ export function Home() {
         {view === "school" && <SchoolMenu />}
         {view === "drills" && <DrillsMenu />}
         {view === "drill-history" && <DrillHistory />}
-        {view === "openings" && <OpeningTraining />}
+        {view === "openings" && <OpeningsMenu />}
+        {view === "openings-legacy" && <OpeningTraining />}
+        {view === "openings-course" && <OpeningCourses />}
         {view === "puzzles" && <PuzzlesMenu />}
         {view === "puzzle-history" && <PuzzleHistory />}
         {view === "profile" && <ProfileMenu />}
@@ -61,6 +67,7 @@ export function Home() {
         {view === "plans" && <PlansMenu />}
         {view === "leaks" && <LeaksMenu />}
         {view === "utility" && <UtilityMenu />}
+        {view === "load-game" && <LoadGame />}
       </div>
     </main>
   );
@@ -154,7 +161,7 @@ function MainMenu() {
           onClick={() => go("puzzles")}
         />
         <Tile big icon="◔" title="Profile" sub="Your games, weaknesses and ratings" onClick={() => go("profile")} />
-        <Tile big icon="⚒" title="Utility" sub="Analysis board and chess clock" onClick={() => go("utility")} />
+        <Tile big icon="⚒" title="Utility" sub="Analysis board, load a game, chess clock" onClick={() => go("utility")} />
       </div>
     </>
   );
@@ -181,6 +188,7 @@ function UtilityMenu() {
             go("board", "utility");
           }}
         />
+        <Tile icon="⇪" title="Load game" sub="A FEN, a PGN or a picture of a board, on the analysis board" onClick={() => go("load-game")} />
         <Tile
           icon="⏱"
           title="Chess clock"
@@ -220,8 +228,9 @@ function GamesMenu() {
 }
 
 interface DrillOverview {
+  /** Per category (drillCategory.ts); one not worked out yet shows as its kind. */
   kinds: {
-    kind: "mistake" | "opening" | "coach" | "puzzle";
+    category: DrillCategory;
     cards: number;
     due: number;
     pctCorrect: number | null;
@@ -243,15 +252,37 @@ const KIND_LABEL: Record<string, string> = {
   puzzle: "Missed puzzles",
 };
 
+/** The overview's rows in menu order, named; a drill not sorted yet shows under its kind. */
+function byCategory(rows: DrillOverview["kinds"]) {
+  const at = (c: string) => {
+    const i = CATEGORIES.findIndex((x) => x.id === c);
+    return i < 0 ? CATEGORIES.length : i;
+  };
+  return [...rows]
+    .filter((k) => k.cards > 0)
+    .sort((a, b) => at(a.category) - at(b.category))
+    .map((k) => {
+      const c = CATEGORIES.find((x) => x.id === k.category);
+      return { k, icon: c?.icon ?? "♟", label: c?.label ?? KIND_LABEL[k.category] ?? k.category, about: c?.about ?? "" };
+    });
+}
+
 function useDrillOverview(limit: number) {
-  return useRead<DrillOverview>("db_drill_overview", { limit }, "Drills are saved on the computer; open the app there or from the home server.");
+  const version = useDrillCategoriesVersion();
+  return useRead<DrillOverview>(
+    "db_drill_overview",
+    { limit },
+    "Drills are saved on the computer; open the app there or from the home server.",
+    version,
+  );
 }
 
 /**
  * A read-only query for a screen. On a phone the last answer shows at once (snapshot.ts) while
  * the computer is asked again; an error only shows when there's nothing to show instead.
  */
-export function useRead<T>(cmd: string, args: Record<string, unknown>, offline: string) {
+/** `refresh`: bump it to ask again. */
+export function useRead<T>(cmd: string, args: Record<string, unknown>, offline: string, refresh = 0) {
   const key = `${cmd}:${JSON.stringify(args)}`;
   const [data, setData] = useState<T | null>(() => cachedRead<T>(key));
   const [error, setError] = useState<string | null>(null);
@@ -268,13 +299,13 @@ export function useRead<T>(cmd: string, args: Record<string, unknown>, offline: 
     return () => {
       live = false;
     };
-  }, [key]);
+  }, [key, refresh]);
   return { data, error: data ? null : error };
 }
 
 function SchoolMenu() {
   const drills = useDrillCounts();
-  const seen = seenCounts();
+  const seen = useSettings((st) => st.openingSeen);
   const lines = TRAINING_SETS.flatMap((s) => s.lines);
   const faced = lines.filter((l) => seen[l.moves.join(" ")]).length;
   return (
@@ -312,6 +343,98 @@ const COMMONNESS_LABEL: Record<Commonness, string> = {
 
 /** The opening picked last time, so coming back to the menu starts where the student was. */
 const OPENING_KEY = "cc-opening-set";
+/** The course picked last time on the courses screen. */
+const COURSE_KEY = "cc-opening-course";
+
+/**
+ * Opening training's two ways in: the courses (decisions, taught then spaced, one opening at a time
+ * as they're written) and the legacy line trainer, kept for the openings that have no course yet.
+ */
+function OpeningsMenu() {
+  const progress = useSettings((s) => s.openingCourse);
+  const due = COURSES.reduce((n, c) => n + counts(c, progress).due, 0);
+  const seen = useSettings((st) => st.openingSeen);
+  const lines = TRAINING_SETS.flatMap((s) => s.lines);
+  const faced = lines.filter((l) => seen[l.moves.join(" ")]).length;
+  return (
+    <>
+      <h2 className="section-title">Opening training</h2>
+      <div className="menu-grid">
+        <Tile
+          icon="♜"
+          title="New opening training"
+          sub={`Courses: ${COURSES.map((c) => c.name).join(", ")}. The decisions that matter, taught then spaced out`}
+          badge={due ? <span className="count">{due}</span> : null}
+          onClick={() => go("openings-course")}
+        />
+        <Tile
+          icon="☰"
+          title="Legacy opening trainer"
+          sub={faced ? `Whole lines, every opening. Faced ${faced} of ${lines.length}` : "Whole lines for every opening, and the mistakes to punish"}
+          onClick={() => go("openings-legacy")}
+        />
+      </div>
+    </>
+  );
+}
+
+function savedCourseId(): string {
+  try {
+    const id = localStorage.getItem(COURSE_KEY);
+    if (id && courseById(id)) return id;
+  } catch {
+    // Private mode: start at the first course.
+  }
+  return COURSES[0].id;
+}
+
+/** The courses: pick a side, then a course, and its map (CourseMap) below. */
+function OpeningCourses() {
+  const [id, setIdState] = useState(savedCourseId);
+  const setId = (next: string) => {
+    setIdState(next);
+    try {
+      localStorage.setItem(COURSE_KEY, next);
+    } catch {
+      // Private mode: not kept.
+    }
+  };
+  const progress = useSettings((s) => s.openingCourse);
+  const course = courseById(id) ?? COURSES[0];
+  const sides = (["white", "black"] as const).filter((c) => COURSES.some((x) => x.color === c));
+  const pickSide = (c: "white" | "black") => c !== course.color && setId(COURSES.find((x) => x.color === c)!.id);
+  return (
+    <>
+      <h2 className="section-title">Opening courses</h2>
+      <div className="segmented opening-side">
+        {sides.map((c) => (
+          <button key={c} className={course.color === c ? "on" : ""} onClick={() => pickSide(c)}>
+            {c === "white" ? "I play White" : "I play Black"}
+          </button>
+        ))}
+      </div>
+      <div className="opening-grid">
+        {COURSES.filter((c) => c.color === course.color).map((c) => {
+          const n = counts(c, progress);
+          return (
+            <button key={c.id} className={`opening-card ${c.id === course.id ? "on" : ""}`} onClick={() => setId(c.id)}>
+              <span className="opening-card-name">{c.name}</span>
+              <span className="mode-chip">
+                {n.known} of {n.total} known{n.due ? ` · ${n.due} due` : ""}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <section className="opening-detail">
+        <div className="opening-detail-head">
+          <h3 className="opening-detail-title">{course.name}</h3>
+        </div>
+        <CourseMap course={course} />
+      </section>
+    </>
+  );
+}
 function savedSetId(): string {
   try {
     const id = localStorage.getItem(OPENING_KEY);
@@ -379,7 +502,7 @@ function OpeningTraining() {
 
   return (
     <>
-      <h2 className="section-title">Opening training</h2>
+      <h2 className="section-title">Legacy opening trainer</h2>
       {/* Three choices, each a level below the last: side, then opening, then how to train it. */}
       <div className="segmented opening-side">
         {(["white", "black"] as const).map((c) => (
@@ -409,31 +532,40 @@ function OpeningTraining() {
             </div>
           )}
         </div>
-        <p className="opening-mode-help muted">{MODE_HELP[set.mode ?? "Main lines"]}</p>
-        <div className="opening-start">
-          <button className="primary" disabled={!set.lines.length} onClick={() => play(pickLine(set))}>
-            ▶ Play a random line
-          </button>
-          <OpponentMistakes />
-        </div>
-        <h3 className="sub-title">
-          Or pick one
-        </h3>
-        <div className="opening-lines">
-          {/* Most played first, each with how often it comes up; ties keep the file's order. The moves are in the tooltip. */}
-          {[...set.lines]
-            .sort((a, b) => b.weight - a.weight)
-            .map((l) => {
-              const c = commonness(l);
-              return (
-                <button key={l.moves.join(" ")} className="opening-line" title={numberedMoves(l.moves)} onClick={() => play(l)}>
-                  <span className="opening-line-name">{shortName(set, l)}</span>
-                  <span className={`rarity ${c}`}>{COMMONNESS_LABEL[c]}</span>
-                </button>
-              );
-            })}
-        </div>
+        <OpeningLines set={set} play={play} />
       </section>
+    </>
+  );
+}
+
+/** The opening's lines to play through, for the mode picked (main lines or punishing mistakes). */
+function OpeningLines({ set, play }: { set: TrainingSet; play: (line: TrainingLine) => void }) {
+  return (
+    <>
+      <p className="opening-mode-help muted">{MODE_HELP[set.mode ?? "Main lines"]}</p>
+      <div className="opening-start">
+        <button className="primary" disabled={!set.lines.length} onClick={() => play(pickLine(set))}>
+          ▶ Play a random line
+        </button>
+        <OpponentMistakes />
+      </div>
+      <h3 className="sub-title">
+        Or pick one
+      </h3>
+      <div className="opening-lines">
+        {/* Most played first, each with how often it comes up; ties keep the file's order. The moves are in the tooltip. */}
+        {[...set.lines]
+          .sort((a, b) => b.weight - a.weight)
+          .map((l) => {
+            const c = commonness(l);
+            return (
+              <button key={l.moves.join(" ")} className="opening-line" title={numberedMoves(l.moves)} onClick={() => play(l)}>
+                <span className="opening-line-name">{shortName(set, l)}</span>
+                <span className={`rarity ${c}`}>{COMMONNESS_LABEL[c]}</span>
+              </button>
+            );
+          })}
+      </div>
     </>
   );
 }
@@ -452,14 +584,14 @@ function DrillsMenu() {
     <>
       <h2 className="section-title">Drills</h2>
       <p className="section-lede muted">
-        Positions you got wrong come back on a schedule until they stick: mistakes from your analyzed games, missed puzzles, opening fixes, and
-        positions the coach set.
+        Positions you got wrong come back on a schedule until they stick: mistakes from your analyzed games, missed puzzles, and positions the
+        coach set. Due drills mixes them all; or pick one sort below.
       </p>
       <div className="menu-grid">
         <Tile
           icon="▶"
           title="Due drills"
-          sub={due ? inProgress(due) : counts.due ? `${counts.due} waiting for review` : "Nothing due right now"}
+          sub={due ? inProgress(due) : counts.due ? `${counts.due} waiting, every kind mixed` : "Nothing due right now"}
           badge={counts.due ? <span className="count">{counts.due}</span> : null}
           disabled={blocked ? BLOCKED : !counts.due && !due}
           onClick={() => startDrills()}
@@ -474,26 +606,34 @@ function DrillsMenu() {
         <Tile icon="☰" title="Drill history" sub="What you got right and wrong lately" onClick={() => go("drill-history")} />
       </div>
       {data && data.kinds.length > 0 && (
-        <table className="stat-table">
-          <thead>
-            <tr>
-              <th>Kind</th>
-              <th>Cards</th>
-              <th>Due</th>
-              <th>Correct</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.kinds.map((k) => (
-              <tr key={k.kind}>
-                <td>{KIND_LABEL[k.kind] ?? k.kind}</td>
-                <td>{k.cards}</td>
-                <td>{k.due}</td>
-                <td>{k.pctCorrect === null ? "–" : `${k.pctCorrect}%`}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          <h3 className="sub-title">Focus on one kind</h3>
+          <div className="menu-grid">
+            {byCategory(data.kinds).map(({ k, icon, label, about }) => {
+              // Nothing of this sort due: practice them all instead of offering an empty session.
+              const practice = !k.due;
+              const parkedHere = parkedFor(parked, practice, null, k.category);
+              const right = k.pctCorrect === null ? "" : ` · ${k.pctCorrect}% right`;
+              return (
+                <Tile
+                  key={k.category}
+                  icon={icon}
+                  title={label}
+                  sub={
+                    parkedHere ? (
+                      inProgress(parkedHere)
+                    ) : (
+                      <span title={about}>{(practice ? `None due · practice all ${k.cards}` : `${k.due} due of ${k.cards}`) + right}</span>
+                    )
+                  }
+                  badge={k.due ? <span className="count">{k.due}</span> : null}
+                  disabled={blocked ? BLOCKED : false}
+                  onClick={() => startDrills(practice, null, k.category)}
+                />
+              );
+            })}
+          </div>
+        </>
       )}
     </>
   );

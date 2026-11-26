@@ -1,6 +1,6 @@
 // Spaced-repetition drills (SM-2 scheduling lives in src-tauri/src/stats.rs). Mistake drills come
-// from post-game analysis; opening drills from Opening leaks fixes; coach drills from ask_move;
-// puzzle drills from missed Lichess puzzles.
+// from post-game analysis, coach drills from ask_move, puzzle drills from missed Lichess puzzles.
+// (Opening-line drills are gone: the old ones are retired.)
 import { gradedOffline, orOffline, packDrillCounts, packDrills, retiredOffline } from "../offline";
 import { create } from "zustand";
 import { Chess } from "chess.js";
@@ -9,8 +9,9 @@ import { hasBackend } from "../db";
 import type { Color, GameMeta } from "../store";
 import type { MoveAnnotation } from "./review";
 import { whiteWinPercent } from "../engine/live";
-import { invoke, isTauri } from "../backend";
+import { invoke, isTauri, listen } from "../backend";
 import { computeLesson, LESSON_VERSION, teaches } from "./lesson";
+import { drillCategory, type DrillCategory } from "./drillCategory";
 
 export interface Drill {
   id: number;
@@ -28,6 +29,8 @@ export interface Drill {
   lapses: number;
   /** What a mistake drill teaches (JSON, see lesson.ts); null until worked out. */
   lesson?: string | null;
+  /** What sort of position it is (drillCategory.ts); null until worked out. */
+  category?: DrillCategory | null;
 }
 
 export interface NewDrill {
@@ -45,6 +48,18 @@ export interface NewDrill {
 
 export const useDrillCounts = create<{ total: number; due: number }>(() => ({ total: 0, due: 0 }));
 
+/** Drills graded or added on another device change the due counts this one loaded at startup. */
+export function initDrillSync() {
+  if (!hasBackend()) return;
+  let timer: number | undefined;
+  listen("resync", () => refreshDrillCounts().catch(() => {}));
+  listen<{ kind: string }>("data-changed", ({ payload }) => {
+    if (payload.kind !== "drills") return;
+    clearTimeout(timer);
+    timer = window.setTimeout(() => refreshDrillCounts().catch(() => {}), 300);
+  });
+}
+
 export async function refreshDrillCounts() {
   if (!hasBackend()) return;
   useDrillCounts.setState(await orOffline<{ total: number; due: number }>("db_drill_counts", {}, packDrillCounts));
@@ -52,14 +67,19 @@ export async function refreshDrillCounts() {
 
 export async function addDrills(drills: NewDrill[]): Promise<number> {
   if (!hasBackend() || drills.length === 0) return 0;
-  const added = await orOffline<number>("db_add_drills", { drills }, () => 0, true);
+  const withCategory = drills.map((d) => ({ ...d, category: drillCategory(d) }));
+  const added = await orOffline<number>("db_add_drills", { drills: withCategory }, () => 0, true);
   await refreshDrillCounts();
   return added;
 }
 
-/** `tag`: only the mistake drills from games with that review tag (e.g. "hung-piece"), due or not. */
-export const dueDrills = (limit = 20, all = false, tag: string | null = null) =>
-  orOffline<Drill[]>("db_due_drills", { limit, all, tag }, () => packDrills(limit, all, tag));
+/**
+ * Due drills come shuffled, so a session mixes every sort. `category`: only that sort (the drills
+ * menu's categories, drillCategory.ts). `tag`: only the mistake drills from games with that review
+ * tag (e.g. "hung-piece"), due or not.
+ */
+export const dueDrills = (limit = 20, all = false, tag: string | null = null, category: DrillCategory | null = null) =>
+  orOffline<Drill[]>("db_due_drills", { limit, all, tag, category }, () => packDrills(limit, all, tag, category));
 
 /** Records the attempt; returns when the drill is next due. */
 export async function gradeDrill(id: number, correct: boolean, played: string, ms: number): Promise<string> {
@@ -153,8 +173,28 @@ export function gameMoveOf(d: Pick<Drill, "kind" | "title">): string | null {
   return d.title.match(/^In your game: \d+\.+(\S+)$/)?.[1] ?? d.title.match(/^Move \d+\.{1,3}: you played (\S+)$/)?.[1] ?? null;
 }
 
-/** Stores a drill's lesson (worked out after the drill was made). */
-export const setDrillLesson = (id: number, lesson: string) => invoke("db_set_drill_lesson", { id, lesson });
+/** Stores a drill's lesson (worked out after the drill was made), and the category it gives. */
+export const setDrillLesson = (d: Pick<Drill, "id" | "kind" | "note">, lesson: string) =>
+  invoke("db_set_drill_lesson", { id: d.id, lesson, category: drillCategory({ ...d, lesson }) });
+
+/** Drills stored before categories: works out theirs (quick, nothing to search) on the computer. */
+export async function backfillCategories() {
+  if (!isTauri) return;
+  try {
+    const drills = await invoke<Drill[]>("db_due_drills", { limit: 100_000, all: true, tag: null, category: null });
+    const missing = drills.filter((d) => !d.category);
+    for (const d of missing) await invoke("db_set_drill_category", { id: d.id, category: drillCategory(d) });
+    if (missing.length) {
+      console.info(`drill categories: ${missing.length} worked out`);
+      useDrillCategoriesVersion.setState((n) => n + 1, true);
+    }
+  } catch (e) {
+    console.warn("backfilling drill categories stopped", e);
+  }
+}
+
+/** Bumped when categories change, so the drills menu reads its counts again. */
+export const useDrillCategoriesVersion = create<number>(() => 0);
 
 let backfilling = false;
 
@@ -183,11 +223,11 @@ export async function backfillLessons() {
         }
         if (!gameUci || !d.answerUci || gameUci === d.answerUci) {
           // Nothing to compare (the game move is unknown): a placeholder, so it isn't tried again.
-          await setDrillLesson(d.id, JSON.stringify({ v: LESSON_VERSION }));
+          await setDrillLesson(d, JSON.stringify({ v: LESSON_VERSION }));
           continue;
         }
         const l = await computeLesson(d.fen, gameUci, d.answerUci);
-        await setDrillLesson(d.id, l.json);
+        await setDrillLesson(d, l.json);
         done++;
         if (!teaches(l.ex)) {
           await retireDrill(d.id);

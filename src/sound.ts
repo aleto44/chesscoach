@@ -203,6 +203,8 @@ function onScreen(): { line: Line; ply: number; key: unknown; student: Color | "
   const analysis = useAnalysis.getState();
   if (analysis) return { line: analysis.x.line, ply: analysis.x.ply, key: analysis.x.base, student: "both" };
   const puzzle = usePuzzle.getState();
+  if (puzzle?.review)
+    return { line: puzzle.review.x.line, ply: puzzle.review.x.ply, key: puzzle.review.x.base, student: "both" };
   if (puzzle?.line) return { line: puzzle.line, ply: viewedPly(puzzle.line.sans.length, puzzle.view), key: puzzle.queue[puzzle.index], student: puzzle.color };
   const drill = useDrill.getState();
   if (drill?.line) {

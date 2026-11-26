@@ -22,7 +22,7 @@ import { initQuiz } from "./coach/quiz";
 import { initNudges } from "./coach/nudge";
 import { initPuzzles } from "./puzzles/puzzles";
 import { initGameOverWatch } from "./game/session";
-import { initTheme } from "./settings";
+import { initSettingsSync, initTheme } from "./settings";
 import { initVisuals } from "./visuals";
 import { initSounds } from "./sound";
 import { initNav } from "./nav";
@@ -38,7 +38,8 @@ import { launchedFrom, mark } from "./perf";
 import { initSnapshot, restoreSnapshot } from "./snapshot";
 import { initOffline } from "./offline";
 import { resumeOpponent } from "./game/opponent";
-import { backfillLessons } from "./analysis/drills";
+import { initTouchLog } from "./touchLog";
+import { backfillCategories, backfillLessons, initDrillSync } from "./analysis/drills";
 
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 
@@ -57,11 +58,13 @@ function start() {
   initGameOverWatch();
   initOpponent();
   initSync();
+  initSettingsSync();
   initClock();
   initReview();
   initQuiz();
   initNudges();
   initPuzzles();
+  initDrillSync();
   initPuzzleSession();
   initDrillSession();
   initOpeningSession();
@@ -78,6 +81,8 @@ function start() {
     .catch((e) => console.error("could not open the app", e));
   // Drills made before lessons get theirs, in the background once the app has settled (computer only).
   window.setTimeout(() => void backfillLessons(), 30_000);
+  // Drills stored before categories get theirs (quick: read from the tags and lesson).
+  void backfillCategories();
 
   root.render(
     <React.StrictMode>
@@ -91,6 +96,7 @@ function start() {
 
 initTheme();
 initVisuals();
+initTouchLog();
 registerServiceWorker();
 // On a phone, nothing works until it's paired with the computer. A phone that was paired before
 // starts the app straight away (waiting for the computer to answer first kept a phone that had

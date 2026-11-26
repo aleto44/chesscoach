@@ -1,8 +1,11 @@
 mod auth;
 mod boot;
 mod coach;
+mod coach_data;
 mod db;
+mod devlog;
 mod import;
+mod loads;
 mod mcp;
 mod puzzles;
 mod relay;
@@ -60,6 +63,17 @@ pub(crate) fn notify_game_changed(app: &AppHandle, client: &str, game_id: i64) {
     relay::emit_all(app, "game-changed", serde_json::json!({ "gameId": game_id, "from": client }));
 }
 
+/// Tells every device that puzzle or drill progress changed, so they refresh the rating and due
+/// counts they loaded at startup. The device that made the change refreshes too: one cheap call.
+pub(crate) fn notify_data_changed(app: &AppHandle, kind: &str) {
+    relay::emit_all(app, "data-changed", serde_json::json!({ "kind": kind }));
+}
+
+/// Tells the other devices that `client` saved a setting, so they take the new value.
+pub(crate) fn notify_setting_changed(app: &AppHandle, client: &str, key: &str, value: &serde_json::Value) {
+    relay::emit_all(app, "setting-changed", serde_json::json!({ "key": key, "value": value, "from": client }));
+}
+
 #[tauri::command]
 fn game_changed(app: AppHandle, game_id: i64) {
     notify_game_changed(&app, relay::DESKTOP, game_id);
@@ -74,6 +88,12 @@ fn coach_send(app: AppHandle, text: String, resume: Option<String>) -> Result<()
 #[tauri::command]
 async fn coach_explain(app: AppHandle, prompt: String) -> Result<String, String> {
     coach::explain(&app, prompt).await
+}
+
+/// Utility › Load game: a chessboard read from an image (see coach::read_board).
+#[tauri::command]
+async fn coach_read_board(app: AppHandle, image: String, media_type: String) -> Result<String, String> {
+    coach::read_board(&app, image, media_type).await
 }
 
 #[tauri::command]
@@ -109,6 +129,7 @@ pub fn run() {
             coach_send,
             coach_reset,
             coach_explain,
+            coach_read_board,
             tool_result,
             auth::auth_status,
             auth::auth_login,
@@ -136,6 +157,7 @@ pub fn run() {
             db::db_prune_empty_games,
             db::db_get_settings,
             db::db_set_setting,
+            db::db_course_progress,
             db::db_player_rating,
             stats::db_save_analysis,
             stats::db_unanalyzed_games,
@@ -146,6 +168,7 @@ pub fn run() {
             stats::db_add_drills,
             stats::db_due_drills,
             stats::db_drill_counts,
+            stats::db_set_drill_category,
             stats::db_set_drill_lesson,
             stats::db_drills_without_lesson,
             stats::db_grade_drill,
@@ -153,17 +176,25 @@ pub fn run() {
             stats::db_drill_overview,
             stats::db_weakness,
             stats::db_rating_history,
+            coach_data::db_coach_query,
             import::import_fetch,
             import::db_import_known,
             import::db_import_game,
             import::db_import_accounts,
             import::db_import_finish,
             import::db_import_remove,
+            loads::db_loads,
+            loads::db_save_load,
+            loads::db_update_load,
+            loads::db_open_load,
+            loads::db_remove_load,
             stats::puzzle_history,
             puzzles::puzzle_status,
             puzzles::puzzle_find,
             puzzles::puzzle_get,
             puzzles::puzzle_record,
+            puzzles::puzzle_void,
+            devlog::dev_log,
             puzzles::puzzle_import_start,
             puzzles::puzzle_import_cancel,
             puzzles::puzzle_import_progress,

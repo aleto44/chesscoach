@@ -12,6 +12,7 @@ import { useOutbox } from "../offline";
 import { SettingsDialog } from "./SettingsDialog";
 import { AnalysisButton } from "./Analysis";
 import { VoiceButton } from "./Voice";
+import { DrawButton } from "./DrawMode";
 import { useAnalysis } from "../analysis/layer";
 
 /** App-wide bar: back and home on the left, where you are, then a quick new game and settings. */
@@ -64,6 +65,8 @@ export function TopBar() {
         <span className="spacer" />
         <OfflineChip />
         <VoiceButton />
+        {/* Desktop draws with right-click drag; only the phone app needs the pencil. */}
+        {isRemote && <DrawButton />}
         <AnalysisButton />
         <button className="primary" onClick={() => setDialog("new")}>
           New game
@@ -90,7 +93,7 @@ function OfflineChip() {
   if (reachable && !pending)
     return <span className="online-dot" role="status" aria-label="Connected to your computer" title="Connected to your computer." />;
   const label = reachable ? `Syncing ${pending}…` : pending ? `Offline · ${pending} to sync` : "Offline";
-  return (
+  const chip = (
     <span
       className={`offline-chip ${reachable ? "syncing" : ""}`}
       title={
@@ -101,5 +104,27 @@ function OfflineChip() {
     >
       {label}
     </span>
+  );
+  if (reachable) return chip;
+  return (
+    <>
+      {chip}
+      <TailscaleHint />
+    </>
+  );
+}
+
+/**
+ * Next to "Offline": the usual reason is that Android stopped the phone's Tailscale VPN (an app
+ * update, a restart). On Android it opens the Tailscale app.
+ */
+function TailscaleHint() {
+  const title = "Is Tailscale on? The phone reaches your computer through it.";
+  if (!/Android/i.test(navigator.userAgent))
+    return <span className="tail-chip" title={title}>Tail?</span>;
+  return (
+    <a className="tail-chip" href="intent://#Intent;package=com.tailscale.ipn;end" title={`${title} Tap to open it.`}>
+      Tail?
+    </a>
   );
 }

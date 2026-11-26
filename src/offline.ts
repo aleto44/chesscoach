@@ -7,6 +7,7 @@ import { create } from "zustand";
 import { invoke, isRemote, Unreachable, useConnection } from "./backend";
 import type { Drill } from "./analysis/drills";
 import type { Puzzle } from "./puzzles/puzzles";
+import type { NodeProgress } from "./openings/progress";
 
 const PACK_KEY = "cc-offline-pack";
 const OUTBOX_KEY = "cc-offline-outbox";
@@ -49,6 +50,16 @@ const saveOutbox = () => {
   keep(OUTBOX_KEY, outbox);
   useOutbox.setState({ pending: outbox.length });
 };
+
+/**
+ * Course answers given offline and not yet sent, by decision: kept on top of the map the computer
+ * sends (at boot, or merged from the other device) until they're through.
+ */
+export function pendingCourse(): Record<string, NodeProgress> {
+  const out: Record<string, NodeProgress> = {};
+  for (const s of outbox) if (s.cmd === "db_course_progress") out[String(s.args.id)] = s.args.progress as NodeProgress;
+  return out;
+}
 
 /** Puzzles tried and drills graded since the pack was made: not offered again offline. */
 const usedPuzzles = new Set<string>(outbox.filter((s) => s.cmd === "puzzle_record").map((s) => String(s.args.id)));
@@ -110,7 +121,7 @@ export async function refreshPack(force = false) {
             filter: { themes: [], exclude: [], opening: null, minRating: db.rating - 300, maxRating: db.rating + 300, limit: PACK_PUZZLES },
           })
         : Promise.resolve([] as Puzzle[]),
-      invoke<Drill[]>("db_due_drills", { limit: 200, all: true, tag: null }),
+      invoke<Drill[]>("db_due_drills", { limit: 200, all: true, tag: null, category: null }),
     ]);
     pack = { at: Date.now(), puzzles, drills };
     keep(PACK_KEY, pack);
@@ -148,12 +159,22 @@ export const packPuzzle = (id: string) => pack.puzzles.find((p) => p.id === id) 
 
 const nowSql = () => new Date().toISOString().slice(0, 19).replace("T", " ");
 
-export function packDrills(limit: number, all: boolean, tag: string | null): Drill[] {
+export function packDrills(limit: number, all: boolean, tag: string | null, category: string | null = null): Drill[] {
   const now = nowSql();
-  return pack.drills
+  const picked = pack.drills
     .filter((d) => !usedDrills.has(d.id))
-    .filter((d) => (tag ? d.kind === "mistake" && `, ${d.note ?? ""},`.includes(`, ${tag},`) : all || d.dueAt <= now))
-    .slice(0, limit);
+    .filter((d) => !category || (d.category ?? d.kind) === category)
+    .filter((d) => (tag ? d.kind === "mistake" && `, ${d.note ?? ""},`.includes(`, ${tag},`) : all || d.dueAt <= now));
+  // Due drills come shuffled, the way the computer gives them.
+  if (!all && !tag) shuffle(picked);
+  return picked.slice(0, limit);
+}
+
+function shuffle<T>(a: T[]) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
 }
 
 export function packDrillCounts() {

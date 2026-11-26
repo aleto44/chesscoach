@@ -36,3 +36,5 @@ crash-console.log
 
 # scripts/trap-harness.mjs output
 trap-preview.html
+label-preview.html
+label-preview.json

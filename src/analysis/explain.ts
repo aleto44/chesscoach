@@ -32,6 +32,24 @@ const DEEP_PLIES = 24;
 const FAR_PAWN_PLIES = 10;
 /** The best move "stands out" when the next best keeps this many points less. */
 const STANDOUT = 10;
+/**
+ * Extra depth for the reply to the move played: that one reply is what the explanation is about,
+ * and at the review's depth the engine can miss it (13.h4 Nh2!, forking queen and rook on the
+ * square h4 left, was found at depth 13 or not depending on what the hash held).
+ */
+const REPLY_EXTRA = 4;
+/** How many times one line may step out of a repetition before it's taken as a real draw. */
+const MAX_DETOURS = 3;
+/** Within this of 0 (centipawns), neither side has a reason to avoid a repetition. */
+const DRAWISH = 50;
+/**
+ * Material and eval this far apart (centipawns), pointing different ways, means the line hasn't
+ * reached its point yet. Wide enough that a gambit pawn against the eval doesn't count.
+ */
+const UNSETTLED = 300;
+
+/** A position without the move counters, to spot one coming back. */
+const posKey = (fen: string) => fen.split(" ").slice(0, 4).join(" ");
 
 export interface Step {
   san: string;
@@ -278,9 +296,21 @@ async function followLine(fen: string, first: string, mover: Color, quiet: numbe
   let queue: string[] = [];
   let latest: EngineLine | undefined = pvEval;
   let stopNext: string | undefined;
+  // For spotting repetitions: the move objects and UCI of every step, and each position along the
+  // line (keys[k] after k steps). The engine searches every chunk from scratch, with no history, so
+  // it happily walks a loop (Ne5 Qe2 Ng4 Qf3) that ends where it started and shows nothing.
+  const moves: Move[] = [];
+  const ucis: string[] = [];
+  const keys: string[] = [posKey(fen)];
+  // Moves that led into a loop, per position: the next search there has to play something else.
+  const banned = new Map<string, Set<string>>();
+  let detours = 0;
   const play = (uci: string) => {
     const [, turn, , , , full] = chess.fen().split(" ");
     const m = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
+    moves.push(m);
+    ucis.push(uci);
+    keys.push(posKey(chess.fen()));
     const hit = attacksOf(chess, m);
     const targets = [...(hit.check ? [hit.check] : []), ...hit.threats.map((t) => t.sq)] as Key[];
     steps.push({
@@ -300,6 +330,14 @@ async function followLine(fen: string, first: string, mover: Color, quiet: numbe
   // Deep: on until something concrete happens: a promotion, or a piece changes hands (a pawn alone
   // often goes back and forth on the way to the real point, as in a race).
   const happened = () => promo !== null || Math.abs(startValue("white") - startValue("black")) >= 3;
+  // 13.h4 Nh2 14.Kxh2 Bg4 15.Nb5: White is a knight up, but the queen on f3 is trapped and goes
+  // after one quiet move (...Bb8). Stopping there said "you win a knight" about a lost queen.
+  const settled = () => {
+    if (!latest) return true;
+    const ahead = (startValue("black") - startValue("white")) * 100;
+    const ev = stored(latest);
+    return Math.sign(ahead) === Math.sign(ev) || Math.abs(ahead - ev) < UNSETTLED;
+  };
   while (!chess.isGameOver() && steps.length < (deep ? DEEP_PLIES : MAX_PLIES)) {
     if (!queue.length) {
       const [l] = await getReviewEngine().analyze(chess.fen(), 1, depth);
@@ -308,8 +346,9 @@ async function followLine(fen: string, first: string, mover: Color, quiet: numbe
       queue = l.pv.slice(0, CHUNK);
     }
     const next = queue[0];
-    // Stop once the idea is shown and nothing is left hanging mid-exchange.
-    if (steps.length >= quiet && !chess.get(next.slice(2, 4) as Square) && (!deep || happened())) {
+    // Stop once the idea is shown and nothing is left hanging mid-exchange, nor about to be won
+    // after a quiet move (the material says one side is ahead, the eval clearly the other).
+    if (steps.length >= quiet && !chess.get(next.slice(2, 4) as Square) && (!deep || happened()) && settled()) {
       stopNext = next;
       break;
     }
@@ -319,6 +358,36 @@ async function followLine(fen: string, first: string, mover: Color, quiet: numbe
       break;
     }
     queue.shift();
+    const back = keys.indexOf(keys[keys.length - 1]);
+    if (back === keys.length - 1) continue;
+    // Back to a position the line already had: a real player who's better off steps out of it, so
+    // the loop goes and the side the eval favours plays its next best move where the loop began.
+    // An even position (a perpetual) is a real repetition: the loop shown once is the point.
+    if (++detours > MAX_DETOURS || !latest || Math.abs(stored(latest)) < DRAWISH) break;
+    const turnAt = new Chess(back === 0 ? fen : steps[back - 1].fen).turn();
+    const favoured = stored(latest) > 0 ? "w" : "b";
+    const cut = favoured === turnAt ? back : back + 1;
+    // The line's first move (the one being judged) is never taken back.
+    if (cut < 1 || cut >= steps.length) break;
+    const at = keys[cut];
+    banned.set(at, new Set([...(banned.get(at) ?? []), ucis[cut]]));
+    steps.length = cut;
+    moves.length = cut;
+    ucis.length = cut;
+    keys.length = cut + 1;
+    chess.load(steps[cut - 1].fen);
+    prev = moves[cut - 1];
+    if (promo && !steps.some((s) => s.fen === promo!.fen)) promo = null;
+    const skip = banned.get(at)!;
+    const lines = await getReviewEngine().analyze(chess.fen(), skip.size + 1, depth);
+    const out = lines.find((l) => l.pv[0] && !skip.has(l.pv[0]));
+    // Every move keeps the repetition: it's a draw, and the line stops here.
+    if (!out) {
+      queue = [];
+      break;
+    }
+    latest = out;
+    queue = out.pv.slice(0, CHUNK);
   }
   const mate = chess.isCheckmate();
   // Mated: the side to move lost. Otherwise the latest search's eval is the line's.
@@ -770,6 +839,19 @@ async function failedRecapture(first: Step, reply: Step | undefined, lineEval: n
   return `${opp} can't simply take back: after ${take}, ${ans.san} wins ${won}.`;
 }
 
+/** The engine's line after `uci` is played in `fen`, or undefined when the game is over. */
+async function bestReply(fen: string, uci: string, depth: number): Promise<EngineLine | undefined> {
+  const chess = new Chess(fen);
+  try {
+    chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
+  } catch {
+    return undefined;
+  }
+  if (chess.isGameOver()) return undefined;
+  const [l] = await getReviewEngine().analyze(chess.fen(), 1, depth);
+  return l?.pv.length ? l : undefined;
+}
+
 export async function explainMove(m: MoveToExplain): Promise<Explanation> {
   const mover = colorOf(m.fenBefore);
   const opp = other(mover);
@@ -778,7 +860,9 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
   const [evB, evA] = [evalFor(m.evalBefore, mover), evalFor(m.evalAfter, mover)];
 
   const depth = m.depth ?? DEPTH;
-  const p = await followLine(m.fenBefore, m.uci, mover, QUIET_PLIES, undefined, undefined, false, depth);
+  // The reply, searched deeper than the rest and shared by both lines after the move played.
+  const reply = await bestReply(m.fenBefore, m.uci, depth + REPLY_EXTRA);
+  const p = await followLine(m.fenBefore, m.uci, mover, QUIET_PLIES, reply?.pv, reply, false, depth);
   const [lost, got] = [p.lost[mover], p.lost[opp]];
   const playedNet = value(got) - value(lost);
   const playedSan = p.steps[0]?.san ?? "";
@@ -933,7 +1017,7 @@ export async function explainMove(m: MoveToExplain): Promise<Explanation> {
   let playedEvent = "";
   let deepLost: PieceType[] = [];
   if (beats && !guard && !forcedMate && !missed && playedNet > -1) {
-    const pd = await followLine(m.fenBefore, m.uci, mover, QUIET_PLIES, undefined, undefined, true, depth);
+    const pd = await followLine(m.fenBefore, m.uci, mover, QUIET_PLIES, reply?.pv, reply, true, depth);
     deepLost = pd.lost[mover];
     const last = pd.steps[pd.steps.length - 1];
     const deepNet = value(pd.lost[opp]) - value(pd.lost[mover]);

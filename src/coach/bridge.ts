@@ -18,6 +18,8 @@ import { guessContext } from "../guess/session";
 import { planContext } from "../plans/session";
 import { cancelQuizzes } from "./quiz";
 import { refreshUsageSoon } from "./usage";
+import { drawingLines, screenText } from "./screenText";
+import { useAnalysis } from "../analysis/layer";
 
 let streamingId: string | null = null;
 const stderrTail: string[] = [];
@@ -108,12 +110,50 @@ function finishTurn() {
 export async function withContext(text: string): Promise<string> {
   return `<screen>
 ${(await screenLines()).join("\n")}
+${onScreenLines().join("\n")}
 </screen>
 
 ${text}`;
 }
 
+/**
+ * Everything else the student can see: the screen's text outside the chat (trainer messages, a hint
+ * or move note they asked for, plan cards, menus) and the arrows on the board. Read from the page, so
+ * every screen is covered, with what it actually shows.
+ */
+function onScreenLines(): string[] {
+  let text = "";
+  let drawn: string[] = [];
+  try {
+    text = screenText();
+    drawn = drawingLines();
+  } catch (e) {
+    console.warn("couldn't read the screen for the coach", e);
+  }
+  return [
+    ...drawn,
+    ...(text
+      ? [
+          `Text on the student's screen outside the chat (what they're reading now; buttons in [brackets]). When they ask about "this", "the hint" or "the note", it's here:`,
+          text,
+        ]
+      : []),
+  ];
+}
+
 async function screenLines(): Promise<string[]> {
+  // The analysis board sits over whatever screen opened it.
+  const a = useAnalysis.getState();
+  if (a) {
+    const { line, ply, forkAt } = a.x;
+    const fen = line.fens[ply];
+    return [
+      `Showing: the analysis board, opened from the ${a.from} (free analysis: engine on, the student plays both sides)`,
+      `Moves: ${line.sans.length ? formatMoves(line) : "(none)"}${forkAt !== null ? ` (the student's what-if moves branch off after ply ${forkAt})` : ""}`,
+      `Viewing ply ${ply} of ${line.sans.length}. FEN: ${fen}`,
+      ...(await engineLines(fen, "")),
+    ];
+  }
   // A coach scenario opened over a session is what's on screen: describe that board instead.
   if (peeking()) return mainBoardLines();
   const puzzle = puzzleContext();

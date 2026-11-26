@@ -95,10 +95,25 @@ type Handler = (e: { payload: any }) => void;
 const handlers = new Map<string, Set<Handler>>();
 let source: EventSource | null = null;
 
+let opened = false;
+/**
+ * Tells listeners of "resync" that this phone may have missed what the computer announced: the
+ * stream was opened again (asleep, or the computer restarted, which forgets the backlog) or the
+ * page came back to the foreground. They reread what they keep (settings, puzzle rating, drills).
+ */
+function resync() {
+  handlers.get("resync")?.forEach((h) => h({ payload: null }));
+}
+if (isRemote) document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && opened && resync());
+
 function connect() {
   source?.close();
   source = new EventSource(`/api/events?client=${encodeURIComponent(clientId)}`);
-  source.onopen = () => mark("live updates connected");
+  source.onopen = () => {
+    mark("live updates connected");
+    if (opened) resync();
+    opened = true;
+  };
   source.onmessage = (e) => {
     try {
       const { event, payload } = JSON.parse(e.data);

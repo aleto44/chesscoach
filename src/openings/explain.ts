@@ -4,7 +4,7 @@
 // Answers are kept on this device, so the same slip doesn't cost another coach call.
 import { Chess, type Square } from "chess.js";
 import type { PlanIdea } from "./plans";
-import { invoke, hasBackend } from "../backend";
+import { invoke, hasBackend, useConnection } from "../backend";
 import { useAuth } from "../coach/auth";
 import { evalWords, storedEval, topMoves } from "../coach/insight";
 import { formatMoves, moveLabel, type Line } from "../chess/line";
@@ -129,7 +129,7 @@ const IDEAS_FORMAT = (played: string, book: string) => [
 ];
 
 /** "White: Kg1 Qd1 Ra1 ... Black: Kg8 ...", so drawings start on real pieces. */
-function pieceList(fen: string): string {
+export function pieceList(fen: string): string {
   const out: Record<"w" | "b", string[]> = { w: [], b: [] };
   for (const row of new Chess(fen).board())
     for (const p of row) if (p) out[p.color].push(`${p.type === "p" ? "" : p.type.toUpperCase()}${p.square}`);
@@ -171,7 +171,8 @@ export function parseIdeas(text: string, fen: string): PlanIdea[] | null {
 }
 
 /** Whether the coach can be asked at all here (a signed-in desktop or a phone linked to one). */
-export const canExplain = () => hasBackend() && useAuth.getState().status === "signed-in";
+/** The coach answers from the computer: not while a phone is out of reach of it (it asks again later). */
+export const canExplain = () => hasBackend() && useConnection.getState().reachable && useAuth.getState().status === "signed-in";
 
 /** One slip to explain: the line being trained, the position, the student's move and the book move. */
 export interface Slip {

@@ -6026,7 +6026,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Be3",
    "best": "Ng4",
    "bestUci": "f6g4",
-   "eval": 86,
+   "eval": 75,
    "p": {
     "800": 0.145,
     "1000": 0.14,
@@ -6045,7 +6045,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "h3",
    "best": "exd4",
    "bestUci": "e5d4",
-   "eval": 101,
+   "eval": 113,
    "p": {
     "1400": 0.038,
     "1600": 0.046,
@@ -6065,7 +6065,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nd5",
    "best": "Nxe4",
    "bestUci": "f6e4",
-   "eval": 146,
+   "eval": 171,
    "p": {
     "800": 0.103,
     "1000": 0.082,
@@ -6083,7 +6083,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Ng5",
    "best": "Nxe3",
    "bestUci": "g4e3",
-   "eval": 178,
+   "eval": 158,
    "p": {
     "800": 0.051
    },
@@ -6105,7 +6105,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "b4",
    "best": "exf4",
    "bestUci": "e5f4",
-   "eval": 252,
+   "eval": 242,
    "p": {
     "800": 0.03
    },
@@ -6154,7 +6154,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxf7",
    "best": "Bxc3+",
    "bestUci": "g7c3",
-   "eval": 446,
+   "eval": 437,
    "p": {
     "800": 0.128,
     "1000": 0.178,
@@ -6174,7 +6174,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nf3",
    "best": "Nxc3",
    "bestUci": "e4c3",
-   "eval": 683,
+   "eval": 657,
    "p": {
     "800": 0.086,
     "1000": 0.079,
@@ -6183,14 +6183,16 @@ export const TRAPS: Record<string, Trap[]> = {
     "1600": 0.031
    },
    "cont": [
-    "Nxc3"
+    "Nxc3",
+    "bxc3",
+    "Bxc3+"
    ]
   },
   {
    "san": "Bf4",
    "best": "Nxc3",
    "bestUci": "e4c3",
-   "eval": 284,
+   "eval": 273,
    "p": {
     "800": 0.035,
     "1000": 0.04,
@@ -6232,7 +6234,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "e5",
    "best": "cxd4",
    "bestUci": "c5d4",
-   "eval": 320,
+   "eval": 328,
    "p": {
     "800": 0.102,
     "1000": 0.09,
@@ -6254,7 +6256,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bxf6",
    "best": "exf6",
    "bestUci": "e7f6",
-   "eval": 150,
+   "eval": 140,
    "p": {
     "800": 0.047
    },
@@ -6268,7 +6270,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "e5",
    "best": "Nfd7",
    "bestUci": "f6d7",
-   "eval": 134,
+   "eval": 128,
    "p": {
     "800": 0.036
    },
@@ -6290,7 +6292,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bd3",
    "best": "Ng4",
    "bestUci": "f6g4",
-   "eval": 263,
+   "eval": 270,
    "p": {
     "800": 0.061,
     "1000": 0.052,
@@ -6306,14 +6308,12 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "e5",
    "best": "Nfd7",
    "bestUci": "f6d7",
-   "eval": 131,
+   "eval": 120,
    "p": {
     "800": 0.035
    },
    "cont": [
-    "Nfd7",
-    "d5",
-    "Nxe5"
+    "Nfd7"
    ]
   }
  ],
@@ -6322,7 +6322,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qxd4",
    "best": "Ng4",
    "bestUci": "f6g4",
-   "eval": 223,
+   "eval": 225,
    "p": {
     "800": 0.036
    },
@@ -6336,7 +6336,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bd3",
    "best": "Qa5",
    "bestUci": "d8a5",
-   "eval": 267,
+   "eval": 276,
    "p": {
     "800": 0.108,
     "1000": 0.11,
@@ -6349,6 +6349,24 @@ export const TRAPS: Record<string, Trap[]> = {
    "cont": [
     "Qa5"
    ]
+  },
+  {
+   "san": "Qc2",
+   "best": "Qa5",
+   "bestUci": "d8a5",
+   "eval": 95,
+   "p": {
+    "800": 0.044,
+    "1000": 0.058,
+    "1200": 0.066,
+    "1400": 0.069,
+    "1600": 0.063,
+    "1800": 0.048,
+    "2000": 0.031
+   },
+   "cont": [
+    "Qa5"
+   ]
   }
  ],
  "r1bq1rk1/pp2ppbp/2n2np1/2p5/2P1P3/2NBBP2/PP4PP/R2QK1NR w KQ -": [
@@ -6356,7 +6374,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bxc5",
    "best": "Qa5",
    "bestUci": "d8a5",
-   "eval": 253,
+   "eval": 266,
    "p": {
     "800": 0.241,
     "1000": 0.24,
@@ -6367,22 +6385,14 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.324
    },
    "cont": [
-    "Qa5",
-    "Ba3",
-    "Nxe4",
-    "Bxe4",
-    "Bxc3+",
-    "bxc3",
-    "Qxc3+",
-    "Kf2",
-    "Qxa3"
+    "Qa5"
    ]
   },
   {
    "san": "Qc2",
    "best": "Nb4",
    "bestUci": "c6b4",
-   "eval": 592,
+   "eval": 555,
    "p": {
     "800": 0.055,
     "1000": 0.061,
@@ -6395,6 +6405,24 @@ export const TRAPS: Record<string, Trap[]> = {
     "Nxc2",
     "Bxc2",
     "Qa5"
+   ]
+  },
+  {
+   "san": "a3",
+   "best": "Be6",
+   "bestUci": "c8e6",
+   "eval": 176,
+   "p": {
+    "800": 0.044,
+    "1000": 0.05,
+    "1200": 0.059,
+    "1400": 0.07,
+    "1600": 0.083,
+    "1800": 0.083,
+    "2000": 0.058
+   },
+   "cont": [
+    "Be6"
    ]
   }
  ],
@@ -6502,7 +6530,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Be3",
    "best": "Ng4",
    "bestUci": "f6g4",
-   "eval": 308,
+   "eval": 333,
    "p": {
     "800": 0.043,
     "1000": 0.032
@@ -6510,30 +6538,30 @@ export const TRAPS: Record<string, Trap[]> = {
    "cont": [
     "Ng4",
     "Bc1",
-    "Bxd4"
+    "cxd4"
    ]
   }
  ],
  "rnbq1rk1/pp2ppbp/3p1np1/2p5/2PPPP2/2N5/PP2B1PP/R1BQK1NR w KQ -": [
   {
    "san": "Be3",
-   "best": "Qa5",
-   "bestUci": "d8a5",
-   "eval": 123,
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 134,
    "p": {
     "800": 0.034
    },
    "cont": [
-    "Qa5"
+    "cxd4"
    ]
   }
  ],
  "rnbq1rk1/pp2ppbp/3p1np1/2p5/2PPPP2/2N2N2/PP4PP/R1BQKB1R w KQ -": [
   {
    "san": "Be3",
-   "best": "cxd4",
-   "bestUci": "c5d4",
-   "eval": 110,
+   "best": "Ng4",
+   "bestUci": "f6g4",
+   "eval": 112,
    "p": {
     "800": 0.069,
     "1000": 0.062,
@@ -6542,7 +6570,7 @@ export const TRAPS: Record<string, Trap[]> = {
     "1600": 0.04
    },
    "cont": [
-    "cxd4"
+    "Ng4"
    ]
   }
  ],
@@ -6571,7 +6599,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Be3",
    "best": "exd5",
    "bestUci": "e6d5",
-   "eval": 137,
+   "eval": 155,
    "p": {
     "800": 0.054,
     "1000": 0.04,
@@ -6587,7 +6615,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxd5",
    "best": "Nxe4",
    "bestUci": "f6e4",
-   "eval": 186,
+   "eval": 188,
    "p": {
     "800": 0.089,
     "1000": 0.067,
@@ -6604,7 +6632,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "e5",
    "best": "cxd4",
    "bestUci": "c5d4",
-   "eval": 134,
+   "eval": 110,
    "p": {
     "800": 0.146,
     "1000": 0.156,
@@ -6630,7 +6658,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxb5",
    "best": "Nxe4",
    "bestUci": "f6e4",
-   "eval": 298,
+   "eval": 329,
    "p": {
     "800": 0.293,
     "1000": 0.3,
@@ -6642,10 +6670,14 @@ export const TRAPS: Record<string, Trap[]> = {
    "cont": [
     "Nxe4",
     "f3",
-    "a6",
-    "fxe4",
-    "axb5",
-    "Nf3",
+    "Qa5+",
+    "Kf1",
+    "Nd2+",
+    "Kf2",
+    "Ba6",
+    "a4",
+    "Nd7",
+    "f4",
     "Bxb2"
    ]
   },
@@ -6653,7 +6685,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "b3",
    "best": "Qa5",
    "bestUci": "d8a5",
-   "eval": 415,
+   "eval": 406,
    "p": {
     "800": 0.239,
     "1000": 0.22,
@@ -6673,7 +6705,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nf3",
    "best": "b4",
    "bestUci": "b5b4",
-   "eval": 277,
+   "eval": 276,
    "p": {
     "800": 0.141,
     "1000": 0.123,
@@ -6683,7 +6715,7 @@ export const TRAPS: Record<string, Trap[]> = {
    },
    "cont": [
     "b4",
-    "Na4",
+    "Nb1",
     "Nxe4"
    ]
   }
@@ -6717,12 +6749,16 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "g4",
    "best": "b5",
    "bestUci": "b7b5",
-   "eval": 122,
+   "eval": 104,
    "p": {
     "800": 0.03
    },
    "cont": [
-    "b5"
+    "b5",
+    "h4",
+    "b4",
+    "Na4",
+    "Nxe4"
    ]
   }
  ],
@@ -6731,7 +6767,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nbd2",
    "best": "Nxg5",
    "bestUci": "e4g5",
-   "eval": 251,
+   "eval": 245,
    "p": {
     "800": 0.062,
     "1000": 0.05,
@@ -6747,7 +6783,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qd3",
    "best": "Nxg5",
    "bestUci": "e4g5",
-   "eval": 284,
+   "eval": 302,
    "p": {
     "800": 0.039
    },
@@ -6755,15 +6791,19 @@ export const TRAPS: Record<string, Trap[]> = {
     "Nxg5",
     "Nxg5",
     "c5",
-    "h4",
-    "cxd4"
+    "Nf3",
+    "cxd4",
+    "Nxd4",
+    "Qb6",
+    "e3",
+    "Qxb2"
    ]
   },
   {
    "san": "Qc2",
    "best": "Nxg5",
    "bestUci": "e4g5",
-   "eval": 236,
+   "eval": 205,
    "p": {
     "800": 0.037,
     "1000": 0.032
@@ -6771,9 +6811,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "cont": [
     "Nxg5",
     "Nxg5",
-    "e5",
-    "h4",
-    "exd4"
+    "Bxd4"
    ]
   }
  ],
@@ -6802,18 +6840,18 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bh4",
    "best": "g5",
    "bestUci": "g6g5",
-   "eval": 172,
+   "eval": 146,
    "p": {
     "800": 0.044
    },
    "cont": [
     "g5",
     "Nxg5",
+    "exd4",
+    "Qxd4",
     "hxg5",
     "Bxg5",
-    "Re8",
-    "dxe5",
-    "Nxe5"
+    "Nc5"
    ]
   }
  ],
@@ -6822,7 +6860,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "dxe5",
    "best": "hxg5",
    "bestUci": "h6g5",
-   "eval": 125,
+   "eval": 101,
    "p": {
     "800": 0.166,
     "1000": 0.174,
@@ -6838,25 +6876,17 @@ export const TRAPS: Record<string, Trap[]> = {
   },
   {
    "san": "Bh4",
-   "best": "g5",
-   "bestUci": "g6g5",
-   "eval": 304,
+   "best": "exd4",
+   "bestUci": "e5d4",
+   "eval": 284,
    "p": {
     "800": 0.049,
     "1000": 0.035
    },
    "cont": [
-    "g5",
-    "Nxg5",
-    "hxg5",
-    "Bxg5",
     "exd4",
-    "Qxd4",
-    "Nxe4",
-    "Qxg7+",
-    "Kxg7",
-    "Bxd8",
-    "Nxc3"
+    "Bxf6",
+    "Qxf6"
    ]
   }
  ],
@@ -6865,7 +6895,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "c3",
    "best": "hxg5",
    "bestUci": "h6g5",
-   "eval": 351,
+   "eval": 336,
    "p": {
     "1200": 0.03,
     "1400": 0.033,
@@ -6897,7 +6927,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxg5",
    "best": "Nxe5",
    "bestUci": "d7e5",
-   "eval": 482,
+   "eval": 486,
    "p": {
     "800": 0.04
    },
@@ -6911,7 +6941,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Be3",
    "best": "Ng4",
    "bestUci": "f6g4",
-   "eval": 109,
+   "eval": 126,
    "p": {
     "800": 0.031
    },
@@ -6945,7 +6975,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "d4",
    "best": "Bxc4",
    "bestUci": "e6c4",
-   "eval": 81,
+   "eval": 86,
    "p": {
     "800": 0.062,
     "1000": 0.041,
@@ -6961,7 +6991,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "f5",
    "best": "Qb6+",
    "bestUci": "d8b6",
-   "eval": 137,
+   "eval": 121,
    "p": {
     "800": 0.267,
     "1000": 0.313,
@@ -6983,7 +7013,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "fxe5",
    "best": "dxe5",
    "bestUci": "d6e5",
-   "eval": 159,
+   "eval": 160,
    "p": {
     "800": 0.205,
     "1000": 0.153,
@@ -7001,7 +7031,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "g3",
    "best": "Nxe2+",
    "bestUci": "f4e2",
-   "eval": 119,
+   "eval": 145,
    "p": {
     "800": 0.097,
     "1000": 0.099,
@@ -7016,10 +7046,28 @@ export const TRAPS: Record<string, Trap[]> = {
    ]
   },
   {
+   "san": "Bg4",
+   "best": "f5",
+   "bestUci": "f7f5",
+   "eval": 102,
+   "p": {
+    "800": 0.091,
+    "1000": 0.104,
+    "1200": 0.121,
+    "1400": 0.149,
+    "1600": 0.191,
+    "1800": 0.237,
+    "2000": 0.264
+   },
+   "cont": [
+    "f5"
+   ]
+  },
+  {
    "san": "Bf3",
    "best": "h6",
    "bestUci": "h7h6",
-   "eval": 189,
+   "eval": 178,
    "p": {
     "800": 0.083,
     "1000": 0.076,
@@ -7043,7 +7091,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "exf5",
    "best": "e4",
    "bestUci": "e5e4",
-   "eval": 206,
+   "eval": 136,
    "p": {
     "800": 0.186,
     "1000": 0.187,
@@ -7063,7 +7111,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bh4",
    "best": "g5",
    "bestUci": "g6g5",
-   "eval": 271,
+   "eval": 247,
    "p": {
     "800": 0.286,
     "1000": 0.254,
@@ -7078,11 +7126,7 @@ export const TRAPS: Record<string, Trap[]> = {
     "Nxg5",
     "hxg5",
     "Bxg5",
-    "Nf6",
-    "exf5",
-    "Nh7",
-    "Bh4",
-    "Bxf5"
+    "Nf4"
    ]
   }
  ],
@@ -7155,7 +7199,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "dxe5",
    "best": "Nxe3",
    "bestUci": "g4e3",
-   "eval": 219,
+   "eval": 189,
    "p": {
     "800": 0.131,
     "1000": 0.128,
@@ -7173,7 +7217,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bd2",
    "best": "exd4",
    "bestUci": "e5d4",
-   "eval": 169,
+   "eval": 193,
    "p": {
     "800": 0.046,
     "1000": 0.032
@@ -7188,18 +7232,14 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "dxe5",
    "best": "fxg5",
    "bestUci": "f6g5",
-   "eval": 507,
+   "eval": 523,
    "p": {
     "800": 0.035
    },
    "cont": [
     "fxg5",
     "exd6",
-    "Nge5",
-    "dxc7",
-    "Nxf3+",
-    "Bxf3",
-    "Qxc7"
+    "Nge5"
    ]
   }
  ],
@@ -7208,7 +7248,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nd5",
    "best": "Nge5",
    "bestUci": "g4e5",
-   "eval": 130,
+   "eval": 137,
    "p": {
     "800": 0.438,
     "1000": 0.463,
@@ -7228,7 +7268,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxg5",
    "best": "fxg5",
    "bestUci": "f6g5",
-   "eval": 578,
+   "eval": 570,
    "p": {
     "800": 0.04,
     "1000": 0.039,
@@ -7237,11 +7277,11 @@ export const TRAPS: Record<string, Trap[]> = {
    "cont": [
     "fxg5",
     "Bxg4",
-    "Bxg4",
-    "Qxg4",
     "gxh4",
+    "Bxc8",
+    "Qxc8",
     "dxe5",
-    "Nxe5"
+    "dxe5"
    ]
   }
  ],
@@ -7250,7 +7290,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxg5",
    "best": "Qxg5",
    "bestUci": "d8g5",
-   "eval": 463,
+   "eval": 468,
    "p": {
     "800": 0.031
    },
@@ -7264,7 +7304,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "d5",
    "best": "gxf3",
    "bestUci": "g4f3",
-   "eval": 548,
+   "eval": 517,
    "p": {
     "800": 0.085,
     "1000": 0.08,
@@ -7276,10 +7316,8 @@ export const TRAPS: Record<string, Trap[]> = {
    },
    "cont": [
     "gxf3",
-    "dxc6",
-    "fxe2",
-    "Qxe2",
-    "bxc6",
+    "Bxf3",
+    "Nd4",
     "cxd6",
     "cxd6"
    ]
@@ -7288,7 +7326,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qb3+",
    "best": "Kh8",
    "bestUci": "g8h8",
-   "eval": 354,
+   "eval": 388,
    "p": {
     "2000": 0.031
    },
@@ -7304,7 +7342,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qxe3",
    "best": "exd4",
    "bestUci": "e5d4",
-   "eval": 655,
+   "eval": 671,
    "p": {
     "800": 0.591,
     "1000": 0.441,
@@ -7324,7 +7362,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxd4",
    "best": "Nxd4",
    "bestUci": "c6d4",
-   "eval": 707,
+   "eval": 606,
    "p": {
     "800": 0.523,
     "1000": 0.529,
@@ -7335,18 +7373,14 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.346
    },
    "cont": [
-    "Nxd4",
-    "Qxd4",
-    "Nf3+",
-    "Bxf3",
-    "Bxd4"
+    "Nxd4"
    ]
   },
   {
    "san": "Bg5",
    "best": "Nxf3+",
    "bestUci": "e5f3",
-   "eval": 746,
+   "eval": 716,
    "p": {
     "800": 0.126,
     "1000": 0.138,
@@ -7368,7 +7402,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "b3",
    "best": "d3",
    "bestUci": "d4d3",
-   "eval": 613,
+   "eval": 578,
    "p": {
     "800": 0.03
    },
@@ -7384,7 +7418,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "b4",
    "best": "d3",
    "bestUci": "d4d3",
-   "eval": 604,
+   "eval": 583,
    "p": {
     "1200": 0.031,
     "1400": 0.034,
@@ -7396,7 +7430,7 @@ export const TRAPS: Record<string, Trap[]> = {
     "d3",
     "Bxd3",
     "Nxf3+",
-    "Qxf3",
+    "gxf3",
     "Bxa1"
    ]
   },
@@ -7404,7 +7438,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bf4",
    "best": "Nxf3+",
    "bestUci": "e5f3",
-   "eval": 343,
+   "eval": 318,
    "p": {
     "1600": 0.032,
     "1800": 0.036,
@@ -7418,7 +7452,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Rb1",
    "best": "Nxf3+",
    "bestUci": "e5f3",
-   "eval": 354,
+   "eval": 333,
    "p": {
     "1800": 0.044,
     "2000": 0.059
@@ -7433,7 +7467,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxc6",
    "best": "Nxd1",
    "bestUci": "f2d1",
-   "eval": 478,
+   "eval": 465,
    "p": {
     "800": 0.198,
     "1000": 0.265,
@@ -7457,7 +7491,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Kxf2",
    "best": "Qh4+",
    "bestUci": "d8h4",
-   "eval": 614,
+   "eval": 607,
    "p": {
     "800": 0.064,
     "1000": 0.065,
@@ -7481,7 +7515,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bh6",
    "best": "Bxf2+",
    "bestUci": "d4f2",
-   "eval": 680,
+   "eval": 713,
    "p": {
     "800": 0.294,
     "1000": 0.341,
@@ -7501,7 +7535,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qxd4",
    "best": "Nxd4",
    "bestUci": "c6d4",
-   "eval": 596,
+   "eval": 599,
    "p": {
     "800": 0.049,
     "1000": 0.036
@@ -7514,7 +7548,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Kh1",
    "best": "Bxf2",
    "bestUci": "d4f2",
-   "eval": 709,
+   "eval": 682,
    "p": {
     "800": 0.038,
     "1000": 0.036,
@@ -7528,7 +7562,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Kf1",
    "best": "Qh4",
    "bestUci": "d8h4",
-   "eval": 473,
+   "eval": 468,
    "p": {
     "800": 0.037,
     "1000": 0.04,
@@ -7540,11 +7574,11 @@ export const TRAPS: Record<string, Trap[]> = {
    "cont": [
     "Qh4",
     "g3",
-    "Bh3+",
-    "Ke1",
-    "Bxf2+",
-    "Kxf2",
-    "Qf6+"
+    "Qh3+",
+    "Rg2",
+    "f5",
+    "Nb5",
+    "fxe4+"
    ]
   }
  ],
@@ -7553,7 +7587,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "exf5",
    "best": "Rxf5",
    "bestUci": "f8f5",
-   "eval": 505,
+   "eval": 548,
    "p": {
     "800": 0.389,
     "1000": 0.395,
@@ -7567,12 +7601,10 @@ export const TRAPS: Record<string, Trap[]> = {
     "Rxf5",
     "Nd1",
     "Qe7",
-    "Bh6",
-    "Rf7",
-    "h3",
+    "Bf3",
     "Bxf2+",
-    "Nxf2",
-    "Qh4"
+    "Qxf2",
+    "Ne5"
    ]
   }
  ],
@@ -7581,7 +7613,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "dxe5",
    "best": "Nxe3",
    "bestUci": "g4e3",
-   "eval": 182,
+   "eval": 205,
    "p": {
     "800": 0.157,
     "1000": 0.154,
@@ -7599,7 +7631,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bd2",
    "best": "exd4",
    "bestUci": "e5d4",
-   "eval": 205,
+   "eval": 190,
    "p": {
     "800": 0.088,
     "1000": 0.072,
@@ -7614,7 +7646,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bc1",
    "best": "exd4",
    "bestUci": "e5d4",
-   "eval": 205,
+   "eval": 208,
    "p": {
     "800": 0.066,
     "1000": 0.08,
@@ -7634,7 +7666,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxg5",
    "best": "dxe5",
    "bestUci": "d6e5",
-   "eval": 555,
+   "eval": 545,
    "p": {
     "800": 0.035
    },
@@ -7648,7 +7680,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxg5",
    "best": "exd4",
    "bestUci": "e5d4",
-   "eval": 289,
+   "eval": 310,
    "p": {
     "800": 0.182,
     "1000": 0.202,
@@ -7670,7 +7702,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxg5",
    "best": "Qxd1",
    "bestUci": "d8d1",
-   "eval": 388,
+   "eval": 378,
    "p": {
     "800": 0.147,
     "1000": 0.162,
@@ -7694,7 +7726,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxh4",
    "best": "Nd4",
    "bestUci": "c6d4",
-   "eval": 532,
+   "eval": 531,
    "p": {
     "800": 0.566,
     "1000": 0.481,
@@ -7704,20 +7736,14 @@ export const TRAPS: Record<string, Trap[]> = {
     "1800": 0.052
    },
    "cont": [
-    "Nd4",
-    "g3",
-    "Bh3",
-    "Bd3",
-    "Bxf1",
-    "Kxf1",
-    "c6"
+    "Nd4"
    ]
   },
   {
    "san": "h3",
    "best": "Nd4",
    "bestUci": "c6d4",
-   "eval": 532,
+   "eval": 538,
    "p": {
     "800": 0.03
    },
@@ -7751,7 +7777,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxf7",
    "best": "Nxb2",
    "bestUci": "d1b2",
-   "eval": 471,
+   "eval": 473,
    "p": {
     "800": 0.228,
     "1000": 0.276,
@@ -7773,7 +7799,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxb7",
    "best": "Nxb2",
    "bestUci": "d1b2",
-   "eval": 319,
+   "eval": 301,
    "p": {
     "800": 0.075,
     "1000": 0.084,
@@ -7784,21 +7810,29 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.102
    },
    "cont": [
-    "Nxb2"
+    "Nxb2",
+    "Bf3",
+    "Rb8",
+    "Nxd6",
+    "cxd6",
+    "Bxd6",
+    "Bf5"
    ]
   },
   {
    "san": "Bxd1",
    "best": "Rxd8",
    "bestUci": "f8d8",
-   "eval": 302,
+   "eval": 322,
    "p": {
     "800": 0.07,
     "1000": 0.051,
     "1200": 0.039
    },
    "cont": [
-    "Rxd8"
+    "Rxd8",
+    "f4",
+    "Bxb2"
    ]
   }
  ],
@@ -7807,14 +7841,12 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "dxe5",
    "best": "fxg5",
    "bestUci": "f6g5",
-   "eval": 455,
+   "eval": 472,
    "p": {
     "800": 0.03
    },
    "cont": [
-    "fxg5",
-    "exd6",
-    "Nc6"
+    "fxg5"
    ]
   }
  ],
@@ -7823,7 +7855,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bg5",
    "best": "f6",
    "bestUci": "f7f6",
-   "eval": 465,
+   "eval": 546,
    "p": {
     "800": 0.058,
     "1000": 0.051,
@@ -7838,20 +7870,16 @@ export const TRAPS: Record<string, Trap[]> = {
     "Bf4",
     "cxd5",
     "Nxd4",
-    "Ne5",
-    "cxd5",
     "f5",
     "exf5",
-    "Qa5+",
-    "Qd2",
-    "Qxd5"
+    "Qa5+"
    ]
   },
   {
    "san": "Nxd4",
-   "best": "cxd5",
-   "bestUci": "c6d5",
-   "eval": 600,
+   "best": "Bxd4",
+   "bestUci": "g7d4",
+   "eval": 612,
    "p": {
     "800": 0.057,
     "1000": 0.045,
@@ -7859,11 +7887,11 @@ export const TRAPS: Record<string, Trap[]> = {
     "1400": 0.031
    },
    "cont": [
-    "cxd5",
-    "Bxg4",
     "Bxd4",
-    "Bxc8",
-    "Qxc8"
+    "Bxg4",
+    "Bxg4",
+    "Qxg4",
+    "cxd5"
    ]
   }
  ],
@@ -7965,7 +7993,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qe2",
    "best": "Bxg4",
    "bestUci": "c8g4",
-   "eval": 676,
+   "eval": 636,
    "p": {
     "1000": 0.032,
     "1200": 0.034,
@@ -7984,7 +8012,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nd5",
    "best": "Qxe4+",
    "bestUci": "g4e4",
-   "eval": 891,
+   "eval": 924,
    "p": {
     "800": 0.039,
     "1000": 0.035,
@@ -7995,25 +8023,10 @@ export const TRAPS: Record<string, Trap[]> = {
    ]
   },
   {
-   "san": "Ne2",
-   "best": "Bxb2",
-   "bestUci": "d4b2",
-   "eval": 644,
-   "p": {
-    "800": 0.039,
-    "1000": 0.04,
-    "1200": 0.037,
-    "1400": 0.031
-   },
-   "cont": [
-    "Bxb2"
-   ]
-  },
-  {
    "san": "Bh6",
    "best": "Bxc3+",
    "bestUci": "d4c3",
-   "eval": 647,
+   "eval": 677,
    "p": {
     "800": 0.033,
     "1000": 0.035,
@@ -8021,16 +8034,14 @@ export const TRAPS: Record<string, Trap[]> = {
     "1400": 0.032
    },
    "cont": [
-    "Bxc3+",
-    "bxc3",
-    "Qxe4+"
+    "Bxc3+"
    ]
   },
   {
    "san": "Qc2",
    "best": "Qf3",
    "bestUci": "g4f3",
-   "eval": 718,
+   "eval": 706,
    "p": {
     "800": 0.03,
     "1000": 0.047,
@@ -8041,22 +8052,14 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.087
    },
    "cont": [
-    "Qf3",
-    "Rf1",
-    "Bg4",
-    "Qd1",
-    "Bxc3",
-    "Qxf3",
-    "Bxd2+",
-    "Kxd2",
-    "Bxf3"
+    "Qf3"
    ]
   },
   {
    "san": "Qb3",
    "best": "Bxc3",
    "bestUci": "d4c3",
-   "eval": 750,
+   "eval": 716,
    "p": {
     "1400": 0.032,
     "1600": 0.037,
@@ -8095,7 +8098,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "g3",
    "best": "Bxf3",
    "bestUci": "g4f3",
-   "eval": 966,
+   "eval": 935,
    "p": {
     "800": 0.067,
     "1000": 0.043,
@@ -8231,7 +8234,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "b3",
    "best": "Ng4",
    "bestUci": "f6g4",
-   "eval": 644,
+   "eval": 626,
    "p": {
     "800": 0.265,
     "1000": 0.231,
@@ -8242,17 +8245,17 @@ export const TRAPS: Record<string, Trap[]> = {
    },
    "cont": [
     "Ng4",
-    "c5",
-    "Qxc5",
     "fxg4",
-    "Qxd4+"
+    "Qxd4+",
+    "Kh1",
+    "Qxc3"
    ]
   },
   {
    "san": "Qd2",
    "best": "Nxe4",
    "bestUci": "f6e4",
-   "eval": 147,
+   "eval": 137,
    "p": {
     "800": 0.064,
     "1000": 0.074,
@@ -8276,7 +8279,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qd2",
    "best": "Nxf4",
    "bestUci": "h5f4",
-   "eval": 651,
+   "eval": 656,
    "p": {
     "800": 0.077,
     "1000": 0.046
@@ -8291,7 +8294,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bd2",
    "best": "Bxd4+",
    "bestUci": "g7d4",
-   "eval": 582,
+   "eval": 580,
    "p": {
     "800": 0.032
    },
@@ -8317,32 +8320,14 @@ export const TRAPS: Record<string, Trap[]> = {
  "rnbqr1k1/ppp2pbp/3p2p1/8/2PNn3/2N5/PPQ1BPPP/R1B2RK1 w - -": [
   {
    "san": "Nf3",
-   "best": "Bf5",
-   "bestUci": "c8f5",
-   "eval": 297,
+   "best": "Nxc3",
+   "bestUci": "e4c3",
+   "eval": 295,
    "p": {
     "800": 0.051,
     "1000": 0.057,
     "1200": 0.051,
     "1400": 0.039
-   },
-   "cont": [
-    "Bf5"
-   ]
-  },
-  {
-   "san": "Be3",
-   "best": "Nxc3",
-   "bestUci": "e4c3",
-   "eval": 246,
-   "p": {
-    "800": 0.037,
-    "1000": 0.047,
-    "1200": 0.056,
-    "1400": 0.07,
-    "1600": 0.089,
-    "1800": 0.107,
-    "2000": 0.123
    },
    "cont": [
     "Nxc3"
@@ -8354,7 +8339,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "bxc3",
    "best": "Bf5",
    "bestUci": "c8f5",
-   "eval": 294,
+   "eval": 289,
    "p": {
     "800": 0.315,
     "1000": 0.272,
@@ -8372,7 +8357,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qxc3",
    "best": "Bxc3",
    "bestUci": "g7c3",
-   "eval": 700,
+   "eval": 681,
    "p": {
     "800": 0.045
    },
@@ -8388,7 +8373,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bh6",
    "best": "Qh4",
    "bestUci": "d8h4",
-   "eval": 452,
+   "eval": 421,
    "p": {
     "800": 0.1,
     "1000": 0.105,
@@ -8404,111 +8389,49 @@ export const TRAPS: Record<string, Trap[]> = {
    ]
   },
   {
-   "san": "Bf3",
-   "best": "Bf5",
-   "bestUci": "c8f5",
-   "eval": 199,
-   "p": {
-    "800": 0.091,
-    "1000": 0.104,
-    "1200": 0.112,
-    "1400": 0.117,
-    "1600": 0.112,
-    "1800": 0.094,
-    "2000": 0.063
-   },
-   "cont": [
-    "Bf5"
-   ]
-  },
-  {
-   "san": "Qd3",
-   "best": "Nc6",
-   "bestUci": "b8c6",
-   "eval": 210,
-   "p": {
-    "800": 0.087,
-    "1000": 0.08,
-    "1200": 0.071,
-    "1400": 0.062,
-    "1600": 0.046
-   },
-   "cont": [
-    "Nc6",
-    "Nc3",
-    "Bf5",
-    "Qd1",
-    "Bxc3",
-    "bxc3",
-    "Qf6",
-    "Be3",
-    "Qxc3"
-   ]
-  },
-  {
-   "san": "Be3",
-   "best": "Nc6",
-   "bestUci": "b8c6",
-   "eval": 253,
-   "p": {
-    "800": 0.079,
-    "1000": 0.066,
-    "1200": 0.053,
-    "1400": 0.038
-   },
-   "cont": [
-    "Nc6"
-   ]
-  },
-  {
-   "san": "Rd1",
-   "best": "Nc6",
-   "bestUci": "b8c6",
-   "eval": 231,
-   "p": {
-    "800": 0.076,
-    "1000": 0.077,
-    "1200": 0.075,
-    "1400": 0.074,
-    "1600": 0.072,
-    "1800": 0.071,
-    "2000": 0.065
-   },
-   "cont": [
-    "Nc6"
-   ]
-  },
-  {
    "san": "Ng5",
    "best": "Bg7",
    "bestUci": "d4g7",
-   "eval": 267,
+   "eval": 262,
    "p": {
     "800": 0.036
    },
    "cont": [
     "Bg7"
    ]
-  },
-  {
-   "san": "Ng3",
-   "best": "Nc6",
-   "bestUci": "b8c6",
-   "eval": 200,
-   "p": {
-    "800": 0.032
-   },
-   "cont": [
-    "Nc6"
-   ]
   }
  ],
  "r1bqr1k1/ppp2p1p/2np2p1/8/2PbN3/3B4/PPQ2PPP/R1B2RK1 w - -": [
   {
+   "san": "Rb1",
+   "best": "Nb4",
+   "bestUci": "c6b4",
+   "eval": 412,
+   "p": {
+    "800": 0.048,
+    "1000": 0.051,
+    "1200": 0.048,
+    "1400": 0.039
+   },
+   "cont": [
+    "Nb4",
+    "Qb3",
+    "c5",
+    "Bg5",
+    "f6",
+    "Be3",
+    "Bxe3",
+    "fxe3",
+    "f5",
+    "Nf2",
+    "Rxe3"
+   ]
+  },
+  {
    "san": "Ng5",
    "best": "Nb4",
    "bestUci": "c6b4",
-   "eval": 345,
+   "eval": 366,
    "p": {
     "800": 0.034
    },
@@ -8522,7 +8445,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxf6+",
    "best": "Bxf6",
    "bestUci": "d4f6",
-   "eval": 536,
+   "eval": 549,
    "p": {
     "800": 0.233,
     "1000": 0.139,
@@ -8537,7 +8460,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bh4",
    "best": "g5",
    "bestUci": "g6g5",
-   "eval": 355,
+   "eval": 311,
    "p": {
     "800": 0.16,
     "1000": 0.209,
@@ -8549,21 +8472,17 @@ export const TRAPS: Record<string, Trap[]> = {
    },
    "cont": [
     "g5",
-    "Rad1",
-    "Nc6",
     "Bh5",
-    "Re6",
-    "Bg4",
     "gxh4",
-    "Bxe6+",
-    "Bxe6"
+    "Bxe8",
+    "Qxe8"
    ]
   },
   {
    "san": "Bxf6",
    "best": "Bxf6",
    "bestUci": "d4f6",
-   "eval": 570,
+   "eval": 576,
    "p": {
     "800": 0.103,
     "1000": 0.055,
@@ -8579,7 +8498,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxf6+",
    "best": "Bxf6",
    "bestUci": "d4f6",
-   "eval": 606,
+   "eval": 580,
    "p": {
     "800": 0.078,
     "1000": 0.05,
@@ -8593,7 +8512,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Rad1",
    "best": "Bxe4",
    "bestUci": "f5e4",
-   "eval": 581,
+   "eval": 587,
    "p": {
     "800": 0.037
    },
@@ -8605,7 +8524,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qb3",
    "best": "Bxe4",
    "bestUci": "f5e4",
-   "eval": 558,
+   "eval": 570,
    "p": {
     "800": 0.036
    },
@@ -8617,7 +8536,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "c5",
    "best": "d5",
    "bestUci": "d6d5",
-   "eval": 496,
+   "eval": 531,
    "p": {
     "800": 0.035
    },
@@ -8633,7 +8552,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Ng3",
    "best": "Bxc2",
    "bestUci": "f5c2",
-   "eval": 875,
+   "eval": 866,
    "p": {
     "800": 0.031
    },
@@ -8647,7 +8566,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Re1",
    "best": "Nxf2",
    "bestUci": "e4f2",
-   "eval": 292,
+   "eval": 318,
    "p": {
     "800": 0.033,
     "1000": 0.031
@@ -8660,7 +8579,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nd5",
    "best": "c6",
    "bestUci": "c7c6",
-   "eval": 415,
+   "eval": 447,
    "p": {
     "800": 0.032,
     "1000": 0.035,
@@ -8686,7 +8605,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bg3",
    "best": "Rxd4",
    "bestUci": "e4d4",
-   "eval": 709,
+   "eval": 695,
    "p": {
     "800": 0.079,
     "1000": 0.057,
@@ -8700,7 +8619,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qd2",
    "best": "Rxd4",
    "bestUci": "e4d4",
-   "eval": 681,
+   "eval": 693,
    "p": {
     "800": 0.044
    },
@@ -8712,7 +8631,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "g3",
    "best": "Rxd4",
    "bestUci": "e4d4",
-   "eval": 690,
+   "eval": 699,
    "p": {
     "800": 0.042
    },
@@ -8724,7 +8643,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bf3",
    "best": "Rxf4",
    "bestUci": "e4f4",
-   "eval": 714,
+   "eval": 720,
    "p": {
     "800": 0.038,
     "1000": 0.03
@@ -8739,7 +8658,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "dxe5",
    "best": "hxg5",
    "bestUci": "h6g5",
-   "eval": 121,
+   "eval": 116,
    "p": {
     "800": 0.147,
     "1000": 0.153,
@@ -8750,7 +8669,17 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.103
    },
    "cont": [
-    "hxg5"
+    "hxg5",
+    "exf6",
+    "Bxf6",
+    "h3",
+    "Re8",
+    "Qc2",
+    "Nc5",
+    "Rae1",
+    "Bxc3",
+    "Qxc3",
+    "Nxe4"
    ]
   }
  ],
@@ -8759,7 +8688,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qxd4",
    "best": "Nc5",
    "bestUci": "a6c5",
-   "eval": 135,
+   "eval": 131,
    "p": {
     "800": 0.06,
     "1000": 0.041
@@ -8771,10 +8700,27 @@ export const TRAPS: Record<string, Trap[]> = {
  ],
  "r1bq1rk1/ppp2pbp/n2p2p1/4p3/2PPP1n1/2N1BN2/PP2BPPP/R2Q1RK1 w - -": [
   {
+   "san": "dxe5",
+   "best": "Nxe3",
+   "bestUci": "g4e3",
+   "eval": 72,
+   "p": {
+    "800": 0.214,
+    "1000": 0.204,
+    "1200": 0.189,
+    "1400": 0.157,
+    "1600": 0.108,
+    "1800": 0.06
+   },
+   "cont": [
+    "Nxe3"
+   ]
+  },
+  {
    "san": "d5",
    "best": "Nxe3",
    "bestUci": "g4e3",
-   "eval": 115,
+   "eval": 117,
    "p": {
     "800": 0.192,
     "1000": 0.189,
@@ -8789,24 +8735,10 @@ export const TRAPS: Record<string, Trap[]> = {
    ]
   },
   {
-   "san": "Bd2",
-   "best": "exd4",
-   "bestUci": "e5d4",
-   "eval": 185,
-   "p": {
-    "800": 0.078,
-    "1000": 0.063,
-    "1200": 0.043
-   },
-   "cont": [
-    "exd4"
-   ]
-  },
-  {
    "san": "h3",
    "best": "Nxe3",
    "bestUci": "g4e3",
-   "eval": 113,
+   "eval": 104,
    "p": {
     "800": 0.074,
     "1000": 0.077,
@@ -8823,7 +8755,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qd2",
    "best": "Nxe3",
    "bestUci": "g4e3",
-   "eval": 94,
+   "eval": 92,
    "p": {
     "800": 0.064,
     "1000": 0.061,
@@ -8840,7 +8772,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "a3",
    "best": "Nxe3",
    "bestUci": "g4e3",
-   "eval": 137,
+   "eval": 133,
    "p": {
     "800": 0.04,
     "1000": 0.043,
@@ -8858,7 +8790,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "hxg4",
    "best": "dxc3",
    "bestUci": "d4c3",
-   "eval": 313,
+   "eval": 302,
    "p": {
     "800": 0.076,
     "1000": 0.07,
@@ -8876,7 +8808,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Be3",
    "best": "c6",
    "bestUci": "c7c6",
-   "eval": 140,
+   "eval": 160,
    "p": {
     "800": 0.117,
     "1000": 0.113,
@@ -8894,7 +8826,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "c5",
    "best": "c6",
    "bestUci": "c7c6",
-   "eval": 129,
+   "eval": 142,
    "p": {
     "800": 0.034
    },
@@ -8903,7 +8835,7 @@ export const TRAPS: Record<string, Trap[]> = {
     "Nxf6+",
     "Nxf6",
     "cxd6",
-    "Nxe4"
+    "exd4"
    ]
   }
  ],
@@ -8912,7 +8844,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Be3",
    "best": "c6",
    "bestUci": "c7c6",
-   "eval": 164,
+   "eval": 198,
    "p": {
     "800": 0.174,
     "1000": 0.155,
@@ -8945,10 +8877,28 @@ export const TRAPS: Record<string, Trap[]> = {
  ],
  "r1b1qrk1/ppp2pb1/n5pp/4p1B1/2P1P1n1/2N2N1P/PP2BPP1/R2Q1RK1 w - -": [
   {
+   "san": "hxg4",
+   "best": "hxg5",
+   "bestUci": "h6g5",
+   "eval": 70,
+   "p": {
+    "800": 0.26,
+    "1000": 0.264,
+    "1200": 0.261,
+    "1400": 0.251,
+    "1600": 0.228,
+    "1800": 0.197,
+    "2000": 0.17
+   },
+   "cont": [
+    "hxg5"
+   ]
+  },
+  {
    "san": "Bxh6",
    "best": "Nxh6",
    "bestUci": "g4h6",
-   "eval": 548,
+   "eval": 536,
    "p": {
     "800": 0.061,
     "1000": 0.049,
@@ -8964,7 +8914,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nd5",
    "best": "Nxe4",
    "bestUci": "f6e4",
-   "eval": 185,
+   "eval": 166,
    "p": {
     "800": 0.11,
     "1000": 0.082,
@@ -8981,7 +8931,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "b4",
    "best": "Ncxe4",
    "bestUci": "c5e4",
-   "eval": 198,
+   "eval": 211,
    "p": {
     "800": 0.201,
     "1000": 0.142,
@@ -8999,7 +8949,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Be3",
    "best": "Ncxe4",
    "bestUci": "c5e4",
-   "eval": 192,
+   "eval": 179,
    "p": {
     "800": 0.098,
     "1000": 0.063,
@@ -9015,7 +8965,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "h3",
    "best": "Ncxe4",
    "bestUci": "c5e4",
-   "eval": 234,
+   "eval": 235,
    "p": {
     "800": 0.032
    },
@@ -9031,7 +8981,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nb3",
    "best": "Ncxe4",
    "bestUci": "c5e4",
-   "eval": 256,
+   "eval": 253,
    "p": {
     "800": 0.126,
     "1000": 0.111,
@@ -9047,15 +8997,15 @@ export const TRAPS: Record<string, Trap[]> = {
   },
   {
    "san": "Nf3",
-   "best": "Nfxe4",
-   "bestUci": "f6e4",
-   "eval": 300,
+   "best": "Ncxe4",
+   "bestUci": "c5e4",
+   "eval": 295,
    "p": {
     "800": 0.066,
     "1000": 0.036
    },
    "cont": [
-    "Nfxe4",
+    "Ncxe4",
     "Nxe4",
     "Nxe4"
    ]
@@ -9066,7 +9016,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bh4",
    "best": "g5",
    "bestUci": "g6g5",
-   "eval": 215,
+   "eval": 210,
    "p": {
     "800": 0.437,
     "1000": 0.399,
@@ -9089,7 +9039,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Be3",
    "best": "Ncxe4",
    "bestUci": "c5e4",
-   "eval": 193,
+   "eval": 173,
    "p": {
     "800": 0.149,
     "1000": 0.114,
@@ -9108,7 +9058,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Rb1",
    "best": "Nfxe4",
    "bestUci": "f6e4",
-   "eval": 288,
+   "eval": 284,
    "p": {
     "2000": 0.034
    },
@@ -9124,7 +9074,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "a4",
    "best": "Ng4",
    "bestUci": "f6g4",
-   "eval": 114,
+   "eval": 125,
    "p": {
     "800": 0.054,
     "1000": 0.041,
@@ -9138,7 +9088,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nb5",
    "best": "Nfxe4",
    "bestUci": "f6e4",
-   "eval": 234,
+   "eval": 223,
    "p": {
     "800": 0.047,
     "1000": 0.032
@@ -9149,14 +9099,14 @@ export const TRAPS: Record<string, Trap[]> = {
   },
   {
    "san": "Qd2",
-   "best": "Ncxe4",
-   "bestUci": "c5e4",
-   "eval": 288,
+   "best": "Nfxe4",
+   "bestUci": "f6e4",
+   "eval": 313,
    "p": {
     "800": 0.033
    },
    "cont": [
-    "Ncxe4",
+    "Nfxe4",
     "Nxe4",
     "Nxe4"
    ]
@@ -9167,7 +9117,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "b4",
    "best": "axb3",
    "bestUci": "a4b3",
-   "eval": 204,
+   "eval": 188,
    "p": {
     "800": 0.057,
     "1000": 0.036
@@ -9180,7 +9130,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Rb1",
    "best": "Nfxe4",
    "bestUci": "f6e4",
-   "eval": 391,
+   "eval": 379,
    "p": {
     "800": 0.052,
     "1000": 0.049,
@@ -9200,14 +9150,24 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Ng5",
    "best": "Nf4",
    "bestUci": "h5f4",
-   "eval": 225,
+   "eval": 186,
    "p": {
     "800": 0.068,
     "1000": 0.052,
     "1200": 0.036
    },
    "cont": [
-    "Nf4"
+    "Nf4",
+    "Nf3",
+    "f5",
+    "Nd2",
+    "Qg5",
+    "Bf3",
+    "Bh6",
+    "Kh1",
+    "Nfd3",
+    "exf5",
+    "Nxc1"
    ]
   }
  ],
@@ -9216,7 +9176,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxg5",
    "best": "hxg5",
    "bestUci": "h6g5",
-   "eval": 262,
+   "eval": 270,
    "p": {
     "800": 0.18,
     "1000": 0.186,
@@ -9229,22 +9189,22 @@ export const TRAPS: Record<string, Trap[]> = {
    "cont": [
     "hxg5",
     "Bxg5",
-    "Qd7"
+    "Qe8"
    ]
   }
  ],
  "r1bq1rk1/1pp2pb1/3p2pp/p1nPp2n/2P1P3/2N2N2/PPQBBPPP/R4RK1 w - -": [
   {
    "san": "a4",
-   "best": "f5",
-   "bestUci": "f7f5",
-   "eval": 96,
+   "best": "Nf4",
+   "bestUci": "h5f4",
+   "eval": 115,
    "p": {
     "800": 0.041,
     "1000": 0.03
    },
    "cont": [
-    "f5"
+    "Nf4"
    ]
   }
  ],
@@ -9253,7 +9213,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nd5",
    "best": "Nxe4",
    "bestUci": "f6e4",
-   "eval": 235,
+   "eval": 233,
    "p": {
     "800": 0.04,
     "1000": 0.03
@@ -9268,7 +9228,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nf3",
    "best": "Nxc3",
    "bestUci": "e4c3",
-   "eval": 166,
+   "eval": 186,
    "p": {
     "800": 0.048,
     "1000": 0.041,
@@ -9285,7 +9245,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxf7",
    "best": "Qxd1",
    "bestUci": "d8d1",
-   "eval": 437,
+   "eval": 458,
    "p": {
     "800": 0.044,
     "1000": 0.062,
@@ -9305,7 +9265,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxg6",
    "best": "Nxc3",
    "bestUci": "e4c3",
-   "eval": 554,
+   "eval": 562,
    "p": {
     "1000": 0.034,
     "1200": 0.042,
@@ -9376,7 +9336,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nd5",
    "best": "Nxe4",
    "bestUci": "f6e4",
-   "eval": 158,
+   "eval": 167,
    "p": {
     "800": 0.046,
     "1000": 0.042,
@@ -9393,7 +9353,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxf7",
    "best": "Nxc3",
    "bestUci": "e4c3",
-   "eval": 454,
+   "eval": 468,
    "p": {
     "800": 0.119,
     "1000": 0.173,
@@ -9404,14 +9364,16 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.31
    },
    "cont": [
-    "Nxc3"
+    "Nxc3",
+    "bxc3",
+    "Kxf7"
    ]
   },
   {
    "san": "Nf3",
    "best": "Bxc3",
    "bestUci": "g7c3",
-   "eval": 372,
+   "eval": 375,
    "p": {
     "800": 0.115,
     "1000": 0.099,
@@ -9429,7 +9391,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bf4",
    "best": "Nxc3",
    "bestUci": "e4c3",
-   "eval": 549,
+   "eval": 532,
    "p": {
     "800": 0.044,
     "1000": 0.046,
@@ -9447,7 +9409,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Ng4",
    "best": "Nxc3",
    "bestUci": "e4c3",
-   "eval": 213,
+   "eval": 232,
    "p": {
     "800": 0.03
    },
@@ -9498,7 +9460,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Be3",
    "best": "c6",
    "bestUci": "c7c6",
-   "eval": 341,
+   "eval": 344,
    "p": {
     "800": 0.187,
     "1000": 0.24,
@@ -9516,7 +9478,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "c5",
    "best": "Nxg5",
    "bestUci": "e4g5",
-   "eval": 406,
+   "eval": 394,
    "p": {
     "800": 0.184,
     "1000": 0.15,
@@ -9549,14 +9511,24 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.033
    },
    "cont": [
-    "Nxg5"
+    "Nxg5",
+    "Nxg5",
+    "c6",
+    "Nc3",
+    "h6",
+    "Nge4",
+    "f5",
+    "Nd6",
+    "Rd8",
+    "c5",
+    "Nxc5"
    ]
   },
   {
    "san": "Bh4",
    "best": "f6",
    "bestUci": "f7f6",
-   "eval": 355,
+   "eval": 368,
    "p": {
     "800": 0.103,
     "1000": 0.128,
@@ -9574,7 +9546,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "b4",
    "best": "Nxg5",
    "bestUci": "e4g5",
-   "eval": 433,
+   "eval": 420,
    "p": {
     "800": 0.092,
     "1000": 0.09,
@@ -9585,19 +9557,29 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.045
    },
    "cont": [
-    "Nxg5"
+    "Nxg5",
+    "Nxg5",
+    "c6",
+    "b5",
+    "cxd5",
+    "bxa6",
+    "h6",
+    "Nxf7",
+    "Kxf7",
+    "cxd5",
+    "bxa6"
    ]
   },
   {
    "san": "Rad1",
-   "best": "Nxg5",
-   "bestUci": "e4g5",
-   "eval": 298,
+   "best": "h6",
+   "bestUci": "h7h6",
+   "eval": 308,
    "p": {
     "800": 0.031
    },
    "cont": [
-    "Nxg5"
+    "h6"
    ]
   }
  ],
@@ -9606,7 +9588,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nd5",
    "best": "c6",
    "bestUci": "c7c6",
-   "eval": 424,
+   "eval": 421,
    "p": {
     "800": 0.346,
     "1000": 0.352,
@@ -9624,7 +9606,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bh4",
    "best": "Rxe7",
    "bestUci": "e8e7",
-   "eval": 624,
+   "eval": 608,
    "p": {
     "800": 0.059,
     "1000": 0.056,
@@ -9645,7 +9627,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bd3",
    "best": "Nxg5",
    "bestUci": "e4g5",
-   "eval": 476,
+   "eval": 466,
    "p": {
     "800": 0.117,
     "1000": 0.097,
@@ -9661,7 +9643,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bh4",
    "best": "Nd6",
    "bestUci": "e4d6",
-   "eval": 340,
+   "eval": 314,
    "p": {
     "800": 0.1,
     "1000": 0.103,
@@ -9679,7 +9661,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Rad1",
    "best": "Nxg5",
    "bestUci": "e4g5",
-   "eval": 343,
+   "eval": 335,
    "p": {
     "800": 0.091,
     "1000": 0.077,
@@ -9697,7 +9679,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "b3",
    "best": "Nc3",
    "bestUci": "e4c3",
-   "eval": 490,
+   "eval": 497,
    "p": {
     "800": 0.068,
     "1000": 0.062,
@@ -9712,7 +9694,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "a3",
    "best": "Nxg5",
    "bestUci": "e4g5",
-   "eval": 381,
+   "eval": 403,
    "p": {
     "800": 0.05,
     "1000": 0.05,
@@ -9730,7 +9712,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Rfe1",
    "best": "Nxg5",
    "bestUci": "e4g5",
-   "eval": 405,
+   "eval": 412,
    "p": {
     "800": 0.034,
     "1000": 0.032
@@ -9743,7 +9725,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Rfd1",
    "best": "Nxg5",
    "bestUci": "e4g5",
-   "eval": 352,
+   "eval": 341,
    "p": {
     "1400": 0.031,
     "1600": 0.033,
@@ -9760,7 +9742,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "O-O",
    "best": "Nxe4",
    "bestUci": "f6e4",
-   "eval": 175,
+   "eval": 169,
    "p": {
     "800": 0.371,
     "1000": 0.318,
@@ -9780,7 +9762,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bd3",
    "best": "Nxe4",
    "bestUci": "f6e4",
-   "eval": 232,
+   "eval": 217,
    "p": {
     "800": 0.247,
     "1000": 0.248,
@@ -9795,9 +9777,9 @@ export const TRAPS: Record<string, Trap[]> = {
   },
   {
    "san": "Qc2",
-   "best": "c4",
-   "bestUci": "c5c4",
-   "eval": 143,
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 111,
    "p": {
     "800": 0.121,
     "1000": 0.178,
@@ -9808,20 +9790,24 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.17
    },
    "cont": [
-    "c4",
+    "Nxe4",
+    "Nxe4",
+    "Bf5",
+    "Nfd2",
+    "Qe7",
+    "Bf3",
+    "Bxe4",
+    "Nxe4",
+    "f5",
     "O-O",
-    "b5",
-    "e5",
-    "dxe5",
-    "fxe5",
-    "Nxd5"
+    "fxe4"
    ]
   },
   {
    "san": "Qd3",
    "best": "Nxe4",
    "bestUci": "f6e4",
-   "eval": 214,
+   "eval": 163,
    "p": {
     "800": 0.041,
     "1000": 0.035,
@@ -9872,7 +9858,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxe5",
    "best": "Nbd7",
    "bestUci": "b8d7",
-   "eval": 104,
+   "eval": 97,
    "p": {
     "800": 0.071,
     "1000": 0.059,
@@ -9890,23 +9876,13 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "O-O",
    "best": "e4",
    "bestUci": "e5e4",
-   "eval": 153,
+   "eval": 154,
    "p": {
     "800": 0.047,
     "1000": 0.034
    },
    "cont": [
-    "e4",
-    "Ne5",
-    "Nbd7",
-    "Nc4",
-    "Nb6",
-    "Ne3",
-    "Re7",
-    "f5",
-    "Bxf5",
-    "Nxf5",
-    "gxf5"
+    "e4"
    ]
   }
  ],
@@ -9932,7 +9908,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bg5",
    "best": "Nxf3+",
    "bestUci": "e5f3",
-   "eval": 649,
+   "eval": 646,
    "p": {
     "800": 0.112,
     "1000": 0.118,
@@ -9952,7 +9928,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Ng5",
    "best": "c4",
    "bestUci": "c5c4",
-   "eval": 166,
+   "eval": 177,
    "p": {
     "800": 0.045,
     "1000": 0.05,
@@ -9963,17 +9939,7 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.088
    },
    "cont": [
-    "c4",
-    "Kh1",
-    "Bf5",
-    "Nge4",
-    "Qb6",
-    "Na4",
-    "Qb4",
-    "Bd2",
-    "Qe7",
-    "Rxf5",
-    "gxf5"
+    "c4"
    ]
   }
  ],
@@ -9982,7 +9948,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "dxe6",
    "best": "Qxd1+",
    "bestUci": "d8d1",
-   "eval": 252,
+   "eval": 284,
    "p": {
     "800": 0.21,
     "1000": 0.192,
@@ -10018,7 +9984,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "h3",
    "best": "Nxe5",
    "bestUci": "g4e5",
-   "eval": 197,
+   "eval": 193,
    "p": {
     "800": 0.068,
     "1000": 0.073,
@@ -10035,44 +10001,54 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "b3",
    "best": "c4",
    "bestUci": "c5c4",
-   "eval": 373,
+   "eval": 349,
    "p": {
     "800": 0.039
    },
    "cont": [
     "c4",
     "Qd2",
-    "Bf5",
-    "e6",
-    "fxe6"
+    "Nxe5",
+    "Nxe5",
+    "Rxe5"
    ]
   },
   {
    "san": "d6",
    "best": "c4",
    "bestUci": "c5c4",
-   "eval": 262,
+   "eval": 257,
    "p": {
     "800": 0.031
    },
    "cont": [
     "c4",
     "Rf1",
-    "Qxb2"
+    "Nxe5",
+    "Nxe5",
+    "Rxe5"
    ]
   },
   {
    "san": "Bf4",
    "best": "Nd7",
    "bestUci": "b8d7",
-   "eval": 205,
+   "eval": 174,
    "p": {
     "800": 0.031,
     "1000": 0.031,
     "1200": 0.031
    },
    "cont": [
-    "Nd7"
+    "Nd7",
+    "Na4",
+    "Qa5+",
+    "Bd2",
+    "Qc7",
+    "d6",
+    "Qc6",
+    "O-O",
+    "Ndxe5"
    ]
   }
  ],
@@ -10081,7 +10057,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "dxe6",
    "best": "Bxe6",
    "bestUci": "c8e6",
-   "eval": 288,
+   "eval": 281,
    "p": {
     "800": 0.188,
     "1000": 0.163,
@@ -10104,7 +10080,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "d6",
    "best": "Qxb2",
    "bestUci": "b6b2",
-   "eval": 210,
+   "eval": 193,
    "p": {
     "800": 0.112,
     "1000": 0.123,
@@ -10122,7 +10098,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "h3",
    "best": "Qxb2",
    "bestUci": "b6b2",
-   "eval": 253,
+   "eval": 272,
    "p": {
     "800": 0.052,
     "1000": 0.065,
@@ -10137,38 +10113,10 @@ export const TRAPS: Record<string, Trap[]> = {
    ]
   },
   {
-   "san": "Na4",
-   "best": "Qa5+",
-   "bestUci": "b6a5",
-   "eval": 147,
-   "p": {
-    "800": 0.038,
-    "1000": 0.04,
-    "1200": 0.042,
-    "1400": 0.043,
-    "1600": 0.04,
-    "1800": 0.036,
-    "2000": 0.03
-   },
-   "cont": [
-    "Qa5+",
-    "Bd2",
-    "Qd8",
-    "Bg5",
-    "Bf6",
-    "Bxf6",
-    "Qxf6",
-    "O-O",
-    "Ne3",
-    "Qd2",
-    "exd5"
-   ]
-  },
-  {
    "san": "Rb1",
    "best": "c4",
    "bestUci": "c5c4",
-   "eval": 212,
+   "eval": 225,
    "p": {
     "800": 0.031,
     "1000": 0.032,
@@ -10184,7 +10132,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nd2",
    "best": "Rxe5",
    "bestUci": "e8e5",
-   "eval": 491,
+   "eval": 419,
    "p": {
     "800": 0.078,
     "1000": 0.055,
@@ -10198,7 +10146,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Kf1",
    "best": "Nxe5",
    "bestUci": "g4e5",
-   "eval": 356,
+   "eval": 376,
    "p": {
     "800": 0.044,
     "1000": 0.042,
@@ -10214,9 +10162,9 @@ export const TRAPS: Record<string, Trap[]> = {
  "rnb1r1k1/pp3pbp/1q4p1/2pPn1B1/8/2N2N2/PP2B1PP/R2Q1RK1 w - -": [
   {
    "san": "Rb1",
-   "best": "Bf5",
-   "bestUci": "c8f5",
-   "eval": 178,
+   "best": "Nxf3+",
+   "bestUci": "e5f3",
+   "eval": 174,
    "p": {
     "800": 0.045,
     "1000": 0.059,
@@ -10227,14 +10175,14 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.046
    },
    "cont": [
-    "Bf5"
+    "Nxf3+"
    ]
   },
   {
    "san": "Bb5",
    "best": "Bd7",
    "bestUci": "c8d7",
-   "eval": 189,
+   "eval": 191,
    "p": {
     "800": 0.04,
     "1000": 0.031
@@ -10247,19 +10195,27 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "b3",
    "best": "Nxf3+",
    "bestUci": "e5f3",
-   "eval": 423,
+   "eval": 374,
    "p": {
     "800": 0.034
    },
    "cont": [
-    "Nxf3+"
+    "Nxf3+",
+    "Rxf3",
+    "Bd4+",
+    "Kh1",
+    "Bg4",
+    "Rf2",
+    "Bxf2",
+    "Bxg4",
+    "Bd4"
    ]
   },
   {
    "san": "Qc2",
    "best": "Bf5",
    "bestUci": "c8f5",
-   "eval": 163,
+   "eval": 162,
    "p": {
     "1000": 0.03,
     "1200": 0.037,
@@ -10274,28 +10230,10 @@ export const TRAPS: Record<string, Trap[]> = {
  ],
  "rnb1r1k1/pp3pbp/3P2p1/2p1n1B1/8/2N2N2/Pq2B1PP/R2Q1RK1 w - -": [
   {
-   "san": "Nxe5",
-   "best": "Rxe5",
-   "bestUci": "e8e5",
-   "eval": 165,
-   "p": {
-    "800": 0.589,
-    "1000": 0.586,
-    "1200": 0.554,
-    "1400": 0.495,
-    "1600": 0.424,
-    "1800": 0.342,
-    "2000": 0.268
-   },
-   "cont": [
-    "Rxe5"
-   ]
-  },
-  {
    "san": "Na4",
    "best": "Nxf3+",
    "bestUci": "e5f3",
-   "eval": 321,
+   "eval": 307,
    "p": {
     "800": 0.033,
     "1600": 0.03,
@@ -10317,7 +10255,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nb5",
    "best": "Nxf3+",
    "bestUci": "e5f3",
-   "eval": 523,
+   "eval": 501,
    "p": {
     "1200": 0.035,
     "1400": 0.046,
@@ -10330,23 +10268,6 @@ export const TRAPS: Record<string, Trap[]> = {
     "Bxf3",
     "Qxb5"
    ]
-  },
-  {
-   "san": "Rc1",
-   "best": "Nxf3+",
-   "bestUci": "e5f3",
-   "eval": 165,
-   "p": {
-    "1400": 0.035,
-    "1600": 0.047,
-    "1800": 0.06,
-    "2000": 0.071
-   },
-   "cont": [
-    "Nxf3+",
-    "Bxf3",
-    "Bxc3"
-   ]
   }
  ],
  "rnb1r1k1/pp3pbp/1q4p1/2pP2B1/8/2N2n2/PP2B1PP/R2Q1R1K w - -": [
@@ -10354,7 +10275,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bxf3",
    "best": "Qxb2",
    "bestUci": "b6b2",
-   "eval": 348,
+   "eval": 344,
    "p": {
     "800": 0.664,
     "1000": 0.659,
@@ -10372,9 +10293,9 @@ export const TRAPS: Record<string, Trap[]> = {
  "rn2r1k1/pp3pbp/1q4p1/2pPnbB1/8/2N2N2/PP1QB1PP/R4RK1 w - -": [
   {
    "san": "Bh6",
-   "best": "c4+",
-   "bestUci": "c5c4",
-   "eval": 160,
+   "best": "Nbd7",
+   "bestUci": "b8d7",
+   "eval": 148,
    "p": {
     "800": 0.091,
     "1000": 0.078,
@@ -10383,14 +10304,14 @@ export const TRAPS: Record<string, Trap[]> = {
     "1600": 0.037
    },
    "cont": [
-    "c4+"
+    "Nbd7"
    ]
   },
   {
    "san": "Na4",
    "best": "Qb4",
    "bestUci": "b6b4",
-   "eval": 150,
+   "eval": 148,
    "p": {
     "800": 0.032
    },
@@ -10402,22 +10323,14 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nh4",
    "best": "Bd3",
    "bestUci": "f5d3",
-   "eval": 231,
+   "eval": 240,
    "p": {
     "1600": 0.033,
     "1800": 0.046,
     "2000": 0.069
    },
    "cont": [
-    "Bd3",
-    "Kh1",
-    "c4",
-    "Be3",
-    "Qb4",
-    "a3",
-    "Qe7",
-    "Nf3",
-    "Bxe2"
+    "Bd3"
    ]
   }
  ],
@@ -10426,7 +10339,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxe4",
    "best": "dxe4",
    "bestUci": "d5e4",
-   "eval": 357,
+   "eval": 379,
    "p": {
     "800": 0.128,
     "1000": 0.106,
@@ -10437,6 +10350,24 @@ export const TRAPS: Record<string, Trap[]> = {
    "cont": [
     "dxe4"
    ]
+  },
+  {
+   "san": "Qxd5",
+   "best": "Nxc3",
+   "bestUci": "e4c3",
+   "eval": 194,
+   "p": {
+    "800": 0.048,
+    "1000": 0.046,
+    "1200": 0.044,
+    "1400": 0.045,
+    "1600": 0.051,
+    "1800": 0.065,
+    "2000": 0.092
+   },
+   "cont": [
+    "Nxc3"
+   ]
   }
  ],
  "r1bq1rk1/pp3pbp/2np2p1/2pNP3/2P1nP2/5N2/PP2B1PP/R1BQK2R w KQ -": [
@@ -10444,7 +10375,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "exd6",
    "best": "Qxd6",
    "bestUci": "d8d6",
-   "eval": 203,
+   "eval": 222,
    "p": {
     "800": 0.099,
     "1000": 0.1,
@@ -10455,14 +10386,24 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.231
    },
    "cont": [
-    "Qxd6"
+    "Qxd6",
+    "O-O",
+    "Re8",
+    "Be3",
+    "Be6",
+    "Re1",
+    "Rad8",
+    "Qc2",
+    "Bxd5",
+    "cxd5",
+    "Qxd5"
    ]
   },
   {
    "san": "Qd3",
    "best": "Bf5",
    "bestUci": "c8f5",
-   "eval": 229,
+   "eval": 236,
    "p": {
     "800": 0.059,
     "1000": 0.075,
@@ -10486,7 +10427,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bd3",
    "best": "Nf6",
    "bestUci": "e4f6",
-   "eval": 289,
+   "eval": 288,
    "p": {
     "800": 0.118,
     "1000": 0.118,
@@ -10504,7 +10445,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Nxe5",
    "best": "Nxe5",
    "bestUci": "c6e5",
-   "eval": 244,
+   "eval": 218,
    "p": {
     "800": 0.107,
     "1000": 0.101,
@@ -10521,24 +10462,6 @@ export const TRAPS: Record<string, Trap[]> = {
     "Bf4",
     "Bxb2"
    ]
-  },
-  {
-   "san": "Qc2",
-   "best": "Nf6",
-   "bestUci": "e4f6",
-   "eval": 197,
-   "p": {
-    "800": 0.031,
-    "1000": 0.041,
-    "1200": 0.049,
-    "1400": 0.053,
-    "1600": 0.054,
-    "1800": 0.048,
-    "2000": 0.037
-   },
-   "cont": [
-    "Nf6"
-   ]
   }
  ],
  "r1bq1rk1/pp4bp/2np2p1/2pNPp2/2P1nP2/5N2/PPQ1B1PP/R1B1K2R w KQ f6": [
@@ -10546,7 +10469,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Ng5",
    "best": "Nd4",
    "bestUci": "c6d4",
-   "eval": 512,
+   "eval": 511,
    "p": {
     "800": 0.031
    },
@@ -10564,7 +10487,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bxe4",
    "best": "fxe4",
    "bestUci": "f5e4",
-   "eval": 275,
+   "eval": 244,
    "p": {
     "800": 0.236,
     "1000": 0.209,
@@ -10584,7 +10507,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qe2",
    "best": "dxe5",
    "bestUci": "d6e5",
-   "eval": 225,
+   "eval": 217,
    "p": {
     "800": 0.04,
     "1000": 0.039,
@@ -10595,13 +10518,7 @@ export const TRAPS: Record<string, Trap[]> = {
     "2000": 0.048
    },
    "cont": [
-    "dxe5",
-    "fxe5",
-    "Be6",
-    "O-O",
-    "Bxd5",
-    "cxd5",
-    "Nxe5"
+    "dxe5"
    ]
   }
  ],
@@ -10635,34 +10552,10 @@ export const TRAPS: Record<string, Trap[]> = {
  ],
  "r1bq1rk1/pp4bp/2n3p1/2pNp3/2P1pP2/5N2/PP4PP/R1BQ1RK1 w - -": [
   {
-   "san": "Ng5",
-   "best": "exf4",
-   "bestUci": "e5f4",
-   "eval": 267,
-   "p": {
-    "800": 0.284,
-    "1000": 0.293,
-    "1200": 0.3,
-    "1400": 0.321,
-    "1600": 0.361,
-    "1800": 0.417,
-    "2000": 0.5
-   },
-   "cont": [
-    "exf4",
-    "Nxe4",
-    "Bf5",
-    "Rxf4",
-    "g5",
-    "Rxf5",
-    "Rxf5"
-   ]
-  },
-  {
    "san": "fxe5",
    "best": "exf3",
    "bestUci": "e4f3",
-   "eval": 594,
+   "eval": 596,
    "p": {
     "800": 0.122,
     "1000": 0.092,
@@ -10673,14 +10566,16 @@ export const TRAPS: Record<string, Trap[]> = {
    "cont": [
     "exf3",
     "Rxf3",
-    "Bf5"
+    "Rxf3",
+    "Qxf3",
+    "Nxe5"
    ]
   },
   {
    "san": "Nd2",
    "best": "e3",
    "bestUci": "e4e3",
-   "eval": 420,
+   "eval": 390,
    "p": {
     "800": 0.046,
     "1000": 0.046,
@@ -10689,17 +10584,7 @@ export const TRAPS: Record<string, Trap[]> = {
     "1600": 0.033
    },
    "cont": [
-    "e3",
-    "Nxe3",
-    "exf4",
-    "Nd5",
-    "g5",
-    "Qh5",
-    "Rf5",
-    "Re1",
-    "Ne5",
-    "Rxe5",
-    "Rxe5"
+    "e3"
    ]
   }
  ],
@@ -10725,10 +10610,28 @@ export const TRAPS: Record<string, Trap[]> = {
  ],
  "r1bq1rk1/pp1n1pbp/3p2p1/2pPP3/5P2/2P2N2/P3B1PP/R1BQK2R w KQ -": [
   {
+   "san": "Bb2",
+   "best": "dxe5",
+   "bestUci": "d6e5",
+   "eval": 332,
+   "p": {
+    "800": 0.158,
+    "1000": 0.184,
+    "1200": 0.197,
+    "1400": 0.193,
+    "1600": 0.166,
+    "1800": 0.125,
+    "2000": 0.095
+   },
+   "cont": [
+    "dxe5"
+   ]
+  },
+  {
    "san": "exd6",
    "best": "Bxc3+",
    "bestUci": "g7c3",
-   "eval": 355,
+   "eval": 325,
    "p": {
     "800": 0.1,
     "1000": 0.081,
@@ -10752,7 +10655,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "c4",
    "best": "e4",
    "bestUci": "e5e4",
-   "eval": 471,
+   "eval": 450,
    "p": {
     "800": 0.108,
     "1000": 0.1,
@@ -10772,16 +10675,20 @@ export const TRAPS: Record<string, Trap[]> = {
   },
   {
    "san": "Bb2",
-   "best": "exf4",
-   "bestUci": "e5f4",
-   "eval": 331,
+   "best": "e4",
+   "bestUci": "e5e4",
+   "eval": 362,
    "p": {
     "800": 0.035,
     "1000": 0.032,
     "1800": 0.03
    },
    "cont": [
-    "exf4"
+    "e4",
+    "Ng5",
+    "Nf6",
+    "Qc2",
+    "Qxd5"
    ]
   }
  ],
@@ -10806,7 +10713,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "fxe5",
    "best": "Nxe5",
    "bestUci": "d7e5",
-   "eval": 551,
+   "eval": 586,
    "p": {
     "800": 0.602,
     "1000": 0.617,
@@ -10830,7 +10737,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "O-O",
    "best": "e4",
    "bestUci": "e5e4",
-   "eval": 490,
+   "eval": 478,
    "p": {
     "800": 0.181,
     "1000": 0.164,
@@ -10852,7 +10759,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bb2",
    "best": "e4",
    "bestUci": "e5e4",
-   "eval": 346,
+   "eval": 386,
    "p": {
     "800": 0.091,
     "1000": 0.101,
@@ -10867,26 +10774,22 @@ export const TRAPS: Record<string, Trap[]> = {
     "Ne5",
     "Nxe5",
     "fxe5",
-    "Qe8",
-    "Qd2",
-    "Bxe5"
+    "Qg5",
+    "Qc1",
+    "Qxg2"
    ]
   },
   {
    "san": "Nxe5",
    "best": "Nxe5",
    "bestUci": "d7e5",
-   "eval": 652,
+   "eval": 659,
    "p": {
     "800": 0.053,
     "1000": 0.039
    },
    "cont": [
-    "Nxe5",
-    "fxe5",
-    "Bxe5",
-    "O-O",
-    "Bxa1"
+    "Nxe5"
    ]
   }
  ],
@@ -10895,7 +10798,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bb2",
    "best": "e5",
    "bestUci": "e6e5",
-   "eval": 364,
+   "eval": 375,
    "p": {
     "800": 0.112,
     "1000": 0.114,
@@ -10917,7 +10820,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "c4",
    "best": "Bxa1",
    "bestUci": "g7a1",
-   "eval": 602,
+   "eval": 615,
    "p": {
     "800": 0.034
    },
@@ -10931,25 +10834,25 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Ng5",
    "best": "e5",
    "bestUci": "e7e5",
-   "eval": 500,
+   "eval": 538,
    "p": {
     "800": 0.037
    },
    "cont": [
     "e5",
-    "Nh3",
-    "exf4",
+    "dxe5",
+    "dxe5",
     "Bxh5",
-    "gxh5",
-    "Nxf4",
-    "h4"
+    "exf4",
+    "exf4",
+    "gxh5"
    ]
   },
   {
    "san": "Nbd2",
    "best": "Nxf4",
    "bestUci": "h5f4",
-   "eval": 145,
+   "eval": 154,
    "p": {
     "800": 0.032
    },
@@ -10964,10 +10867,30 @@ export const TRAPS: Record<string, Trap[]> = {
  ],
  "r1bq1rk1/pppnppb1/3p3p/6pn/2PP3B/4PN2/PP2BPPP/RN1Q1RK1 w - -": [
   {
+   "san": "Nxg5",
+   "best": "hxg5",
+   "bestUci": "h6g5",
+   "eval": 131,
+   "p": {
+    "800": 0.273,
+    "1000": 0.302,
+    "1200": 0.314,
+    "1400": 0.3,
+    "1600": 0.252,
+    "1800": 0.169,
+    "2000": 0.091
+   },
+   "cont": [
+    "hxg5",
+    "Bxg5",
+    "Nhf6"
+   ]
+  },
+  {
    "san": "Bxg5",
    "best": "hxg5",
    "bestUci": "h6g5",
-   "eval": 218,
+   "eval": 222,
    "p": {
     "800": 0.069,
     "1000": 0.062,
@@ -11006,7 +10929,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Bh2",
    "best": "Bxb2",
    "bestUci": "g7b2",
-   "eval": 192,
+   "eval": 207,
    "p": {
     "800": 0.402,
     "1000": 0.395,
@@ -11024,7 +10947,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "cxd6",
    "best": "Nxf4",
    "bestUci": "h5f4",
-   "eval": 322,
+   "eval": 340,
    "p": {
     "800": 0.313,
     "1000": 0.289,
@@ -11043,7 +10966,7 @@ export const TRAPS: Record<string, Trap[]> = {
     "dxe7",
     "Qxe7",
     "Qxa1",
-    "Bf5"
+    "Nd7"
    ]
   }
  ],
@@ -11087,7 +11010,7 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "Qd2",
    "best": "cxd4",
    "bestUci": "c5d4",
-   "eval": 127,
+   "eval": 146,
    "p": {
     "800": 0.213,
     "1000": 0.216,
@@ -11104,12 +11027,14 @@ export const TRAPS: Record<string, Trap[]> = {
    "san": "O-O",
    "best": "Bxc2",
    "bestUci": "f5c2",
-   "eval": 871,
+   "eval": 870,
    "p": {
     "800": 0.033
    },
    "cont": [
-    "Bxc2"
+    "Bxc2",
+    "dxc5",
+    "Qxb2"
    ]
   }
  ],
@@ -15950,6 +15875,5139 @@ export const TRAPS: Record<string, Trap[]> = {
     "Nxf7+"
    ]
   }
+ ],
+ "rnbq1rk1/ppp2pbp/3p2p1/4p3/2PPP1n1/2N1BN2/PP2BPPP/R2QK2R w KQ -": [
+  {
+   "san": "d5",
+   "best": "Nxe3",
+   "bestUci": "g4e3",
+   "eval": 79,
+   "p": {
+    "800": 0.142,
+    "1000": 0.149,
+    "1200": 0.149,
+    "1400": 0.123,
+    "1600": 0.069
+   },
+   "cont": [
+    "Nxe3"
+   ]
+  },
+  {
+   "san": "Bd2",
+   "best": "exd4",
+   "bestUci": "e5d4",
+   "eval": 316,
+   "p": {
+    "800": 0.133,
+    "1000": 0.114,
+    "1200": 0.081,
+    "1400": 0.043
+   },
+   "cont": [
+    "exd4"
+   ]
+  },
+  {
+   "san": "Qd2",
+   "best": "Nxe3",
+   "bestUci": "g4e3",
+   "eval": 77,
+   "p": {
+    "800": 0.097,
+    "1000": 0.096,
+    "1200": 0.093,
+    "1400": 0.087,
+    "1600": 0.064
+   },
+   "cont": [
+    "Nxe3"
+   ]
+  },
+  {
+   "san": "h3",
+   "best": "Nxe3",
+   "bestUci": "g4e3",
+   "eval": 74,
+   "p": {
+    "800": 0.058,
+    "1000": 0.051,
+    "1200": 0.046,
+    "1400": 0.035
+   },
+   "cont": [
+    "Nxe3"
+   ]
+  }
+ ],
+ "r1bq1rk1/1pp1npbp/3p1np1/p2Pp3/1PP1P3/2N2N2/P3BPPP/R1BQ1RK1 w - -": [
+  {
+   "san": "a3",
+   "best": "axb4",
+   "bestUci": "a5b4",
+   "eval": 405,
+   "p": {
+    "800": 0.089,
+    "1000": 0.08,
+    "1200": 0.061,
+    "1400": 0.04
+   },
+   "cont": [
+    "axb4"
+   ]
+  }
+ ],
+ "r1bq1rk1/1pp2pbp/n2p1np1/p2Pp3/P1P1P3/2N2N2/1P2BPPP/R1BQK2R w KQ -": [
+  {
+   "san": "Na2",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 376,
+   "p": {
+    "800": 0.036
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp2pbp/3p1np1/4p3/2PPP3/2NB1P2/PP4PP/R1BQK1NR w KQ -": [
+  {
+   "san": "Be3",
+   "best": "Ng4",
+   "bestUci": "f6g4",
+   "eval": 268,
+   "p": {
+    "800": 0.077,
+    "1000": 0.059,
+    "1200": 0.052,
+    "1400": 0.043,
+    "1600": 0.037,
+    "1800": 0.031
+   },
+   "cont": [
+    "Ng4"
+   ]
+  }
+ ],
+ "rnbq1rk1/p3ppbp/1p3np1/2p5/2P1P3/2N1BP2/PP2N1PP/R2QKB1R w KQ -": [
+  {
+   "san": "Nd5",
+   "best": "e6",
+   "bestUci": "e7e6",
+   "eval": 132,
+   "p": {
+    "800": 0.083,
+    "1000": 0.075,
+    "1200": 0.069,
+    "1400": 0.062,
+    "1600": 0.056,
+    "1800": 0.049,
+    "2000": 0.04
+   },
+   "cont": [
+    "e6"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp3pbp/4pnp1/2pPp3/2P2P2/2N2N2/PP4PP/R1BQKB1R w KQ -": [
+  {
+   "san": "Nxe5",
+   "best": "exd5",
+   "bestUci": "e6d5",
+   "eval": 147,
+   "p": {
+    "800": 0.065,
+    "1000": 0.042
+   },
+   "cont": [
+    "exd5"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp4bp/3ppnp1/2p5/2P1PP2/2N2N2/PP4PP/R1BQKB1R w KQ -": [
+  {
+   "san": "h3",
+   "best": "Nh5",
+   "bestUci": "f6h5",
+   "eval": 125,
+   "p": {
+    "1400": 0.031,
+    "1600": 0.034,
+    "1800": 0.038,
+    "2000": 0.038
+   },
+   "cont": [
+    "Nh5"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp3pb1/3ppnpp/2pP4/2P1P3/2N5/PP1BBPPP/R2QK1NR w KQ -": [
+  {
+   "san": "f4",
+   "best": "b5",
+   "bestUci": "b7b5",
+   "eval": 76,
+   "p": {
+    "800": 0.035,
+    "1000": 0.041,
+    "1200": 0.052,
+    "1400": 0.067,
+    "1600": 0.081,
+    "1800": 0.081,
+    "2000": 0.065
+   },
+   "cont": [
+    "b5"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p2p1/6B1/2PPn3/5NP1/PP2PPBP/RN1QK2R w KQ -": [
+  {
+   "san": "O-O",
+   "best": "Nxg5",
+   "bestUci": "e4g5",
+   "eval": 156,
+   "p": {
+    "800": 0.214,
+    "1000": 0.164,
+    "1200": 0.136,
+    "1400": 0.114,
+    "1600": 0.093,
+    "1800": 0.074,
+    "2000": 0.052
+   },
+   "cont": [
+    "Nxg5"
+   ]
+  },
+  {
+   "san": "Nbd2",
+   "best": "Nxg5",
+   "bestUci": "e4g5",
+   "eval": 268,
+   "p": {
+    "800": 0.083,
+    "1000": 0.073,
+    "1200": 0.06,
+    "1400": 0.045,
+    "1600": 0.033
+   },
+   "cont": [
+    "Nxg5",
+    "Nxg5",
+    "Bxd4"
+   ]
+  },
+  {
+   "san": "Bh4",
+   "best": "h6",
+   "bestUci": "h7h6",
+   "eval": 149,
+   "p": {
+    "800": 0.067,
+    "1000": 0.059,
+    "1200": 0.047,
+    "1400": 0.035
+   },
+   "cont": [
+    "h6"
+   ]
+  }
+ ],
+ "r1bq1rk1/pppnppbp/3p2p1/7n/3P1B2/2P1PN2/PP2BPPP/RN1Q1RK1 w - -": [
+  {
+   "san": "Ng5",
+   "best": "e5",
+   "bestUci": "e7e5",
+   "eval": 532,
+   "p": {
+    "800": 0.053
+   },
+   "cont": [
+    "e5",
+    "dxe5",
+    "dxe5",
+    "Bxe5",
+    "Bxe5"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp2pbp/2np1np1/4p3/2PPP3/2N3P1/PP2NPBP/R1BQK2R w KQ -": [
+  {
+   "san": "Be3",
+   "best": "Ng4",
+   "bestUci": "f6g4",
+   "eval": 100,
+   "p": {
+    "800": 0.033,
+    "1000": 0.035,
+    "1200": 0.036,
+    "1400": 0.035
+   },
+   "cont": [
+    "Ng4"
+   ]
+  },
+  {
+   "san": "h3",
+   "best": "exd4",
+   "bestUci": "e5d4",
+   "eval": 147,
+   "p": {
+    "1400": 0.033,
+    "1600": 0.046,
+    "1800": 0.054,
+    "2000": 0.05
+   },
+   "cont": [
+    "exd4"
+   ]
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/3p1n2/8/3PP3/8/PPP2PPP/RNBQKBNR w KQkq -": [
+  {
+   "san": "Nf3",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 100,
+   "p": {
+    "800": 0.034,
+    "1000": 0.034,
+    "1200": 0.032,
+    "1400": 0.031
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p2p1/8/2BPn3/2N2N1P/PPP2PP1/R1BQK2R w KQ -": [
+  {
+   "san": "O-O",
+   "best": "Nxc3",
+   "bestUci": "e4c3",
+   "eval": 177,
+   "p": {
+    "1800": 0.035,
+    "2000": 0.034
+   },
+   "cont": [
+    "Nxc3"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp2ppbp/2pp1np1/8/2BPP3/2N1BN2/PPP2PPP/R2QK2R w KQ -": [
+  {
+   "san": "d5",
+   "best": "b5",
+   "bestUci": "b7b5",
+   "eval": 148,
+   "p": {
+    "800": 0.033
+   },
+   "cont": [
+    "b5",
+    "Bb3",
+    "b4",
+    "Na4",
+    "Nxe4"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6p1/3p4/2BPN3/5N2/PPP2PPP/R1BQ1RK1 w - -": [
+  {
+   "san": "Neg5",
+   "best": "dxc4",
+   "bestUci": "d5c4",
+   "eval": 139,
+   "p": {
+    "800": 0.075,
+    "1000": 0.068,
+    "1200": 0.059,
+    "1400": 0.049,
+    "1600": 0.036
+   },
+   "cont": [
+    "dxc4"
+   ]
+  }
+ ],
+ "rnb2rk1/ppp1ppbp/6p1/3q4/3PN3/5N2/PPP2PPP/R1BQ1RK1 w - -": [
+  {
+   "san": "Neg5",
+   "best": "h6",
+   "bestUci": "h7h6",
+   "eval": 224,
+   "p": {
+    "800": 0.058,
+    "1000": 0.04
+   },
+   "cont": [
+    "h6"
+   ]
+  },
+  {
+   "san": "c3",
+   "best": "Qxe4",
+   "bestUci": "d5e4",
+   "eval": 534,
+   "p": {
+    "800": 0.037,
+    "1000": 0.039,
+    "1200": 0.038,
+    "1400": 0.033
+   },
+   "cont": [
+    "Qxe4"
+   ]
+  }
+ ],
+ "rnb2rk1/ppq1ppbp/6p1/2P5/4B3/5N2/PPP2PPP/R1BQ1RK1 w - -": [
+  {
+   "san": "b4",
+   "best": "Bxa1",
+   "bestUci": "g7a1",
+   "eval": 519,
+   "p": {
+    "800": 0.207,
+    "1000": 0.157,
+    "1200": 0.122,
+    "1400": 0.089,
+    "1600": 0.058,
+    "1800": 0.035
+   },
+   "cont": [
+    "Bxa1"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp2ppbp/6p1/8/3pB3/4BN2/PPP2PPP/R2Q1RK1 w - -": [
+  {
+   "san": "Nxd4",
+   "best": "f5",
+   "bestUci": "f7f5",
+   "eval": 183,
+   "p": {
+    "800": 0.434,
+    "1000": 0.443,
+    "1200": 0.441,
+    "1400": 0.428,
+    "1600": 0.408,
+    "1800": 0.369,
+    "2000": 0.332
+   },
+   "cont": [
+    "f5",
+    "Bf3",
+    "f4",
+    "Nb5",
+    "Qxd1",
+    "Rfxd1",
+    "fxe3"
+   ]
+  }
+ ],
+ "rnbq1rk1/pppnppbp/6p1/4N3/2BP4/2N5/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "san": "Nxf7",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 143,
+   "p": {
+    "800": 0.175,
+    "1000": 0.18,
+    "1200": 0.185,
+    "1400": 0.183,
+    "1600": 0.164,
+    "1800": 0.143,
+    "2000": 0.125
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "Bxf7+",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 136,
+   "p": {
+    "800": 0.074,
+    "1000": 0.055,
+    "1200": 0.038
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp1nppbp/6p1/2p1N3/2BP1P2/2N5/PPP3PP/R1BQK2R w KQ -": [
+  {
+   "san": "Nxf7",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 235,
+   "p": {
+    "800": 0.096,
+    "1000": 0.09,
+    "1200": 0.09,
+    "1400": 0.094,
+    "1600": 0.098,
+    "1800": 0.098,
+    "2000": 0.098
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "Bxf7+",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 287,
+   "p": {
+    "800": 0.051,
+    "1000": 0.035
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  }
+ ],
+ "rnb2rk1/pppqppbp/6p1/8/2BP4/2N5/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "san": "Ne2",
+   "best": "Qc6",
+   "bestUci": "d7c6",
+   "eval": 181,
+   "p": {
+    "800": 0.036,
+    "1000": 0.037,
+    "1200": 0.038,
+    "1400": 0.038,
+    "1600": 0.041,
+    "1800": 0.046,
+    "2000": 0.067
+   },
+   "cont": [
+    "Qc6",
+    "Qd3",
+    "Qxg2"
+   ]
+  }
+ ],
+ "r1b2rk1/pppqppbp/2n3p1/8/2BP4/2N1B3/PPP2PPP/R2QK2R w KQ -": [
+  {
+   "san": "Qf3",
+   "best": "Nxd4",
+   "bestUci": "c6d4",
+   "eval": 199,
+   "p": {
+    "800": 0.05,
+    "1000": 0.046,
+    "1200": 0.039
+   },
+   "cont": [
+    "Nxd4"
+   ]
+  },
+  {
+   "san": "Nb5",
+   "best": "a6",
+   "bestUci": "a7a6",
+   "eval": 193,
+   "p": {
+    "800": 0.033
+   },
+   "cont": [
+    "a6",
+    "Nc3",
+    "Nxd4"
+   ]
+  }
+ ],
+ "r1b2rk1/pppqppbp/2n3p1/8/2BP4/2N5/PPP2PPP/R1BQ1RK1 w - -": [
+  {
+   "san": "Re1",
+   "best": "Qxd4",
+   "bestUci": "d7d4",
+   "eval": 145,
+   "p": {
+    "800": 0.033
+   },
+   "cont": [
+    "Qxd4"
+   ]
+  }
+ ],
+ "r1b2rk1/pppqppbp/6p1/8/2Bn4/2N1B3/PPP2PPP/R2Q1RK1 w - -": [
+  {
+   "san": "Ne2",
+   "best": "Nf5",
+   "bestUci": "d4f5",
+   "eval": 265,
+   "p": {
+    "800": 0.05,
+    "1000": 0.055,
+    "1200": 0.055,
+    "1400": 0.053,
+    "1600": 0.045,
+    "1800": 0.039,
+    "2000": 0.033
+   },
+   "cont": [
+    "Nf5"
+   ]
+  },
+  {
+   "san": "Qc1",
+   "best": "Qc6",
+   "bestUci": "d7c6",
+   "eval": 245,
+   "p": {
+    "1600": 0.035,
+    "1800": 0.036,
+    "2000": 0.03
+   },
+   "cont": [
+    "Qc6"
+   ]
+  }
+ ],
+ "r1b2rk1/ppp1ppbp/2n3p1/1B6/3q4/2N5/PPP2PPP/R1BQ1RK1 w - -": [
+  {
+   "san": "Qxd4",
+   "best": "Nxd4",
+   "bestUci": "c6d4",
+   "eval": 256,
+   "p": {
+    "800": 0.242,
+    "1000": 0.165,
+    "1200": 0.114,
+    "1400": 0.075,
+    "1600": 0.048,
+    "1800": 0.032
+   },
+   "cont": [
+    "Nxd4"
+   ]
+  }
+ ],
+ "r1b2rk1/pppqppbp/6p1/8/2Bn4/8/PPP1NPPP/R1BQ1RK1 w - -": [
+  {
+   "san": "Be3",
+   "best": "Nf5",
+   "bestUci": "d4f5",
+   "eval": 268,
+   "p": {
+    "800": 0.09,
+    "1000": 0.092,
+    "1200": 0.089,
+    "1400": 0.088,
+    "1600": 0.085,
+    "1800": 0.085,
+    "2000": 0.081
+   },
+   "cont": [
+    "Nf5"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp2ppbp/3p1np1/2p5/3PP3/2N1BP2/PPPQ2PP/R3KBNR w KQ -": [
+  {
+   "san": "Bh6",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 297,
+   "p": {
+    "800": 0.063,
+    "1000": 0.045,
+    "1200": 0.032
+   },
+   "cont": [
+    "cxd4"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp2pbp/3p1npB/4p3/3PP3/2N5/PPPQ1PPP/R3KBNR w KQ -": [
+  {
+   "san": "O-O-O",
+   "best": "exd4",
+   "bestUci": "e5d4",
+   "eval": 259,
+   "p": {
+    "800": 0.079,
+    "1000": 0.07,
+    "1200": 0.063,
+    "1400": 0.055,
+    "1600": 0.048,
+    "1800": 0.04,
+    "2000": 0.032
+   },
+   "cont": [
+    "exd4"
+   ]
+  },
+  {
+   "san": "h4",
+   "best": "exd4",
+   "bestUci": "e5d4",
+   "eval": 338,
+   "p": {
+    "800": 0.037,
+    "1000": 0.045,
+    "1200": 0.052,
+    "1400": 0.051,
+    "1600": 0.044,
+    "1800": 0.035
+   },
+   "cont": [
+    "exd4"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp3pbp/2pp1npB/3Pp3/4P3/2N5/PPPQ1PPP/R3KBNR w KQ -": [
+  {
+   "san": "f3",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 232,
+   "p": {
+    "1800": 0.033
+   },
+   "cont": [
+    "Nxe4",
+    "fxe4",
+    "Qh4+",
+    "g3",
+    "Qxh6"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp2pbp/3p1npB/8/3pP3/2N5/PPPQNPPP/R3KB1R w KQ -": [
+  {
+   "san": "Bxg7",
+   "best": "dxc3",
+   "bestUci": "d4c3",
+   "eval": 401,
+   "p": {
+    "800": 0.254,
+    "1000": 0.227,
+    "1200": 0.186,
+    "1400": 0.146,
+    "1600": 0.11,
+    "1800": 0.081,
+    "2000": 0.068
+   },
+   "cont": [
+    "dxc3",
+    "Nxc3",
+    "Kxg7"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp2pbp/5npB/4p3/4P3/2N5/PPPQ1PPP/R3KBNR w KQ -": [
+  {
+   "san": "Qe3",
+   "best": "Ng4",
+   "bestUci": "f6g4",
+   "eval": 559,
+   "p": {
+    "800": 0.079,
+    "1000": 0.082,
+    "1200": 0.08,
+    "1400": 0.069,
+    "1600": 0.052,
+    "1800": 0.034
+   },
+   "cont": [
+    "Ng4",
+    "Rd1",
+    "Nxe3",
+    "Bxe3",
+    "Qe8"
+   ]
+  }
+ ],
+ "r1bq1r2/ppp2pkp/2np1np1/4p3/3PP3/2N5/PPPQ1PPP/2KR1BNR w - -": [
+  {
+   "san": "h4",
+   "best": "exd4",
+   "bestUci": "e5d4",
+   "eval": 218,
+   "p": {
+    "800": 0.038,
+    "1000": 0.033
+   },
+   "cont": [
+    "exd4"
+   ]
+  }
+ ],
+ "rnbq1r2/pp3pkp/2pp1np1/3Pp3/4P3/2N5/PPPQ1PPP/R3KBNR w KQ -": [
+  {
+   "san": "Bc4",
+   "best": "b5",
+   "bestUci": "b7b5",
+   "eval": 131,
+   "p": {
+    "800": 0.074,
+    "1000": 0.075,
+    "1200": 0.071,
+    "1400": 0.066,
+    "1600": 0.06,
+    "1800": 0.057,
+    "2000": 0.061
+   },
+   "cont": [
+    "b5"
+   ]
+  }
+ ],
+ "r1bq1r2/ppp2pkp/2np1np1/4p3/3PP3/2N2P2/PPPQ2PP/R3KBNR w KQ -": [
+  {
+   "san": "O-O-O",
+   "best": "Nxd4",
+   "bestUci": "c6d4",
+   "eval": 132,
+   "p": {
+    "800": 0.15,
+    "1000": 0.108,
+    "1200": 0.075,
+    "1400": 0.048
+   },
+   "cont": [
+    "Nxd4"
+   ]
+  }
+ ],
+ "r1bq1r2/pp2npkp/2pp1np1/3Pp3/4P1P1/2N2P2/PPPQ3P/R3KBNR w KQ -": [
+  {
+   "san": "Bc4",
+   "best": "b5",
+   "bestUci": "b7b5",
+   "eval": 194,
+   "p": {
+    "800": 0.039,
+    "1000": 0.043,
+    "1200": 0.046,
+    "1400": 0.052,
+    "1600": 0.054,
+    "1800": 0.065,
+    "2000": 0.08
+   },
+   "cont": [
+    "b5",
+    "Bb3",
+    "b4",
+    "Nce2",
+    "cxd5"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp2pbp/6p1/4N3/4n3/2N5/PPP1BPPP/R1BQ1RK1 w - -": [
+  {
+   "san": "Nxf7",
+   "best": "Qxd1",
+   "bestUci": "d8d1",
+   "eval": 78,
+   "p": {
+    "800": 0.051,
+    "1000": 0.069,
+    "1200": 0.083,
+    "1400": 0.094,
+    "1600": 0.099,
+    "1800": 0.095,
+    "2000": 0.079
+   },
+   "cont": [
+    "Qxd1",
+    "Bxd1",
+    "Nxc3"
+   ]
+  },
+  {
+   "san": "Nf3",
+   "best": "Nxc3",
+   "bestUci": "e4c3",
+   "eval": 113,
+   "p": {
+    "800": 0.032
+   },
+   "cont": [
+    "Nxc3",
+    "bxc3",
+    "Bxc3"
+   ]
+  },
+  {
+   "san": "Nxg6",
+   "best": "Nxc3",
+   "bestUci": "e4c3",
+   "eval": 544,
+   "p": {
+    "1000": 0.032,
+    "1200": 0.037,
+    "1400": 0.041,
+    "1600": 0.044,
+    "1800": 0.04
+   },
+   "cont": [
+    "Nxc3"
+   ]
+  }
+ ],
+ "rnbr2k1/ppp2pbp/6p1/4N3/4n3/2N5/PPP1BPPP/R1B2RK1 w - -": [
+  {
+   "san": "Nxf7",
+   "best": "Nxc3",
+   "bestUci": "e4c3",
+   "eval": 320,
+   "p": {
+    "800": 0.17,
+    "1000": 0.257,
+    "1200": 0.335,
+    "1400": 0.414,
+    "1600": 0.488,
+    "1800": 0.524,
+    "2000": 0.53
+   },
+   "cont": [
+    "Nxc3"
+   ]
+  },
+  {
+   "san": "Nf3",
+   "best": "Nxc3",
+   "bestUci": "e4c3",
+   "eval": 143,
+   "p": {
+    "800": 0.072,
+    "1000": 0.055,
+    "1200": 0.038
+   },
+   "cont": [
+    "Nxc3",
+    "bxc3",
+    "Bxc3"
+   ]
+  },
+  {
+   "san": "Bf4",
+   "best": "Nxc3",
+   "bestUci": "e4c3",
+   "eval": 234,
+   "p": {
+    "800": 0.036,
+    "1000": 0.033
+   },
+   "cont": [
+    "Nxc3",
+    "bxc3",
+    "Re8",
+    "Rad1",
+    "Bxe5",
+    "Bxe5",
+    "Rxe5"
+   ]
+  },
+  {
+   "san": "Nxg6",
+   "best": "Nxc3",
+   "bestUci": "e4c3",
+   "eval": 376,
+   "p": {
+    "1600": 0.036,
+    "1800": 0.042,
+    "2000": 0.042
+   },
+   "cont": [
+    "Nxc3"
+   ]
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/3p1n2/8/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq -": [
+  {
+   "san": "d4",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 93,
+   "p": {
+    "800": 0.043,
+    "1000": 0.04,
+    "1200": 0.039,
+    "1400": 0.036,
+    "1600": 0.031
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/5n2/4p3/8/5N2/PPPP1PPP/RNBQKB1R w KQkq -": [
+  {
+   "san": "Bc4",
+   "best": "Nc6",
+   "bestUci": "b8c6",
+   "eval": 142,
+   "p": {
+    "800": 0.063,
+    "1000": 0.067,
+    "1200": 0.062,
+    "1400": 0.052,
+    "1600": 0.038
+   },
+   "cont": [
+    "Nc6"
+   ]
+  },
+  {
+   "san": "Nc3",
+   "best": "e4",
+   "bestUci": "e5e4",
+   "eval": 133,
+   "p": {
+    "800": 0.035,
+    "1000": 0.034
+   },
+   "cont": [
+    "e4"
+   ]
+  },
+  {
+   "san": "d3",
+   "best": "e4",
+   "bestUci": "e5e4",
+   "eval": 165,
+   "p": {
+    "1200": 0.03,
+    "1400": 0.033
+   },
+   "cont": [
+    "e4"
+   ]
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/3p1n2/8/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq -": [
+  {
+   "san": "Nf3",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 101,
+   "p": {
+    "800": 0.13,
+    "1000": 0.098,
+    "1200": 0.076,
+    "1400": 0.058,
+    "1600": 0.042
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  }
+ ],
+ "r1bqkb1r/ppp1pppp/2np1n2/8/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq -": [
+  {
+   "san": "Ne2",
+   "best": "Ne5",
+   "bestUci": "c6e5",
+   "eval": 164,
+   "p": {
+    "800": 0.091,
+    "1000": 0.112,
+    "1200": 0.13,
+    "1400": 0.146,
+    "1600": 0.153,
+    "1800": 0.144,
+    "2000": 0.119
+   },
+   "cont": [
+    "Ne5",
+    "Qb3",
+    "Nxe4"
+   ]
+  },
+  {
+   "san": "Nh3",
+   "best": "Ne5",
+   "bestUci": "c6e5",
+   "eval": 178,
+   "p": {
+    "800": 0.053,
+    "1000": 0.037
+   },
+   "cont": [
+    "Ne5",
+    "Qe2",
+    "Bxh3",
+    "gxh3",
+    "Qd7",
+    "Nc3",
+    "Qxh3"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p1np1/6N1/2B1P3/3P4/PPP2PPP/RNBQK2R w KQ -": [
+  {
+   "san": "Nxf7",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 212,
+   "p": {
+    "800": 0.097,
+    "1000": 0.079,
+    "1200": 0.069,
+    "1400": 0.057,
+    "1600": 0.042
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "Qf3",
+   "best": "h6",
+   "bestUci": "h7h6",
+   "eval": 191,
+   "p": {
+    "800": 0.093,
+    "1000": 0.083,
+    "1200": 0.069,
+    "1400": 0.048
+   },
+   "cont": [
+    "h6"
+   ]
+  },
+  {
+   "san": "Bxf7+",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 205,
+   "p": {
+    "800": 0.062,
+    "1000": 0.044,
+    "1200": 0.032
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp2ppbp/3p1np1/2p5/2B1P3/2PP1N2/PP3PPP/RNBQ1RK1 w - -": [
+  {
+   "san": "d4",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 149,
+   "p": {
+    "800": 0.035
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  }
+ ],
+ "r1bq1rk1/pp2ppbp/2np1np1/2p3B1/2B1P3/2PP1N2/PP3PPP/RN1Q1RK1 w - -": [
+  {
+   "san": "d4",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 262,
+   "p": {
+    "800": 0.079,
+    "1000": 0.047,
+    "1200": 0.03
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  }
+ ],
+ "rnbqkb1r/ppp2ppp/3p1n2/4p3/4PP2/2N5/PPPP2PP/R1BQKBNR w KQkq -": [
+  {
+   "san": "f5",
+   "best": "d5",
+   "bestUci": "d6d5",
+   "eval": 109,
+   "p": {
+    "800": 0.06,
+    "1000": 0.054,
+    "1200": 0.049,
+    "1400": 0.041,
+    "1600": 0.031
+   },
+   "cont": [
+    "d5"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p1np1/6N1/2B1P3/2N5/PPPP1PPP/R1BQK2R w KQ -": [
+  {
+   "san": "Nxf7",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 158,
+   "p": {
+    "800": 0.112,
+    "1000": 0.091,
+    "1200": 0.077,
+    "1400": 0.063,
+    "1600": 0.044
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "Qf3",
+   "best": "h6",
+   "bestUci": "h7h6",
+   "eval": 208,
+   "p": {
+    "800": 0.07,
+    "1000": 0.066,
+    "1200": 0.055,
+    "1400": 0.041
+   },
+   "cont": [
+    "h6"
+   ]
+  },
+  {
+   "san": "Nd5",
+   "best": "h6",
+   "bestUci": "h7h6",
+   "eval": 175,
+   "p": {
+    "800": 0.031
+   },
+   "cont": [
+    "h6",
+    "Nxf6+",
+    "exf6",
+    "Nf3",
+    "Re8",
+    "O-O",
+    "Rxe4"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp2ppbp/2pp1np1/6N1/2B1P3/2NP4/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "san": "Qf3",
+   "best": "h6",
+   "bestUci": "h7h6",
+   "eval": 157,
+   "p": {
+    "800": 0.115,
+    "1000": 0.105,
+    "1200": 0.088,
+    "1400": 0.067,
+    "1600": 0.047,
+    "1800": 0.034,
+    "2000": 0.03
+   },
+   "cont": [
+    "h6"
+   ]
+  },
+  {
+   "san": "Be3",
+   "best": "d5",
+   "bestUci": "d6d5",
+   "eval": 373,
+   "p": {
+    "800": 0.102,
+    "1000": 0.114,
+    "1200": 0.113,
+    "1400": 0.101,
+    "1600": 0.079,
+    "1800": 0.053,
+    "2000": 0.031
+   },
+   "cont": [
+    "d5",
+    "e5",
+    "Ng4",
+    "Bb3",
+    "d4",
+    "e6",
+    "f5",
+    "Bd2",
+    "dxc3",
+    "Bxc3",
+    "a5"
+   ]
+  },
+  {
+   "san": "Nxf7",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 141,
+   "p": {
+    "800": 0.07,
+    "1000": 0.055,
+    "1200": 0.046,
+    "1400": 0.036
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "Bxf7+",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 146,
+   "p": {
+    "800": 0.066,
+    "1000": 0.045,
+    "1200": 0.031
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppb1/3p1npp/6N1/2B1P2P/2N5/PPPP1PP1/R1BQK2R w KQ -": [
+  {
+   "san": "f4",
+   "best": "hxg5",
+   "bestUci": "h6g5",
+   "eval": 276,
+   "p": {
+    "800": 0.032,
+    "1000": 0.033,
+    "1200": 0.036,
+    "1400": 0.041,
+    "1600": 0.046,
+    "1800": 0.05,
+    "2000": 0.054
+   },
+   "cont": [
+    "hxg5",
+    "hxg5",
+    "Nxe4"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppb1/3p1npp/6N1/2BPP3/2N5/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "san": "h4",
+   "best": "hxg5",
+   "bestUci": "h6g5",
+   "eval": 199,
+   "p": {
+    "800": 0.156,
+    "1000": 0.147,
+    "1200": 0.121,
+    "1400": 0.093,
+    "1600": 0.07,
+    "1800": 0.05,
+    "2000": 0.032
+   },
+   "cont": [
+    "hxg5"
+   ]
+  }
+ ],
+ "rnbq2k1/ppp1prb1/3p1npp/8/2BPP3/2N5/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "san": "O-O",
+   "best": "e6",
+   "bestUci": "e7e6",
+   "eval": 269,
+   "p": {
+    "1600": 0.032,
+    "1800": 0.037,
+    "2000": 0.04
+   },
+   "cont": [
+    "e6",
+    "e5",
+    "Nh7",
+    "d5",
+    "Nf8",
+    "Re1",
+    "Bxe5"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppb1/6pp/3p4/2BPN3/5N2/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "san": "Bxd5",
+   "best": "Qxd5",
+   "bestUci": "d8d5",
+   "eval": 146,
+   "p": {
+    "800": 0.419,
+    "1000": 0.432,
+    "1200": 0.438,
+    "1400": 0.424,
+    "1600": 0.392,
+    "1800": 0.32,
+    "2000": 0.227
+   },
+   "cont": [
+    "Qxd5"
+   ]
+  },
+  {
+   "san": "Neg5",
+   "best": "dxc4",
+   "bestUci": "d5c4",
+   "eval": 346,
+   "p": {
+    "800": 0.067,
+    "1000": 0.062,
+    "1200": 0.051,
+    "1400": 0.036
+   },
+   "cont": [
+    "dxc4"
+   ]
+  },
+  {
+   "san": "Bxh6",
+   "best": "Bxh6",
+   "bestUci": "g7h6",
+   "eval": 463,
+   "p": {
+    "800": 0.064,
+    "1000": 0.058,
+    "1200": 0.046,
+    "1400": 0.033
+   },
+   "cont": [
+    "Bxh6"
+   ]
+  },
+  {
+   "san": "Ne5",
+   "best": "dxc4",
+   "bestUci": "d5c4",
+   "eval": 164,
+   "p": {
+    "800": 0.034,
+    "1000": 0.034,
+    "1200": 0.035,
+    "1400": 0.034
+   },
+   "cont": [
+    "dxc4"
+   ]
+  },
+  {
+   "san": "Ned2",
+   "best": "dxc4",
+   "bestUci": "d5c4",
+   "eval": 143,
+   "p": {
+    "1400": 0.031,
+    "1600": 0.043,
+    "1800": 0.056,
+    "2000": 0.056
+   },
+   "cont": [
+    "dxc4",
+    "Nxc4",
+    "c5"
+   ]
+  }
+ ],
+ "rnb2rk1/ppp1ppb1/6pp/3q4/3PN3/5N2/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "san": "Qd3",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 235,
+   "p": {
+    "800": 0.273,
+    "1000": 0.275,
+    "1200": 0.267,
+    "1400": 0.246,
+    "1600": 0.213,
+    "1800": 0.16,
+    "2000": 0.111
+   },
+   "cont": [
+    "Bf5"
+   ]
+  },
+  {
+   "san": "O-O",
+   "best": "Qxe4",
+   "bestUci": "d5e4",
+   "eval": 554,
+   "p": {
+    "800": 0.077,
+    "1000": 0.065,
+    "1200": 0.053,
+    "1400": 0.041
+   },
+   "cont": [
+    "Qxe4"
+   ]
+  },
+  {
+   "san": "Nc5",
+   "best": "e5",
+   "bestUci": "e7e5",
+   "eval": 374,
+   "p": {
+    "800": 0.031
+   },
+   "cont": [
+    "e5"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppb1/6pp/8/3Pp3/1B3N2/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "san": "Nd2",
+   "best": "Qxd4",
+   "bestUci": "d8d4",
+   "eval": 230,
+   "p": {
+    "800": 0.325,
+    "1000": 0.334,
+    "1200": 0.336,
+    "1400": 0.328,
+    "1600": 0.298,
+    "1800": 0.248,
+    "2000": 0.141
+   },
+   "cont": [
+    "Qxd4"
+   ]
+  },
+  {
+   "san": "Nh4",
+   "best": "Kh7",
+   "bestUci": "g8h7",
+   "eval": 433,
+   "p": {
+    "800": 0.146,
+    "1000": 0.153,
+    "1200": 0.161,
+    "1400": 0.17,
+    "1600": 0.172,
+    "1800": 0.16,
+    "2000": 0.108
+   },
+   "cont": [
+    "Kh7",
+    "g3",
+    "Qxd4",
+    "Qxd4",
+    "Bxd4"
+   ]
+  },
+  {
+   "san": "Ng1",
+   "best": "c5",
+   "bestUci": "c7c5",
+   "eval": 362,
+   "p": {
+    "1400": 0.032,
+    "1600": 0.035,
+    "1800": 0.034
+   },
+   "cont": [
+    "c5"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/5np1/4p3/3P4/2NB1N2/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "san": "Nxe5",
+   "best": "Qxd4",
+   "bestUci": "d8d4",
+   "eval": 189,
+   "p": {
+    "800": 0.11,
+    "1000": 0.088,
+    "1200": 0.067,
+    "1400": 0.049,
+    "1600": 0.032
+   },
+   "cont": [
+    "Qxd4"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6p1/4P3/6n1/2NB1N2/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "san": "Ng5",
+   "best": "Nxe5",
+   "bestUci": "g4e5",
+   "eval": 324,
+   "p": {
+    "800": 0.035
+   },
+   "cont": [
+    "Nxe5"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/2n3p1/4P3/6n1/2NB1N2/PPP1QPPP/R1B1K2R w KQ -": [
+  {
+   "san": "h3",
+   "best": "Ngxe5",
+   "bestUci": "g4e5",
+   "eval": 249,
+   "p": {
+    "800": 0.198,
+    "1000": 0.169,
+    "1200": 0.128,
+    "1400": 0.081,
+    "1600": 0.042
+   },
+   "cont": [
+    "Ngxe5",
+    "Nxe5",
+    "Nxe5"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/2n3p1/4P3/6n1/2NB1N2/PPP2PPP/R1BQ1RK1 w - -": [
+  {
+   "san": "Ng5",
+   "best": "Ngxe5",
+   "bestUci": "g4e5",
+   "eval": 288,
+   "p": {
+    "800": 0.07,
+    "1000": 0.049,
+    "1200": 0.032
+   },
+   "cont": [
+    "Ngxe5"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6p1/4n3/8/2NB1N1P/PPP2PP1/R1BQK2R w KQ -": [
+  {
+   "san": "O-O",
+   "best": "Nxd3",
+   "bestUci": "e5d3",
+   "eval": 187,
+   "p": {
+    "800": 0.147,
+    "1000": 0.142,
+    "1200": 0.13,
+    "1400": 0.116,
+    "1600": 0.094,
+    "1800": 0.069,
+    "2000": 0.044
+   },
+   "cont": [
+    "Nxd3",
+    "cxd3",
+    "Nc6",
+    "Re1",
+    "e5",
+    "Bg5",
+    "Qd7",
+    "d4",
+    "exd4"
+   ]
+  },
+  {
+   "san": "Bf4",
+   "best": "Nxd3+",
+   "bestUci": "e5d3",
+   "eval": 285,
+   "p": {
+    "800": 0.042,
+    "1000": 0.035
+   },
+   "cont": [
+    "Nxd3+"
+   ]
+  }
+ ],
+ "r1bqk2r/ppp1ppbp/2np1np1/8/3PPP2/2NB4/PPP3PP/R1BQK1NR w KQkq -": [
+  {
+   "san": "Be3",
+   "best": "Ng4",
+   "bestUci": "f6g4",
+   "eval": 272,
+   "p": {
+    "800": 0.14,
+    "1000": 0.129,
+    "1200": 0.118,
+    "1400": 0.103,
+    "1600": 0.087,
+    "1800": 0.072,
+    "2000": 0.06
+   },
+   "cont": [
+    "Ng4",
+    "Nd5",
+    "Nxe3",
+    "Nxe3",
+    "Bxd4"
+   ]
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/3p2p1/8/3PPPn1/2N1B3/PPP3PP/R2QKBNR w KQkq -": [
+  {
+   "san": "Bd2",
+   "best": "Bxd4",
+   "bestUci": "g7d4",
+   "eval": 132,
+   "p": {
+    "800": 0.301,
+    "1000": 0.351,
+    "1200": 0.368,
+    "1400": 0.342,
+    "1600": 0.27,
+    "1800": 0.162,
+    "2000": 0.081
+   },
+   "cont": [
+    "Bxd4"
+   ]
+  },
+  {
+   "san": "Be2",
+   "best": "Nxe3",
+   "bestUci": "g4e3",
+   "eval": 742,
+   "p": {
+    "800": 0.057,
+    "1000": 0.032
+   },
+   "cont": [
+    "Nxe3"
+   ]
+  },
+  {
+   "san": "h3",
+   "best": "Nxe3",
+   "bestUci": "g4e3",
+   "eval": 585,
+   "p": {
+    "800": 0.051,
+    "1000": 0.034
+   },
+   "cont": [
+    "Nxe3"
+   ]
+  },
+  {
+   "san": "Nf3",
+   "best": "Nxe3",
+   "bestUci": "g4e3",
+   "eval": 545,
+   "p": {
+    "800": 0.035
+   },
+   "cont": [
+    "Nxe3"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp2ppbp/3p1np1/2pP4/4PP2/2N2N2/PPP3PP/R1BQKB1R w KQ -": [
+  {
+   "san": "Bc4",
+   "best": "b5",
+   "bestUci": "b7b5",
+   "eval": 84,
+   "p": {
+    "800": 0.21,
+    "1000": 0.195,
+    "1200": 0.172,
+    "1400": 0.152,
+    "1600": 0.14,
+    "1800": 0.126,
+    "2000": 0.105
+   },
+   "cont": [
+    "b5"
+   ]
+  },
+  {
+   "san": "Be3",
+   "best": "b5",
+   "bestUci": "b7b5",
+   "eval": 99,
+   "p": {
+    "800": 0.098,
+    "1000": 0.084,
+    "1200": 0.07,
+    "1400": 0.057,
+    "1600": 0.045,
+    "1800": 0.036
+   },
+   "cont": [
+    "b5"
+   ]
+  },
+  {
+   "san": "Bb5",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 194,
+   "p": {
+    "800": 0.036
+   },
+   "cont": [
+    "Nxe4",
+    "Nxe4",
+    "Qa5+",
+    "Nc3",
+    "Bxc3+",
+    "bxc3",
+    "Qxb5"
+   ]
+  }
+ ],
+ "rn1qk2r/pp1bppbp/3p1np1/1Bp5/3PPP2/2N2N2/PPP3PP/R1BQK2R w KQkq -": [
+  {
+   "san": "dxc5",
+   "best": "Bxb5",
+   "bestUci": "d7b5",
+   "eval": 210,
+   "p": {
+    "800": 0.121,
+    "1000": 0.118,
+    "1200": 0.119,
+    "1400": 0.122,
+    "1600": 0.118,
+    "1800": 0.111,
+    "2000": 0.094
+   },
+   "cont": [
+    "Bxb5"
+   ]
+  },
+  {
+   "san": "O-O",
+   "best": "Bxb5",
+   "bestUci": "d7b5",
+   "eval": 100,
+   "p": {
+    "800": 0.11,
+    "1000": 0.118,
+    "1200": 0.121,
+    "1400": 0.115,
+    "1600": 0.098,
+    "1800": 0.061
+   },
+   "cont": [
+    "Bxb5",
+    "Nxb5",
+    "Nxe4"
+   ]
+  },
+  {
+   "san": "d5",
+   "best": "Bxb5",
+   "bestUci": "d7b5",
+   "eval": 240,
+   "p": {
+    "800": 0.065,
+    "1000": 0.063,
+    "1200": 0.065,
+    "1400": 0.064,
+    "1600": 0.062,
+    "1800": 0.049
+   },
+   "cont": [
+    "Bxb5"
+   ]
+  }
+ ],
+ "rnb1k2r/pp2ppbp/3p1np1/q1P5/4PP2/2N2N2/PPP3PP/R1BQKB1R w KQkq -": [
+  {
+   "san": "Be3",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 176,
+   "p": {
+    "800": 0.041,
+    "1000": 0.031
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  }
+ ],
+ "rn2k2r/pp1bppbp/3p1np1/qBP5/4PP2/2N2N2/PPP3PP/R1BQK2R w KQkq -": [
+  {
+   "san": "Bd2",
+   "best": "Bxb5",
+   "bestUci": "d7b5",
+   "eval": 324,
+   "p": {
+    "800": 0.048,
+    "1000": 0.03
+   },
+   "cont": [
+    "Bxb5",
+    "cxd6",
+    "exd6"
+   ]
+  },
+  {
+   "san": "cxd6",
+   "best": "Bxb5",
+   "bestUci": "d7b5",
+   "eval": 228,
+   "p": {
+    "800": 0.04,
+    "1000": 0.031
+   },
+   "cont": [
+    "Bxb5"
+   ]
+  }
+ ],
+ "rnb1k2r/pp2ppbp/5np1/q1P1p3/5P2/2N2N2/PPP3PP/R1BQKB1R w KQkq -": [
+  {
+   "san": "Bb5+",
+   "best": "Bd7",
+   "bestUci": "c8d7",
+   "eval": 141,
+   "p": {
+    "800": 0.052,
+    "1000": 0.054,
+    "1200": 0.058,
+    "1400": 0.066,
+    "1600": 0.082,
+    "1800": 0.103,
+    "2000": 0.118
+   },
+   "cont": [
+    "Bd7"
+   ]
+  },
+  {
+   "san": "Bd2",
+   "best": "Qxc5",
+   "bestUci": "a5c5",
+   "eval": 154,
+   "p": {
+    "800": 0.043,
+    "1000": 0.036
+   },
+   "cont": [
+    "Qxc5"
+   ]
+  }
+ ],
+ "rnb1k2r/pp2ppbp/3p1np1/q7/N3PP2/3B1N2/PPP3PP/R1BQK2R w KQkq -": [
+  {
+   "san": "c3",
+   "best": "Bd7",
+   "bestUci": "c8d7",
+   "eval": 199,
+   "p": {
+    "800": 0.147,
+    "1000": 0.17,
+    "1200": 0.202,
+    "1400": 0.252,
+    "1600": 0.323,
+    "1800": 0.403,
+    "2000": 0.453
+   },
+   "cont": [
+    "Bd7",
+    "Bc2",
+    "Nxe4",
+    "Bxe4",
+    "Bxa4"
+   ]
+  },
+  {
+   "san": "Bd2",
+   "best": "Qxa4",
+   "bestUci": "a5a4",
+   "eval": 488,
+   "p": {
+    "800": 0.03
+   },
+   "cont": [
+    "Qxa4"
+   ]
+  }
+ ],
+ "r1b2rk1/pp2ppbp/2np1np1/q7/4PP2/2NBBN2/PPP1Q1PP/2KR3R w - -": [
+  {
+   "san": "h4",
+   "best": "Bg4",
+   "bestUci": "c8g4",
+   "eval": 91,
+   "p": {
+    "800": 0.14,
+    "1000": 0.16,
+    "1200": 0.171,
+    "1400": 0.175,
+    "1600": 0.16,
+    "1800": 0.134,
+    "2000": 0.092
+   },
+   "cont": [
+    "Bg4"
+   ]
+  }
+ ],
+ "rnb2rk1/pp2ppbp/3p2p1/q6n/4PP2/2NBBN1P/PPP1Q1P1/R3K2R w KQ -": [
+  {
+   "san": "Bd2",
+   "best": "Ng3",
+   "bestUci": "h5g3",
+   "eval": 395,
+   "p": {
+    "800": 0.188,
+    "1000": 0.239,
+    "1200": 0.263,
+    "1400": 0.269,
+    "1600": 0.258,
+    "1800": 0.227,
+    "2000": 0.184
+   },
+   "cont": [
+    "Ng3",
+    "Qe3",
+    "Nxh1"
+   ]
+  },
+  {
+   "san": "g4",
+   "best": "Bxc3+",
+   "bestUci": "g7c3",
+   "eval": 271,
+   "p": {
+    "800": 0.144,
+    "1000": 0.126,
+    "1200": 0.103,
+    "1400": 0.077,
+    "1600": 0.052,
+    "1800": 0.032
+   },
+   "cont": [
+    "Bxc3+",
+    "bxc3",
+    "Ng3",
+    "Qh2",
+    "Qxc3+"
+   ]
+  },
+  {
+   "san": "O-O-O",
+   "best": "Ng3",
+   "bestUci": "h5g3",
+   "eval": 215,
+   "p": {
+    "800": 0.131,
+    "1000": 0.083,
+    "1200": 0.056,
+    "1400": 0.038
+   },
+   "cont": [
+    "Ng3",
+    "Qf2",
+    "Nxh1",
+    "Rxh1",
+    "Nc6"
+   ]
+  },
+  {
+   "san": "Bf2",
+   "best": "Bxc3+",
+   "bestUci": "g7c3",
+   "eval": 707,
+   "p": {
+    "800": 0.086,
+    "1000": 0.069,
+    "1200": 0.059,
+    "1400": 0.048,
+    "1600": 0.037
+   },
+   "cont": [
+    "Bxc3+",
+    "bxc3",
+    "Qxc3+"
+   ]
+  },
+  {
+   "san": "Bd4",
+   "best": "Ng3",
+   "bestUci": "h5g3",
+   "eval": 357,
+   "p": {
+    "1000": 0.031,
+    "1200": 0.033,
+    "1400": 0.034,
+    "1600": 0.032
+   },
+   "cont": [
+    "Ng3",
+    "Qd2",
+    "Nxh1",
+    "Bxg7",
+    "Kxg7"
+   ]
+  },
+  {
+   "san": "e5",
+   "best": "Ng3",
+   "bestUci": "h5g3",
+   "eval": 457,
+   "p": {
+    "1800": 0.032,
+    "2000": 0.033
+   },
+   "cont": [
+    "Ng3",
+    "Qd2",
+    "Nxh1"
+   ]
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/3p1np1/8/2BPP3/5N2/PPP2PPP/RNBQK2R w KQkq -": [
+  {
+   "san": "O-O",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 108,
+   "p": {
+    "800": 0.127,
+    "1000": 0.124,
+    "1200": 0.12,
+    "1400": 0.111,
+    "1600": 0.101,
+    "1800": 0.077,
+    "2000": 0.052
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  },
+  {
+   "san": "Bg5",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 185,
+   "p": {
+    "800": 0.042,
+    "1000": 0.04,
+    "1200": 0.033
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp2pbp/2np1np1/4p3/2PPP3/2NB1N2/PP3PPP/R1BQ1RK1 w - -": [
+  {
+   "san": "Bg5",
+   "best": "Nxd4",
+   "bestUci": "c6d4",
+   "eval": 144,
+   "p": {
+    "800": 0.055,
+    "1000": 0.045,
+    "1200": 0.038,
+    "1400": 0.032
+   },
+   "cont": [
+    "Nxd4",
+    "Nxd4",
+    "exd4"
+   ]
+  }
+ ],
+ "r2q1rk1/ppp1ppbp/2np1np1/8/2PPP1b1/P2B1N2/1P3PPP/RNBQ1RK1 w - -": [
+  {
+   "san": "h3",
+   "best": "Bxf3",
+   "bestUci": "g4f3",
+   "eval": 170,
+   "p": {
+    "800": 0.161,
+    "1000": 0.151,
+    "1200": 0.134,
+    "1400": 0.108,
+    "1600": 0.076,
+    "1800": 0.043
+   },
+   "cont": [
+    "Bxf3",
+    "Qxf3",
+    "Nxd4"
+   ]
+  },
+  {
+   "san": "Nbd2",
+   "best": "Nxd4",
+   "bestUci": "c6d4",
+   "eval": 165,
+   "p": {
+    "800": 0.086,
+    "1000": 0.092,
+    "1200": 0.085,
+    "1400": 0.071,
+    "1600": 0.053,
+    "1800": 0.034
+   },
+   "cont": [
+    "Nxd4"
+   ]
+  },
+  {
+   "san": "b4",
+   "best": "Nxd4",
+   "bestUci": "c6d4",
+   "eval": 416,
+   "p": {
+    "800": 0.055,
+    "1000": 0.034
+   },
+   "cont": [
+    "Nxd4"
+   ]
+  },
+  {
+   "san": "Nc3",
+   "best": "Nxd4",
+   "bestUci": "c6d4",
+   "eval": 208,
+   "p": {
+    "800": 0.047,
+    "1000": 0.038,
+    "1200": 0.031
+   },
+   "cont": [
+    "Nxd4"
+   ]
+  },
+  {
+   "san": "Bc2",
+   "best": "Bxf3",
+   "bestUci": "g4f3",
+   "eval": 209,
+   "p": {
+    "1200": 0.034,
+    "1400": 0.037,
+    "1600": 0.038,
+    "1800": 0.036,
+    "2000": 0.032
+   },
+   "cont": [
+    "Bxf3",
+    "Qxf3",
+    "Nxd4"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/3p1np1/3P4/1nP1P3/3B1N2/PP3PPP/RNBQ1RK1 w - -": [
+  {
+   "san": "Be2",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 135,
+   "p": {
+    "800": 0.167,
+    "1000": 0.19,
+    "1200": 0.188,
+    "1400": 0.164,
+    "1600": 0.131,
+    "1800": 0.103,
+    "2000": 0.087
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  },
+  {
+   "san": "Bd2",
+   "best": "Nxd3",
+   "bestUci": "b4d3",
+   "eval": 607,
+   "p": {
+    "800": 0.04
+   },
+   "cont": [
+    "Nxd3"
+   ]
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/3p1np1/1N6/3P1B2/8/PPP1PPPP/R2QKBNR w KQkq -": [
+  {
+   "san": "Qd3",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 185,
+   "p": {
+    "800": 0.033
+   },
+   "cont": [
+    "Bf5",
+    "Qd1",
+    "c5",
+    "e4",
+    "Bxe4",
+    "dxc5",
+    "a6",
+    "Nc3",
+    "Qa5",
+    "Qd2",
+    "Qxc5"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp2ppbp/5npB/2pp4/3P3P/2N5/PPPQPPP1/R3KBNR w KQ -": [
+  {
+   "san": "h5",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 304,
+   "p": {
+    "800": 0.214,
+    "1000": 0.223,
+    "1200": 0.238,
+    "1400": 0.272,
+    "1600": 0.314,
+    "1800": 0.352,
+    "2000": 0.345
+   },
+   "cont": [
+    "cxd4"
+   ]
+  },
+  {
+   "san": "dxc5",
+   "best": "Bxh6",
+   "bestUci": "g7h6",
+   "eval": 139,
+   "p": {
+    "800": 0.085,
+    "1000": 0.078,
+    "1200": 0.077,
+    "1400": 0.08,
+    "1600": 0.083,
+    "1800": 0.085,
+    "2000": 0.084
+   },
+   "cont": [
+    "Bxh6"
+   ]
+  },
+  {
+   "san": "O-O-O",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 526,
+   "p": {
+    "800": 0.042,
+    "1000": 0.038,
+    "1200": 0.033
+   },
+   "cont": [
+    "cxd4",
+    "Bxg7",
+    "dxc3",
+    "Qxc3",
+    "Kxg7"
+   ]
+  },
+  {
+   "san": "f3",
+   "best": "Bxh6",
+   "bestUci": "g7h6",
+   "eval": 357,
+   "p": {
+    "800": 0.041,
+    "1000": 0.036,
+    "1200": 0.031
+   },
+   "cont": [
+    "Bxh6",
+    "Qxh6",
+    "cxd4"
+   ]
+  },
+  {
+   "san": "Nf3",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 269,
+   "p": {
+    "2000": 0.032
+   },
+   "cont": [
+    "cxd4"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp2ppbp/5npB/2pp4/3P4/2N5/PPPQPPPP/2KR1BNR w - -": [
+  {
+   "san": "h4",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 559,
+   "p": {
+    "800": 0.092,
+    "1000": 0.11,
+    "1200": 0.121,
+    "1400": 0.125,
+    "1600": 0.112,
+    "1800": 0.083,
+    "2000": 0.053
+   },
+   "cont": [
+    "cxd4",
+    "Bxg7",
+    "dxc3",
+    "bxc3",
+    "Kxg7"
+   ]
+  },
+  {
+   "san": "Nf3",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 400,
+   "p": {
+    "800": 0.037
+   },
+   "cont": [
+    "cxd4",
+    "Nxd4",
+    "Bxh6",
+    "Qxh6",
+    "e5",
+    "Nf3",
+    "Ng4",
+    "Qd2",
+    "Nxf2"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6pB/3p4/3Pn3/2N2N2/PPPQPPPP/R3KB1R w KQ -": [
+  {
+   "san": "Bxg7",
+   "best": "Nxd2",
+   "bestUci": "e4d2",
+   "eval": 575,
+   "p": {
+    "800": 0.041,
+    "1000": 0.035,
+    "1200": 0.03
+   },
+   "cont": [
+    "Nxd2"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6pB/3p4/3P4/2n1QN2/PPP1PPPP/R3KB1R w KQ -": [
+  {
+   "san": "Qxc3",
+   "best": "Bxh6",
+   "bestUci": "g7h6",
+   "eval": 596,
+   "p": {
+    "800": 0.035
+   },
+   "cont": [
+    "Bxh6"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6pB/8/3Pp3/5N2/PPPQPPPP/R3KB1R w KQ -": [
+  {
+   "san": "Ne5",
+   "best": "Bxh6",
+   "bestUci": "g7h6",
+   "eval": 632,
+   "p": {
+    "800": 0.156,
+    "1000": 0.135,
+    "1200": 0.118,
+    "1400": 0.103,
+    "1600": 0.093,
+    "1800": 0.085,
+    "2000": 0.074
+   },
+   "cont": [
+    "Bxh6",
+    "Qxh6",
+    "Qxd4"
+   ]
+  },
+  {
+   "san": "Nh4",
+   "best": "Bxh6",
+   "bestUci": "g7h6",
+   "eval": 385,
+   "p": {
+    "800": 0.039
+   },
+   "cont": [
+    "Bxh6",
+    "Qxh6",
+    "Qxd4"
+   ]
+  }
+ ],
+ "rnbq1r2/ppp1ppkp/6p1/8/3Pp3/5N2/PPPQPPPP/R3KB1R w KQ -": [
+  {
+   "san": "Nh4",
+   "best": "e5",
+   "bestUci": "e7e5",
+   "eval": 285,
+   "p": {
+    "800": 0.054,
+    "1000": 0.041
+   },
+   "cont": [
+    "e5",
+    "g3",
+    "Qxd4"
+   ]
+  }
+ ],
+ "rnbq1r2/ppp1p1kp/5pp1/4N3/3Pp3/8/PPPQPPPP/R3KB1R w KQ -": [
+  {
+   "san": "Nxg6",
+   "best": "hxg6",
+   "bestUci": "h7g6",
+   "eval": 453,
+   "p": {
+    "800": 0.047,
+    "1000": 0.033
+   },
+   "cont": [
+    "hxg6"
+   ]
+  }
+ ],
+ "rnbq1r2/pp2ppkp/6p1/2p5/3Pp3/8/PPPQPPPP/R3KBNR w KQ -": [
+  {
+   "san": "Qc3",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 441,
+   "p": {
+    "800": 0.053,
+    "1000": 0.041,
+    "1200": 0.031
+   },
+   "cont": [
+    "cxd4"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp2pbp/2n2pp1/8/2BP4/1QN1P3/PP3PPP/R3K1NR w KQ -": [
+  {
+   "san": "O-O-O",
+   "best": "Na5",
+   "bestUci": "c6a5",
+   "eval": 160,
+   "p": {
+    "800": 0.064,
+    "1000": 0.045
+   },
+   "cont": [
+    "Na5"
+   ]
+  }
+ ],
+ "r1bq1rk1/1pp1n1bp/3p2p1/p2Ppp1n/PPP1P3/2N2N2/4BPPP/R1BQR1K1 w - -": [
+  {
+   "san": "exf5",
+   "best": "e4",
+   "bestUci": "e5e4",
+   "eval": 161,
+   "p": {
+    "800": 0.107,
+    "1000": 0.11,
+    "1200": 0.103,
+    "1400": 0.088,
+    "1600": 0.071,
+    "1800": 0.052,
+    "2000": 0.036
+   },
+   "cont": [
+    "e4"
+   ]
+  },
+  {
+   "san": "Ng5",
+   "best": "axb4",
+   "bestUci": "a5b4",
+   "eval": 120,
+   "p": {
+    "800": 0.049,
+    "1000": 0.051,
+    "1200": 0.049,
+    "1400": 0.044,
+    "1600": 0.04,
+    "1800": 0.034
+   },
+   "cont": [
+    "axb4",
+    "Bxh5",
+    "bxc3"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1n1b1/3p1npp/2PPppN1/1P2P3/2N5/P3BPPP/R1BQR1K1 w - -": [
+  {
+   "san": "Nh3",
+   "best": "fxe4",
+   "bestUci": "f5e4",
+   "eval": 216,
+   "p": {
+    "800": 0.043,
+    "1000": 0.041,
+    "1200": 0.038,
+    "1400": 0.03
+   },
+   "cont": [
+    "fxe4"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp3bp/3p1pp1/4p3/2PnP1n1/2N2N2/PP2BPPP/R1BQ1RK1 w - -": [
+  {
+   "san": "h3",
+   "best": "Nxe2+",
+   "bestUci": "d4e2",
+   "eval": 108,
+   "p": {
+    "800": 0.044,
+    "1000": 0.041,
+    "1200": 0.037,
+    "1400": 0.033
+   },
+   "cont": [
+    "Nxe2+",
+    "Qxe2",
+    "Nh6",
+    "a4",
+    "a5",
+    "c5",
+    "dxc5"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp2p2/2np3p/6p1/2PbN3/6B1/PP2BPPP/R2Q1RK1 w - -": [
+  {
+   "san": "Bh5",
+   "best": "f5",
+   "bestUci": "f7f5",
+   "eval": 559,
+   "p": {
+    "800": 0.275,
+    "1000": 0.274,
+    "1200": 0.259,
+    "1400": 0.226,
+    "1600": 0.176,
+    "1800": 0.118,
+    "2000": 0.065
+   },
+   "cont": [
+    "f5",
+    "Nc3",
+    "f4",
+    "Nb5",
+    "Bxb2"
+   ]
+  },
+  {
+   "san": "Rb1",
+   "best": "f5",
+   "bestUci": "f7f5",
+   "eval": 460,
+   "p": {
+    "800": 0.242,
+    "1000": 0.274,
+    "1200": 0.289,
+    "1400": 0.299,
+    "1600": 0.3,
+    "1800": 0.286,
+    "2000": 0.25
+   },
+   "cont": [
+    "f5",
+    "b4",
+    "Bg7",
+    "Nxd6",
+    "cxd6",
+    "Bxd6",
+    "Re8"
+   ]
+  },
+  {
+   "san": "b4",
+   "best": "Bxa1",
+   "bestUci": "d4a1",
+   "eval": 420,
+   "p": {
+    "800": 0.067,
+    "1000": 0.062,
+    "1200": 0.06,
+    "1400": 0.06,
+    "1600": 0.064,
+    "1800": 0.069,
+    "2000": 0.073
+   },
+   "cont": [
+    "Bxa1",
+    "Qxa1",
+    "f5"
+   ]
+  },
+  {
+   "san": "Bd3",
+   "best": "f5",
+   "bestUci": "f7f5",
+   "eval": 505,
+   "p": {
+    "800": 0.059,
+    "1000": 0.066,
+    "1200": 0.073,
+    "1400": 0.083,
+    "1600": 0.096,
+    "1800": 0.109,
+    "2000": 0.12
+   },
+   "cont": [
+    "f5",
+    "Qh5",
+    "Qe7",
+    "Nxd6",
+    "cxd6"
+   ]
+  },
+  {
+   "san": "Kh1",
+   "best": "f5",
+   "bestUci": "f7f5",
+   "eval": 513,
+   "p": {
+    "800": 0.036,
+    "1000": 0.039,
+    "1200": 0.044,
+    "1400": 0.053,
+    "1600": 0.071,
+    "1800": 0.096,
+    "2000": 0.124
+   },
+   "cont": [
+    "f5",
+    "Nc3",
+    "f4",
+    "Bd3",
+    "Bg7",
+    "Bc2",
+    "Nd4",
+    "Bb1",
+    "fxg3"
+   ]
+  },
+  {
+   "san": "Bf3",
+   "best": "g4",
+   "bestUci": "g5g4",
+   "eval": 457,
+   "p": {
+    "800": 0.034,
+    "1000": 0.032,
+    "1200": 0.032,
+    "1400": 0.033,
+    "1600": 0.033,
+    "1800": 0.033,
+    "2000": 0.03
+   },
+   "cont": [
+    "g4",
+    "Bxg4",
+    "f5",
+    "Nxd6",
+    "fxg4"
+   ]
+  },
+  {
+   "san": "Qd2",
+   "best": "f5",
+   "bestUci": "f7f5",
+   "eval": 514,
+   "p": {
+    "1800": 0.046,
+    "2000": 0.082
+   },
+   "cont": [
+    "f5",
+    "Nxd6",
+    "cxd6"
+   ]
+  }
+ ],
+ "r1bq1rk1/pppn1pbp/3p1np1/8/2PQP3/2N2N2/PP2BPPP/R1B2RK1 w - -": [
+  {
+   "san": "Nd5",
+   "best": "Re8",
+   "bestUci": "f8e8",
+   "eval": 200,
+   "p": {
+    "800": 0.047
+   },
+   "cont": [
+    "Re8",
+    "Nxf6+",
+    "Nxf6",
+    "e5",
+    "dxe5"
+   ]
+  }
+ ],
+ "r1bqr1k1/pppn1pbp/3p1np1/8/2PNP3/2NB4/PP3PPP/R1BQ1RK1 w - -": [
+  {
+   "san": "f4",
+   "best": "Nc5",
+   "bestUci": "d7c5",
+   "eval": 213,
+   "p": {
+    "800": 0.062,
+    "1000": 0.074,
+    "1200": 0.08,
+    "1400": 0.084,
+    "1600": 0.078,
+    "1800": 0.058,
+    "2000": 0.033
+   },
+   "cont": [
+    "Nc5"
+   ]
+  }
+ ],
+ "rnbqr1k1/ppp2pbp/3p2p1/8/2PN4/2n1B3/PPQ1BPPP/R4RK1 w - -": [
+  {
+   "san": "Qxc3",
+   "best": "c5",
+   "bestUci": "c7c5",
+   "eval": 556,
+   "p": {
+    "800": 0.726,
+    "1000": 0.654,
+    "1200": 0.592,
+    "1400": 0.53,
+    "1600": 0.476,
+    "1800": 0.441,
+    "2000": 0.418
+   },
+   "cont": [
+    "c5"
+   ]
+  }
+ ],
+ "r1bqr1k1/ppp2p1p/2np2p1/8/2PbN3/5B2/PPQ2PPP/R1B2RK1 w - -": [
+  {
+   "san": "Rd1",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 401,
+   "p": {
+    "800": 0.056,
+    "1000": 0.059,
+    "1200": 0.061,
+    "1400": 0.066,
+    "1600": 0.071,
+    "1800": 0.074,
+    "2000": 0.071
+   },
+   "cont": [
+    "Bf5"
+   ]
+  },
+  {
+   "san": "Qd3",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 382,
+   "p": {
+    "800": 0.034,
+    "1000": 0.031
+   },
+   "cont": [
+    "Bf5",
+    "Bd2",
+    "Bxb2"
+   ]
+  },
+  {
+   "san": "Rb1",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 446,
+   "p": {
+    "800": 0.032,
+    "1000": 0.036,
+    "1200": 0.036,
+    "1400": 0.03
+   },
+   "cont": [
+    "Bf5"
+   ]
+  },
+  {
+   "san": "a3",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 448,
+   "p": {
+    "1200": 0.032,
+    "1400": 0.042,
+    "1600": 0.051,
+    "1800": 0.046
+   },
+   "cont": [
+    "Bf5",
+    "Bh6",
+    "Re6",
+    "Rae1",
+    "Qe7",
+    "Re2",
+    "Re8",
+    "Rfe1",
+    "Qh4",
+    "Qd2",
+    "Bxe4"
+   ]
+  }
+ ],
+ "r1bqr1k1/ppp2p1p/2np2p1/8/2PbN3/3Q4/PP2BPPP/R1B2RK1 w - -": [
+  {
+   "san": "Be3",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 364,
+   "p": {
+    "800": 0.145,
+    "1000": 0.117,
+    "1200": 0.096,
+    "1400": 0.073,
+    "1600": 0.052,
+    "1800": 0.035
+   },
+   "cont": [
+    "Bf5"
+   ]
+  },
+  {
+   "san": "Bf3",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 364,
+   "p": {
+    "800": 0.106,
+    "1000": 0.131,
+    "1200": 0.148,
+    "1400": 0.163,
+    "1600": 0.166,
+    "1800": 0.158,
+    "2000": 0.125
+   },
+   "cont": [
+    "Bf5",
+    "Bf4",
+    "Bxb2"
+   ]
+  },
+  {
+   "san": "Bh6",
+   "best": "Qh4",
+   "bestUci": "d8h4",
+   "eval": 589,
+   "p": {
+    "800": 0.101,
+    "1000": 0.11,
+    "1200": 0.11,
+    "1400": 0.102,
+    "1600": 0.085,
+    "1800": 0.059,
+    "2000": 0.034
+   },
+   "cont": [
+    "Qh4",
+    "Qd2",
+    "Rxe4"
+   ]
+  },
+  {
+   "san": "Rb1",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 675,
+   "p": {
+    "800": 0.066,
+    "1000": 0.067,
+    "1200": 0.061,
+    "1400": 0.047,
+    "1600": 0.032
+   },
+   "cont": [
+    "Bf5",
+    "Bg5",
+    "Bxe4"
+   ]
+  },
+  {
+   "san": "b4",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 703,
+   "p": {
+    "800": 0.058,
+    "1000": 0.055,
+    "1200": 0.047,
+    "1400": 0.038
+   },
+   "cont": [
+    "Bf5",
+    "Bg5",
+    "Bxe4"
+   ]
+  },
+  {
+   "san": "Qf3",
+   "best": "Qe7",
+   "bestUci": "d8e7",
+   "eval": 400,
+   "p": {
+    "800": 0.036,
+    "1000": 0.033
+   },
+   "cont": [
+    "Qe7"
+   ]
+  },
+  {
+   "san": "a3",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 688,
+   "p": {
+    "800": 0.032,
+    "1000": 0.034,
+    "1200": 0.036,
+    "1400": 0.039,
+    "1600": 0.037
+   },
+   "cont": [
+    "Bf5",
+    "Bf3",
+    "Qh4",
+    "Bd2",
+    "Bxe4",
+    "Bxe4",
+    "Rxe4"
+   ]
+  },
+  {
+   "san": "Ng5",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 369,
+   "p": {
+    "800": 0.031
+   },
+   "cont": [
+    "Bf5"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp2pbp/n2p2p1/8/2PpP1n1/2N2N2/PP1BBPPP/R2Q1RK1 w - -": [
+  {
+   "san": "Nxd4",
+   "best": "Nxf2",
+   "bestUci": "g4f2",
+   "eval": 328,
+   "p": {
+    "800": 0.571,
+    "1000": 0.539,
+    "1200": 0.511,
+    "1400": 0.49,
+    "1600": 0.479,
+    "1800": 0.478,
+    "2000": 0.469
+   },
+   "cont": [
+    "Nxf2"
+   ]
+  }
+ ],
+ "r1b1qrk1/ppp2pbp/n4np1/4p1B1/2P1P3/2N5/PP1NBPPP/R2Q1RK1 w - -": [
+  {
+   "san": "Bxf6",
+   "best": "Bxf6",
+   "bestUci": "g7f6",
+   "eval": 88,
+   "p": {
+    "800": 0.083,
+    "1000": 0.085,
+    "1200": 0.095,
+    "1400": 0.102,
+    "1600": 0.099,
+    "1800": 0.075,
+    "2000": 0.043
+   },
+   "cont": [
+    "Bxf6"
+   ]
+  }
+ ],
+ "rnbqr1k1/pp3pbp/3p1np1/3P4/2p1PP2/2N5/PP1NB1PP/R1BQK2R w KQ -": [
+  {
+   "san": "Nxc4",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 162,
+   "p": {
+    "800": 0.15,
+    "1000": 0.122,
+    "1200": 0.1,
+    "1400": 0.079,
+    "1600": 0.055,
+    "1800": 0.03
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  },
+  {
+   "san": "Qc2",
+   "best": "Na6",
+   "bestUci": "b8a6",
+   "eval": 196,
+   "p": {
+    "1200": 0.03,
+    "1400": 0.033,
+    "1600": 0.037,
+    "1800": 0.042,
+    "2000": 0.036
+   },
+   "cont": [
+    "Na6"
+   ]
+  }
+ ],
+ "r2q1rk1/pp4bp/2n1b1p1/2pNNp2/2P1nP2/3B4/PP4PP/R1BQ1RK1 w - -": [
+  {
+   "san": "b3",
+   "best": "Nxe5",
+   "bestUci": "c6e5",
+   "eval": 540,
+   "p": {
+    "800": 0.05,
+    "1000": 0.042,
+    "1200": 0.033
+   },
+   "cont": [
+    "Nxe5",
+    "fxe5",
+    "Bxd5",
+    "cxd5",
+    "Bxe5"
+   ]
+  },
+  {
+   "san": "Qf3",
+   "best": "Nxe5",
+   "bestUci": "c6e5",
+   "eval": 348,
+   "p": {
+    "800": 0.031,
+    "1000": 0.033
+   },
+   "cont": [
+    "Nxe5",
+    "fxe5",
+    "Bxd5",
+    "cxd5",
+    "Qxd5"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppb1/3p1np1/7p/3P1B1P/4PN2/PPP1BPP1/RN1QK2R w KQ -": [
+  {
+   "san": "Nh2",
+   "best": "c5",
+   "bestUci": "c7c5",
+   "eval": 120,
+   "p": {
+    "800": 0.07,
+    "1000": 0.079,
+    "1200": 0.078,
+    "1400": 0.066,
+    "1600": 0.046
+   },
+   "cont": [
+    "c5"
+   ]
+  }
+ ],
+ "r1bq1rk1/pp2ppbp/2np1np1/2p5/3P1B2/4PN1P/PPP1BPP1/RN1Q1RK1 w - -": [
+  {
+   "san": "Bh2",
+   "best": "Qb6",
+   "bestUci": "d8b6",
+   "eval": 100,
+   "p": {
+    "2000": 0.034
+   },
+   "cont": [
+    "Qb6"
+   ]
+  }
+ ],
+ "rnb2rk1/pp2ppbp/1q1p1np1/8/3p1B2/1PP1PN1P/P3BPP1/RN1QK2R w KQ -": [
+  {
+   "san": "Nxd4",
+   "best": "e5",
+   "bestUci": "e7e5",
+   "eval": 521,
+   "p": {
+    "800": 0.092,
+    "1000": 0.074,
+    "1200": 0.056,
+    "1400": 0.036
+   },
+   "cont": [
+    "e5",
+    "Bh2",
+    "exd4",
+    "cxd4",
+    "Be6"
+   ]
+  }
+ ],
+ "r1bq1rk1/pppnppbp/3p1np1/8/4P3/2NP1N2/PPP1BPPP/R1BQ1RK1 w - -": [
+  {
+   "san": "b3",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 124,
+   "p": {
+    "800": 0.05,
+    "1000": 0.041,
+    "1200": 0.031
+   },
+   "cont": [
+    "Nxe4",
+    "Nxe4",
+    "Bxa1"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1pp1p/3p1bp1/4n3/4P3/2NP1N2/PPP1BPPP/R2Q1RK1 w - -": [
+  {
+   "san": "Nd5",
+   "best": "Nxf3+",
+   "bestUci": "e5f3",
+   "eval": 247,
+   "p": {
+    "800": 0.216,
+    "1000": 0.225,
+    "1200": 0.218,
+    "1400": 0.206,
+    "1600": 0.185,
+    "1800": 0.155,
+    "2000": 0.123
+   },
+   "cont": [
+    "Nxf3+",
+    "Bxf3",
+    "Bxb2"
+   ]
+  }
+ ],
+ "r1bq1rk1/pp2ppbp/2p2np1/4p1B1/4P3/2NP4/PPPQBPPP/R4RK1 w - -": [
+  {
+   "san": "Bxf6",
+   "best": "exf6",
+   "bestUci": "e7f6",
+   "eval": 140,
+   "p": {
+    "800": 0.036
+   },
+   "cont": [
+    "exf6"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/5np1/6B1/4Pp2/2NP4/PPP1B1PP/R2Q1RK1 w - -": [
+  {
+   "san": "Rxf4",
+   "best": "h6",
+   "bestUci": "h7h6",
+   "eval": 169,
+   "p": {
+    "800": 0.466,
+    "1000": 0.447,
+    "1200": 0.414,
+    "1400": 0.369,
+    "1600": 0.324,
+    "1800": 0.288,
+    "2000": 0.246
+   },
+   "cont": [
+    "h6"
+   ]
+  },
+  {
+   "san": "Bxf6",
+   "best": "Bxf6",
+   "bestUci": "g7f6",
+   "eval": 254,
+   "p": {
+    "800": 0.033
+   },
+   "cont": [
+    "Bxf6"
+   ]
+  }
+ ],
+ "r2q1rk1/ppp1ppbp/6p1/4p1B1/4P1b1/2NP4/PPP2PPP/R4RK1 w - -": [
+  {
+   "san": "Bxe7",
+   "best": "Qxe7",
+   "bestUci": "d8e7",
+   "eval": 1330,
+   "p": {
+    "800": 0.037,
+    "1000": 0.035,
+    "1200": 0.034,
+    "1400": 0.032,
+    "1600": 0.031,
+    "1800": 0.031,
+    "2000": 0.036
+   },
+   "cont": [
+    "Qxe7"
+   ]
+  },
+  {
+   "san": "f4",
+   "best": "f6",
+   "bestUci": "f7f6",
+   "eval": 897,
+   "p": {
+    "1400": 0.033,
+    "1600": 0.04,
+    "1800": 0.044,
+    "2000": 0.045
+   },
+   "cont": [
+    "f6"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1ppb1/6pp/4p1B1/4P1n1/2NP3P/PPP2PP1/R2Q1RK1 w - -": [
+  {
+   "san": "Bxh6",
+   "best": "Nxh6",
+   "bestUci": "g4h6",
+   "eval": 885,
+   "p": {
+    "800": 0.117,
+    "1000": 0.132,
+    "1200": 0.125,
+    "1400": 0.1,
+    "1600": 0.061
+   },
+   "cont": [
+    "Nxh6"
+   ]
+  }
+ ],
+ "r1b2rk1/ppp1qpb1/6pp/4p3/4P1n1/2NP3P/PPP2PP1/R2Q1RK1 w - -": [
+  {
+   "san": "Qxg4",
+   "best": "Bxg4",
+   "bestUci": "c8g4",
+   "eval": 778,
+   "p": {
+    "800": 0.261,
+    "1000": 0.237,
+    "1200": 0.212,
+    "1400": 0.186,
+    "1600": 0.153,
+    "1800": 0.112,
+    "2000": 0.071
+   },
+   "cont": [
+    "Bxg4",
+    "hxg4",
+    "Rad8"
+   ]
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/5n2/4p3/3P4/8/PPP2PPP/RNBQKBNR w KQkq -": [
+  {
+   "san": "Bc4",
+   "best": "Qxd4",
+   "bestUci": "d8d4",
+   "eval": 300,
+   "p": {
+    "800": 0.034,
+    "1000": 0.035,
+    "1200": 0.031
+   },
+   "cont": [
+    "Qxd4"
+   ]
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/5n2/8/3p4/5N2/PPP2PPP/RNBQKB1R w KQkq -": [
+  {
+   "san": "Nxd4",
+   "best": "e5",
+   "bestUci": "e7e5",
+   "eval": 305,
+   "p": {
+    "800": 0.538,
+    "1000": 0.481,
+    "1200": 0.428,
+    "1400": 0.388,
+    "1600": 0.351,
+    "1800": 0.309,
+    "2000": 0.249
+   },
+   "cont": [
+    "e5"
+   ]
+  }
+ ],
+ "rnb1kb1r/ppp1pppp/8/4P3/6n1/8/PPP2PPP/RNBK1BNR w kq -": [
+  {
+   "san": "Nh3",
+   "best": "Nxe5",
+   "bestUci": "g4e5",
+   "eval": 322,
+   "p": {
+    "800": 0.273,
+    "1000": 0.298,
+    "1200": 0.328,
+    "1400": 0.372,
+    "1600": 0.42,
+    "1800": 0.425,
+    "2000": 0.371
+   },
+   "cont": [
+    "Nxe5"
+   ]
+  },
+  {
+   "san": "Nf3",
+   "best": "Nxf2+",
+   "bestUci": "g4f2",
+   "eval": 512,
+   "p": {
+    "800": 0.105,
+    "1000": 0.084,
+    "1200": 0.067,
+    "1400": 0.049,
+    "1600": 0.031
+   },
+   "cont": [
+    "Nxf2+"
+   ]
+  },
+  {
+   "san": "f4",
+   "best": "Nf2+",
+   "bestUci": "g4f2",
+   "eval": 407,
+   "p": {
+    "800": 0.063,
+    "1000": 0.056,
+    "1200": 0.053,
+    "1400": 0.049,
+    "1600": 0.043,
+    "1800": 0.037,
+    "2000": 0.03
+   },
+   "cont": [
+    "Nf2+",
+    "Ke1",
+    "Nxh1"
+   ]
+  },
+  {
+   "san": "Bf4",
+   "best": "Nxf2+",
+   "bestUci": "g4f2",
+   "eval": 532,
+   "p": {
+    "800": 0.063,
+    "1000": 0.056,
+    "1200": 0.048,
+    "1400": 0.04
+   },
+   "cont": [
+    "Nxf2+"
+   ]
+  }
+ ],
+ "rnb1kb1r/ppp1pppp/8/4n3/8/4B3/PPP2PPP/RN1K1BNR w kq -": [
+  {
+   "san": "Bf4",
+   "best": "Nbc6",
+   "bestUci": "b8c6",
+   "eval": 311,
+   "p": {
+    "800": 0.072,
+    "1000": 0.069,
+    "1200": 0.068,
+    "1400": 0.07,
+    "1600": 0.074,
+    "1800": 0.078,
+    "2000": 0.087
+   },
+   "cont": [
+    "Nbc6"
+   ]
+  },
+  {
+   "san": "f4",
+   "best": "Ng4",
+   "bestUci": "e5g4",
+   "eval": 368,
+   "p": {
+    "800": 0.057,
+    "1000": 0.05,
+    "1200": 0.048,
+    "1400": 0.05,
+    "1600": 0.053,
+    "1800": 0.048,
+    "2000": 0.031
+   },
+   "cont": [
+    "Ng4"
+   ]
+  },
+  {
+   "san": "Bd4",
+   "best": "Nbc6",
+   "bestUci": "b8c6",
+   "eval": 376,
+   "p": {
+    "800": 0.037
+   },
+   "cont": [
+    "Nbc6"
+   ]
+  }
+ ],
+ "rnb1kb1r/ppp1pppp/2n5/8/5P2/8/PPP3PP/RNB1KBNR w kq -": [
+  {
+   "san": "g3",
+   "best": "Nb4",
+   "bestUci": "c6b4",
+   "eval": 368,
+   "p": {
+    "800": 0.042
+   },
+   "cont": [
+    "Nb4",
+    "Na3",
+    "Bf5",
+    "Ke2",
+    "Nxc2",
+    "Nxc2",
+    "Bxc2"
+   ]
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/3p1np1/8/3PP3/2N1B3/PPP2PPP/R2QKBNR w KQkq -": [
+  {
+   "san": "e5",
+   "best": "Ng4",
+   "bestUci": "f6g4",
+   "eval": 83,
+   "p": {
+    "800": 0.041
+   },
+   "cont": [
+    "Ng4"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/5np1/4N3/3P4/2N5/PPP2PPP/R1BQKB1R w KQ -": [
+  {
+   "san": "Bd3",
+   "best": "Qxd4",
+   "bestUci": "d8d4",
+   "eval": 197,
+   "p": {
+    "800": 0.061,
+    "1000": 0.053,
+    "1200": 0.043,
+    "1400": 0.033
+   },
+   "cont": [
+    "Qxd4"
+   ]
+  }
+ ],
+ "rnb1k2r/ppp1ppbp/6p1/4P3/6n1/2N2N2/PPP2PPP/R1BK1B1R w kq -": [
+  {
+   "san": "Be3",
+   "best": "Nc6",
+   "bestUci": "b8c6",
+   "eval": 245,
+   "p": {
+    "800": 0.244,
+    "1000": 0.253,
+    "1200": 0.249,
+    "1400": 0.242,
+    "1600": 0.227,
+    "1800": 0.188,
+    "2000": 0.131
+   },
+   "cont": [
+    "Nc6",
+    "Bb5",
+    "Bd7",
+    "Ke2",
+    "Ngxe5",
+    "Nxe5",
+    "Bxe5"
+   ]
+  },
+  {
+   "san": "Bf4",
+   "best": "Nxf2+",
+   "bestUci": "g4f2",
+   "eval": 325,
+   "p": {
+    "800": 0.184,
+    "1000": 0.194,
+    "1200": 0.191,
+    "1400": 0.174,
+    "1600": 0.147,
+    "1800": 0.112,
+    "2000": 0.073
+   },
+   "cont": [
+    "Nxf2+"
+   ]
+  },
+  {
+   "san": "Ne4",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 254,
+   "p": {
+    "800": 0.095,
+    "1000": 0.081,
+    "1200": 0.071,
+    "1400": 0.063,
+    "1600": 0.051,
+    "1800": 0.031
+   },
+   "cont": [
+    "Bf5",
+    "h3",
+    "Nxe5"
+   ]
+  },
+  {
+   "san": "h3",
+   "best": "Nxf2+",
+   "bestUci": "g4f2",
+   "eval": 541,
+   "p": {
+    "800": 0.049,
+    "1000": 0.038
+   },
+   "cont": [
+    "Nxf2+"
+   ]
+  }
+ ],
+ "rnb1k2r/ppp1ppbp/6p1/4n3/2B5/5N2/PPP2PPP/R1BNK2R w KQkq -": [
+  {
+   "san": "Ng5",
+   "best": "Nxc4",
+   "bestUci": "e5c4",
+   "eval": 756,
+   "p": {
+    "800": 0.046,
+    "1000": 0.035
+   },
+   "cont": [
+    "Nxc4"
+   ]
+  },
+  {
+   "san": "Bb3",
+   "best": "Nxf3+",
+   "bestUci": "e5f3",
+   "eval": 398,
+   "p": {
+    "800": 0.037,
+    "1000": 0.034
+   },
+   "cont": [
+    "Nxf3+"
+   ]
+  }
+ ],
+ "rnb1k2r/ppp1ppbp/6p1/4n3/8/5N1P/PPP2PP1/R1BNKB1R w KQkq -": [
+  {
+   "san": "Bf4",
+   "best": "Nxf3+",
+   "bestUci": "e5f3",
+   "eval": 285,
+   "p": {
+    "800": 0.07,
+    "1000": 0.061,
+    "1200": 0.056,
+    "1400": 0.053,
+    "1600": 0.051,
+    "1800": 0.049,
+    "2000": 0.043
+   },
+   "cont": [
+    "Nxf3+"
+   ]
+  }
+ ],
+ "r1b1k2r/ppp1ppbp/2n3p1/4n3/8/5N1P/PPP1BPP1/R1BNK2R w KQkq -": [
+  {
+   "san": "O-O",
+   "best": "Nxf3+",
+   "bestUci": "e5f3",
+   "eval": 368,
+   "p": {
+    "800": 0.251,
+    "1000": 0.269,
+    "1200": 0.295,
+    "1400": 0.326,
+    "1600": 0.354,
+    "1800": 0.368,
+    "2000": 0.341
+   },
+   "cont": [
+    "Nxf3+"
+   ]
+  },
+  {
+   "san": "Bf4",
+   "best": "Nxf3+",
+   "bestUci": "e5f3",
+   "eval": 324,
+   "p": {
+    "800": 0.071,
+    "1000": 0.072,
+    "1200": 0.073,
+    "1400": 0.076,
+    "1600": 0.082,
+    "1800": 0.087,
+    "2000": 0.095
+   },
+   "cont": [
+    "Nxf3+"
+   ]
+  },
+  {
+   "san": "Nc3",
+   "best": "Nb4",
+   "bestUci": "c6b4",
+   "eval": 375,
+   "p": {
+    "800": 0.045,
+    "1000": 0.048,
+    "1200": 0.048,
+    "1400": 0.045,
+    "1600": 0.037
+   },
+   "cont": [
+    "Nb4"
+   ]
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/3p1n2/8/2B5/3P1N2/PPP2PPP/RNBQK2R w KQkq -": [
+  {
+   "san": "Ng5",
+   "best": "d5",
+   "bestUci": "d6d5",
+   "eval": 246,
+   "p": {
+    "800": 0.422,
+    "1000": 0.316,
+    "1200": 0.241,
+    "1400": 0.19,
+    "1600": 0.147,
+    "1800": 0.115,
+    "2000": 0.078
+   },
+   "cont": [
+    "d5"
+   ]
+  }
+ ],
+ "rnbqkb1r/ppp1pp1p/5np1/3p2N1/2B5/8/PPPP1PPP/RNBQR1K1 w kq -": [
+  {
+   "san": "Qf3",
+   "best": "Bg7",
+   "bestUci": "f8g7",
+   "eval": 330,
+   "p": {
+    "1000": 0.036,
+    "1200": 0.051,
+    "1400": 0.065,
+    "1600": 0.079,
+    "1800": 0.09,
+    "2000": 0.103
+   },
+   "cont": [
+    "Bg7"
+   ]
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/3p1np1/8/2B5/2P2N2/PP1P1PPP/RNBQR1K1 w kq -": [
+  {
+   "san": "Bxf7+",
+   "best": "Kxf7",
+   "bestUci": "e8f7",
+   "eval": 471,
+   "p": {
+    "800": 0.038,
+    "1000": 0.048,
+    "1200": 0.054,
+    "1400": 0.061,
+    "1600": 0.068,
+    "1800": 0.072,
+    "2000": 0.069
+   },
+   "cont": [
+    "Kxf7"
+   ]
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/3p1np1/8/2BP4/5N2/PPP2PPP/RNBQR1K1 w kq -": [
+  {
+   "san": "Bxf7+",
+   "best": "Kxf7",
+   "bestUci": "e8f7",
+   "eval": 542,
+   "p": {
+    "1800": 0.03
+   },
+   "cont": [
+    "Kxf7"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p1np1/6N1/2BP4/8/PPP2PPP/RNBQR1K1 w - -": [
+  {
+   "san": "Qf3",
+   "best": "d5",
+   "bestUci": "d6d5",
+   "eval": 361,
+   "p": {
+    "800": 0.1,
+    "1000": 0.104,
+    "1200": 0.097,
+    "1400": 0.083,
+    "1600": 0.066,
+    "1800": 0.05,
+    "2000": 0.035
+   },
+   "cont": [
+    "d5"
+   ]
+  },
+  {
+   "san": "Nxf7",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 387,
+   "p": {
+    "800": 0.085,
+    "1000": 0.074,
+    "1200": 0.065,
+    "1400": 0.053,
+    "1600": 0.042,
+    "1800": 0.03
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "Bxf7+",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 376,
+   "p": {
+    "800": 0.085,
+    "1000": 0.059,
+    "1200": 0.04
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  }
+ ],
+ "r1bq1rk1/pppnppbp/5np1/4p3/3P4/2NB1N1P/PPP2PP1/R1BQK2R w KQ -": [
+  {
+   "san": "Nxe5",
+   "best": "c5",
+   "bestUci": "c7c5",
+   "eval": 76,
+   "p": {
+    "800": 0.061,
+    "1000": 0.057,
+    "1200": 0.051,
+    "1400": 0.042,
+    "1600": 0.032
+   },
+   "cont": [
+    "c5"
+   ]
+  }
+ ],
+ "r1bq1rk1/pppn1pb1/3p1npp/4p3/3PPB2/2NB1N1P/PPP2PP1/R2QK2R w KQ -": [
+  {
+   "san": "Bg3",
+   "best": "exd4",
+   "bestUci": "e5d4",
+   "eval": 143,
+   "p": {
+    "800": 0.032
+   },
+   "cont": [
+    "exd4"
+   ]
+  }
+ ],
+ "r1bq1rk1/pppnppb1/3p1n2/6p1/3PP3/2NB1N1P/PPP2PP1/R2QK2R w KQ -": [
+  {
+   "san": "Nxg5",
+   "best": "e5",
+   "bestUci": "e7e5",
+   "eval": 265,
+   "p": {
+    "800": 0.863,
+    "1000": 0.901,
+    "1200": 0.924,
+    "1400": 0.942,
+    "1600": 0.955,
+    "1800": 0.954,
+    "2000": 0.93
+   },
+   "cont": [
+    "e5"
+   ]
+  }
+ ],
+ "r1bq1rk1/pp1nppb1/3p1n2/2p3B1/3PP3/2NB3P/PPP2PP1/R2QK2R w KQ -": [
+  {
+   "san": "Qf3",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 437,
+   "p": {
+    "800": 0.042,
+    "1000": 0.035
+   },
+   "cont": [
+    "cxd4"
+   ]
+  },
+  {
+   "san": "Qd2",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 404,
+   "p": {
+    "800": 0.034,
+    "1000": 0.036,
+    "1200": 0.033
+   },
+   "cont": [
+    "cxd4"
+   ]
+  },
+  {
+   "san": "h4",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 403,
+   "p": {
+    "800": 0.033,
+    "1000": 0.035,
+    "1200": 0.034,
+    "1400": 0.031
+   },
+   "cont": [
+    "cxd4"
+   ]
+  },
+  {
+   "san": "Ne2",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 354,
+   "p": {
+    "1000": 0.032,
+    "1200": 0.039,
+    "1400": 0.049,
+    "1600": 0.06,
+    "1800": 0.072,
+    "2000": 0.079
+   },
+   "cont": [
+    "cxd4"
+   ]
+  }
+ ],
+ "r1bq1rk1/pp2ppb1/3p1n2/2n3B1/4P3/2NB3P/PPP2PP1/R2QK2R w KQ -": [
+  {
+   "san": "Bxf6",
+   "best": "Bxf6",
+   "bestUci": "g7f6",
+   "eval": 340,
+   "p": {
+    "800": 0.216,
+    "1000": 0.185,
+    "1200": 0.161,
+    "1400": 0.137,
+    "1600": 0.111,
+    "1800": 0.083,
+    "2000": 0.06
+   },
+   "cont": [
+    "Bxf6"
+   ]
+  },
+  {
+   "san": "Bc4",
+   "best": "Nfxe4",
+   "bestUci": "f6e4",
+   "eval": 512,
+   "p": {
+    "800": 0.082,
+    "1000": 0.081,
+    "1200": 0.074,
+    "1400": 0.064,
+    "1600": 0.051,
+    "1800": 0.034
+   },
+   "cont": [
+    "Nfxe4",
+    "Nxe4",
+    "Nxe4"
+   ]
+  },
+  {
+   "san": "h4",
+   "best": "Be6",
+   "bestUci": "c8e6",
+   "eval": 358,
+   "p": {
+    "800": 0.079,
+    "1000": 0.095,
+    "1200": 0.104,
+    "1400": 0.107,
+    "1600": 0.101,
+    "1800": 0.086,
+    "2000": 0.062
+   },
+   "cont": [
+    "Be6"
+   ]
+  },
+  {
+   "san": "Be2",
+   "best": "Nfxe4",
+   "bestUci": "f6e4",
+   "eval": 512,
+   "p": {
+    "800": 0.064,
+    "1000": 0.07,
+    "1200": 0.071,
+    "1400": 0.064,
+    "1600": 0.051,
+    "1800": 0.034
+   },
+   "cont": [
+    "Nfxe4",
+    "Nxe4",
+    "Nxe4"
+   ]
+  }
+ ],
+ "r1bq1rk1/pp1n1pb1/3p1p2/2p5/3PP3/2NB3P/PPP2PP1/R2QK2R w KQ -": [
+  {
+   "san": "e5",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 580,
+   "p": {
+    "800": 0.121,
+    "1000": 0.113,
+    "1200": 0.107,
+    "1400": 0.103,
+    "1600": 0.103,
+    "1800": 0.111,
+    "2000": 0.131
+   },
+   "cont": [
+    "cxd4",
+    "exf6",
+    "dxc3",
+    "fxg7",
+    "Re8+",
+    "Kf1",
+    "cxb2"
+   ]
+  },
+  {
+   "san": "Qg4",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 479,
+   "p": {
+    "800": 0.041,
+    "1000": 0.034
+   },
+   "cont": [
+    "cxd4"
+   ]
+  }
+ ],
+ "r2q1rk1/ppp1ppbp/2n1b1p1/8/6n1/2NB1N2/PPP2PPP/R1BQ1RK1 w - -": [
+  {
+   "san": "Ng5",
+   "best": "Qd6",
+   "bestUci": "d8d6",
+   "eval": 252,
+   "p": {
+    "800": 0.249,
+    "1000": 0.244,
+    "1200": 0.237,
+    "1400": 0.236,
+    "1600": 0.242,
+    "1800": 0.265,
+    "2000": 0.303
+   },
+   "cont": [
+    "Qd6"
+   ]
+  },
+  {
+   "san": "Ne4",
+   "best": "Nge5",
+   "bestUci": "g4e5",
+   "eval": 270,
+   "p": {
+    "800": 0.065,
+    "1000": 0.066,
+    "1200": 0.06,
+    "1400": 0.051,
+    "1600": 0.043,
+    "1800": 0.036,
+    "2000": 0.033
+   },
+   "cont": [
+    "Nge5"
+   ]
+  }
+ ],
+ "r1bq1rk1/pppn1pbp/3p1npB/3Pp3/4P3/2N5/PPPQ1PPP/R3KBNR w KQ -": [
+  {
+   "san": "f3",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 301,
+   "p": {
+    "1200": 0.032,
+    "1400": 0.043,
+    "1600": 0.059,
+    "1800": 0.078,
+    "2000": 0.093
+   },
+   "cont": [
+    "Nxe4",
+    "fxe4",
+    "Qh4+",
+    "g3",
+    "Qxh6"
+   ]
+  }
+ ],
+ "r1bq1r2/pp2npkp/2pp1np1/3Pp3/4P3/2N2P2/PPPQN1PP/R3KB1R w KQ -": [
+  {
+   "san": "f4",
+   "best": "cxd5",
+   "bestUci": "c6d5",
+   "eval": 145,
+   "p": {
+    "800": 0.031
+   },
+   "cont": [
+    "cxd5",
+    "exd5",
+    "b5",
+    "Nxb5",
+    "Nexd5",
+    "Nec3",
+    "Bb7",
+    "O-O-O",
+    "a6",
+    "Na3",
+    "Nxf4"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6p1/3p4/2BPN3/4BN2/PPP2PPP/R2QK2R w KQ -": [
+  {
+   "san": "Neg5",
+   "best": "dxc4",
+   "bestUci": "d5c4",
+   "eval": 195,
+   "p": {
+    "800": 0.061,
+    "1000": 0.057,
+    "1200": 0.05,
+    "1400": 0.042,
+    "1600": 0.033
+   },
+   "cont": [
+    "dxc4"
+   ]
+  }
+ ],
+ "rnb2rk1/ppp1ppbp/6p1/3q4/3PN3/4BN2/PPP2PPP/R2QK2R w KQ -": [
+  {
+   "san": "O-O",
+   "best": "Qxe4",
+   "bestUci": "d5e4",
+   "eval": 534,
+   "p": {
+    "800": 0.081,
+    "1000": 0.066,
+    "1200": 0.053,
+    "1400": 0.04
+   },
+   "cont": [
+    "Qxe4"
+   ]
+  },
+  {
+   "san": "Neg5",
+   "best": "h6",
+   "bestUci": "h7h6",
+   "eval": 227,
+   "p": {
+    "800": 0.045
+   },
+   "cont": [
+    "h6"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/5np1/8/3PB3/4BN2/PPPQ1PPP/R3K2R w KQ -": [
+  {
+   "san": "Bh6",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 599,
+   "p": {
+    "800": 0.135,
+    "1000": 0.092,
+    "1200": 0.057
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  },
+  {
+   "san": "O-O-O",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 633,
+   "p": {
+    "800": 0.051,
+    "1000": 0.038
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  },
+  {
+   "san": "Qd3",
+   "best": "c5",
+   "bestUci": "c7c5",
+   "eval": 160,
+   "p": {
+    "800": 0.03
+   },
+   "cont": [
+    "c5",
+    "c3",
+    "c4",
+    "Qc2",
+    "Nxe4",
+    "Qxe4",
+    "Bf5",
+    "Qh4",
+    "Qb6",
+    "O-O",
+    "Qxb2"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/5np1/8/3PB3/2P1BN2/PP3PPP/R2QK2R w KQ -": [
+  {
+   "san": "O-O",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 596,
+   "p": {
+    "800": 0.076,
+    "1000": 0.049,
+    "1200": 0.033
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  },
+  {
+   "san": "Qd2",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 632,
+   "p": {
+    "800": 0.031
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/5np1/8/3PB3/3QBN2/PPP2PPP/R3K2R w KQ -": [
+  {
+   "san": "Ng5",
+   "best": "c5",
+   "bestUci": "c7c5",
+   "eval": 140,
+   "p": {
+    "800": 0.035
+   },
+   "cont": [
+    "c5"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppb1/3p2pp/8/2BPn3/2N2N2/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "san": "Bxf7+",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 160,
+   "p": {
+    "1400": 0.063,
+    "1600": 0.138,
+    "1800": 0.241,
+    "2000": 0.286
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppb1/6pp/8/2pPN3/5N2/PPP2PPP/R1BQ1RK1 w - -": [
+  {
+   "san": "d5",
+   "best": "c6",
+   "bestUci": "c7c6",
+   "eval": 217,
+   "p": {
+    "800": 0.045
+   },
+   "cont": [
+    "c6"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p1np1/8/3PPP2/2N1B3/PPP3PP/R2QKBNR w KQ -": [
+  {
+   "san": "e5",
+   "best": "Ng4",
+   "bestUci": "f6g4",
+   "eval": 72,
+   "p": {
+    "800": 0.207,
+    "1000": 0.168,
+    "1200": 0.144,
+    "1400": 0.122,
+    "1600": 0.102,
+    "1800": 0.098,
+    "2000": 0.106
+   },
+   "cont": [
+    "Ng4",
+    "Bc1",
+    "c5",
+    "d5",
+    "dxe5"
+   ]
+  }
+ ],
+ "rnbqkb1r/ppp1pp1p/3p1np1/8/4P3/2P2N2/PP1P1PPP/RNBQKB1R w KQkq -": [
+  {
+   "san": "d4",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 128,
+   "p": {
+    "800": 0.283,
+    "1000": 0.246,
+    "1200": 0.231,
+    "1400": 0.225,
+    "1600": 0.219,
+    "1800": 0.213,
+    "2000": 0.208
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/2np1np1/8/2PPP3/3B1N2/PP3PPP/RNBQ1RK1 w - -": [
+  {
+   "san": "Bg5",
+   "best": "Bg4",
+   "bestUci": "c8g4",
+   "eval": 103,
+   "p": {
+    "800": 0.053,
+    "1000": 0.046,
+    "1200": 0.037
+   },
+   "cont": [
+    "Bg4"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp2pbp/3p2p1/3Pp2n/2P1P3/2NQ1N1P/PP3PP1/R1B2RK1 w - -": [
+  {
+   "san": "Ng5",
+   "best": "h6",
+   "bestUci": "h7h6",
+   "eval": 85,
+   "p": {
+    "800": 0.045,
+    "1000": 0.03
+   },
+   "cont": [
+    "h6"
+   ]
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/6p1/1N1p4/3PnB2/8/PPPQPPPP/R3KBNR w KQkq -": [
+  {
+   "san": "Nxc7+",
+   "best": "Qxc7",
+   "bestUci": "d8c7",
+   "eval": 187,
+   "p": {
+    "800": 0.121,
+    "1000": 0.123,
+    "1200": 0.13,
+    "1400": 0.138,
+    "1600": 0.151,
+    "1800": 0.175,
+    "2000": 0.216
+   },
+   "cont": [
+    "Qxc7",
+    "Bxc7",
+    "Nxd2",
+    "Kxd2",
+    "Bxd4",
+    "e3",
+    "Bxb2"
+   ]
+  },
+  {
+   "san": "Qb4",
+   "best": "Nc6",
+   "bestUci": "b8c6",
+   "eval": 254,
+   "p": {
+    "800": 0.057,
+    "1000": 0.05,
+    "1200": 0.046,
+    "1400": 0.04,
+    "1600": 0.035
+   },
+   "cont": [
+    "Nc6"
+   ]
+  }
+ ],
+ "r1bq1rk1/pppn1pbp/5pp1/8/2BP4/1QN1P3/PP3PPP/R3K1NR w KQ -": [
+  {
+   "san": "O-O-O",
+   "best": "c6",
+   "bestUci": "c7c6",
+   "eval": 132,
+   "p": {
+    "800": 0.035
+   },
+   "cont": [
+    "c6"
+   ]
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/3p1np1/8/3PP3/2N2P2/PPP3PP/R1BQKBNR w KQkq -": [
+  {
+   "san": "d5",
+   "best": "O-O",
+   "bestUci": "e8g8",
+   "eval": 80,
+   "p": {
+    "800": 0.076,
+    "1000": 0.042
+   },
+   "cont": [
+    "O-O"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p1np1/6B1/2BP4/5N2/PPP2PPP/RN1QR1K1 w - -": [
+  {
+   "san": "Bxf6",
+   "best": "Bxf6",
+   "bestUci": "g7f6",
+   "eval": 228,
+   "p": {
+    "800": 0.034
+   },
+   "cont": [
+    "Bxf6"
+   ]
+  }
+ ],
+ "r1bq1rk1/pp1nppb1/3p1npp/2p5/3PPB2/2NB1N1P/PPP2PP1/R2QK2R w KQ -": [
+  {
+   "san": "e5",
+   "best": "Nh5",
+   "bestUci": "f6h5",
+   "eval": 164,
+   "p": {
+    "800": 0.18,
+    "1000": 0.175,
+    "1200": 0.169,
+    "1400": 0.166,
+    "1600": 0.167,
+    "1800": 0.17,
+    "2000": 0.18
+   },
+   "cont": [
+    "Nh5",
+    "Bd2",
+    "cxd4",
+    "Nxd4",
+    "Nb6",
+    "Nb3",
+    "dxe5"
+   ]
+  },
+  {
+   "san": "Qd2",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 251,
+   "p": {
+    "800": 0.113,
+    "1000": 0.134,
+    "1200": 0.152,
+    "1400": 0.171,
+    "1600": 0.193,
+    "1800": 0.218,
+    "2000": 0.228
+   },
+   "cont": [
+    "cxd4"
+   ]
+  },
+  {
+   "san": "O-O",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 249,
+   "p": {
+    "800": 0.101,
+    "1000": 0.084,
+    "1200": 0.079,
+    "1400": 0.082,
+    "1600": 0.091,
+    "1800": 0.1,
+    "2000": 0.099
+   },
+   "cont": [
+    "cxd4"
+   ]
+  }
+ ],
+ "r1bq1rk1/pp1nppb1/3p1n1p/2p3p1/3PP3/2NB1NBP/PPP2PP1/R2QK2R w KQ -": [
+  {
+   "san": "Qe2",
+   "best": "Qb6",
+   "bestUci": "d8b6",
+   "eval": 115,
+   "p": {
+    "1800": 0.038,
+    "2000": 0.047
+   },
+   "cont": [
+    "Qb6",
+    "Nd5",
+    "Nxd5",
+    "exd5",
+    "cxd4"
+   ]
+  }
+ ],
+ "r1bq1rk1/pp1nppb1/5n2/2p1p1B1/3P4/2NB3P/PPP2PP1/R2QK2R w KQ -": [
+  {
+   "san": "dxe5",
+   "best": "Nxe5",
+   "bestUci": "d7e5",
+   "eval": 498,
+   "p": {
+    "800": 0.583,
+    "1000": 0.62,
+    "1200": 0.631,
+    "1400": 0.615,
+    "1600": 0.559,
+    "1800": 0.471,
+    "2000": 0.368
+   },
+   "cont": [
+    "Nxe5"
+   ]
+  },
+  {
+   "san": "Qf3",
+   "best": "exd4",
+   "bestUci": "e5d4",
+   "eval": 614,
+   "p": {
+    "800": 0.034,
+    "1000": 0.033,
+    "1200": 0.032,
+    "1400": 0.031
+   },
+   "cont": [
+    "exd4"
+   ]
+  },
+  {
+   "san": "dxc5",
+   "best": "Nxc5",
+   "bestUci": "d7c5",
+   "eval": 540,
+   "p": {
+    "1000": 0.03,
+    "1200": 0.037,
+    "1400": 0.047,
+    "1600": 0.064,
+    "1800": 0.083,
+    "2000": 0.101
+   },
+   "cont": [
+    "Nxc5"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/5np1/3p4/3PP3/2N1BN2/PPPQ1PPP/R3KB1R w KQ -": [
+  {
+   "san": "Bh6",
+   "best": "Nxe4",
+   "bestUci": "f6e4",
+   "eval": 114,
+   "p": {
+    "800": 0.09,
+    "1000": 0.055,
+    "1200": 0.034
+   },
+   "cont": [
+    "Nxe4"
+   ]
+  }
+ ],
+ "rnbq1rk1/ppp1pp1p/6p1/8/3bp3/1B2B3/PPPN1PPP/R2QK2R w KQ -": [
+  {
+   "san": "Nxe4",
+   "best": "Bxb2",
+   "bestUci": "d4b2",
+   "eval": 273,
+   "p": {
+    "800": 0.316,
+    "1000": 0.341,
+    "1200": 0.371,
+    "1400": 0.41,
+    "1600": 0.456,
+    "1800": 0.492,
+    "2000": 0.529
+   },
+   "cont": [
+    "Bxb2"
+   ]
+  },
+  {
+   "san": "Bh6",
+   "best": "Bxb2",
+   "bestUci": "d4b2",
+   "eval": 339,
+   "p": {
+    "800": 0.092,
+    "1000": 0.098,
+    "1200": 0.098,
+    "1400": 0.094,
+    "1600": 0.09,
+    "1800": 0.09,
+    "2000": 0.095
+   },
+   "cont": [
+    "Bxb2"
+   ]
+  }
+ ],
+ "rnbq1rk1/pp2ppbp/6p1/2p1N3/3Pp3/1B2B3/PPP2PPP/R2QK2R w KQ -": [
+  {
+   "san": "Nxf7",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 411,
+   "p": {
+    "800": 0.153,
+    "1000": 0.168,
+    "1200": 0.185,
+    "1400": 0.205,
+    "1600": 0.216,
+    "1800": 0.205,
+    "2000": 0.179
+   },
+   "cont": [
+    "Rxf7",
+    "dxc5",
+    "Qxd1+",
+    "Rxd1",
+    "Nc6"
+   ]
+  },
+  {
+   "san": "dxc5",
+   "best": "Bxe5",
+   "bestUci": "g7e5",
+   "eval": 595,
+   "p": {
+    "800": 0.138,
+    "1000": 0.11,
+    "1200": 0.086,
+    "1400": 0.061,
+    "1600": 0.04
+   },
+   "cont": [
+    "Bxe5",
+    "Qxd8",
+    "Rxd8"
+   ]
+  },
+  {
+   "san": "Bxf7+",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 412,
+   "p": {
+    "800": 0.092,
+    "1000": 0.071,
+    "1200": 0.05,
+    "1400": 0.03
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "Nc4",
+   "best": "cxd4",
+   "bestUci": "c5d4",
+   "eval": 603,
+   "p": {
+    "800": 0.045,
+    "1000": 0.042,
+    "1200": 0.038
+   },
+   "cont": [
+    "cxd4"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/2n3p1/6N1/3Pp3/1B2B3/PPP2PPP/R2QK2R w KQ -": [
+  {
+   "san": "O-O",
+   "best": "Nxd4",
+   "bestUci": "c6d4",
+   "eval": 265,
+   "p": {
+    "800": 0.101,
+    "1000": 0.087,
+    "1200": 0.076,
+    "1400": 0.063,
+    "1600": 0.045
+   },
+   "cont": [
+    "Nxd4"
+   ]
+  },
+  {
+   "san": "Nxf7",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 404,
+   "p": {
+    "800": 0.064,
+    "1000": 0.056,
+    "1200": 0.049,
+    "1400": 0.039
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "h4",
+   "best": "Nxd4",
+   "bestUci": "c6d4",
+   "eval": 269,
+   "p": {
+    "800": 0.057,
+    "1000": 0.065,
+    "1200": 0.066,
+    "1400": 0.061,
+    "1600": 0.049,
+    "1800": 0.033
+   },
+   "cont": [
+    "Nxd4",
+    "Bxd4",
+    "Qxd4",
+    "Qxd4",
+    "Bxd4"
+   ]
+  },
+  {
+   "san": "Bxf7+",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 430,
+   "p": {
+    "800": 0.046,
+    "1000": 0.03
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "f3",
+   "best": "Nxd4",
+   "bestUci": "c6d4",
+   "eval": 265,
+   "p": {
+    "800": 0.032
+   },
+   "cont": [
+    "Nxd4",
+    "Bxd4",
+    "Qxd4",
+    "Qxd4",
+    "Bxd4"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/6p1/n2P2N1/4p3/1B2B3/PPP2PPP/R2QK2R w KQ -": [
+  {
+   "san": "Ba4",
+   "best": "Nc4",
+   "bestUci": "a5c4",
+   "eval": 398,
+   "p": {
+    "800": 0.12,
+    "1000": 0.101,
+    "1200": 0.087,
+    "1400": 0.07,
+    "1600": 0.053,
+    "1800": 0.036
+   },
+   "cont": [
+    "Nc4",
+    "Bb3",
+    "Nxe3",
+    "fxe3",
+    "Bxb2"
+   ]
+  },
+  {
+   "san": "d6",
+   "best": "Nxb3",
+   "bestUci": "a5b3",
+   "eval": 461,
+   "p": {
+    "800": 0.101,
+    "1000": 0.076,
+    "1200": 0.056,
+    "1400": 0.036
+   },
+   "cont": [
+    "Nxb3",
+    "axb3",
+    "exd6"
+   ]
+  },
+  {
+   "san": "Bd4",
+   "best": "Nxb3",
+   "bestUci": "a5b3",
+   "eval": 303,
+   "p": {
+    "800": 0.051,
+    "1000": 0.051,
+    "1200": 0.05,
+    "1400": 0.05,
+    "1600": 0.054,
+    "1800": 0.067,
+    "2000": 0.097
+   },
+   "cont": [
+    "Nxb3"
+   ]
+  }
+ ],
+ "r1bq1rk1/1pp1ppbp/2n3p1/p5N1/3Pp3/1B2B3/PPPQ1PPP/R3K2R w KQ -": [
+  {
+   "san": "O-O-O",
+   "best": "a4",
+   "bestUci": "a5a4",
+   "eval": 340,
+   "p": {
+    "800": 0.097,
+    "1000": 0.087,
+    "1200": 0.083,
+    "1400": 0.078,
+    "1600": 0.083,
+    "1800": 0.096,
+    "2000": 0.103
+   },
+   "cont": [
+    "a4"
+   ]
+  },
+  {
+   "san": "Nxf7",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 420,
+   "p": {
+    "800": 0.054,
+    "1000": 0.045,
+    "1200": 0.038,
+    "1400": 0.032
+   },
+   "cont": [
+    "Rxf7",
+    "Bxf7+",
+    "Kxf7",
+    "O-O",
+    "Kg8",
+    "c3",
+    "Be6",
+    "f3",
+    "Bc4",
+    "Rf2",
+    "exf3"
+   ]
+  },
+  {
+   "san": "Bxf7+",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 408,
+   "p": {
+    "800": 0.035
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp2pbp/2n3p1/4p1N1/3Pp3/1BP1B3/PP3PPP/R2QK2R w KQ -": [
+  {
+   "san": "Nxe4",
+   "best": "exd4",
+   "bestUci": "e5d4",
+   "eval": 226,
+   "p": {
+    "800": 0.476,
+    "1000": 0.496,
+    "1200": 0.501,
+    "1400": 0.491,
+    "1600": 0.427,
+    "1800": 0.291,
+    "2000": 0.139
+   },
+   "cont": [
+    "exd4"
+   ]
+  },
+  {
+   "san": "O-O",
+   "best": "exd4",
+   "bestUci": "e5d4",
+   "eval": 239,
+   "p": {
+    "800": 0.084,
+    "1000": 0.073,
+    "1200": 0.065,
+    "1400": 0.056,
+    "1600": 0.046,
+    "1800": 0.034
+   },
+   "cont": [
+    "exd4"
+   ]
+  },
+  {
+   "san": "Nxf7",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 391,
+   "p": {
+    "800": 0.076,
+    "1000": 0.076,
+    "1200": 0.078,
+    "1400": 0.075,
+    "1600": 0.064,
+    "1800": 0.042
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "Bxf7+",
+   "best": "Rxf7",
+   "bestUci": "f8f7",
+   "eval": 441,
+   "p": {
+    "800": 0.056,
+    "1000": 0.044,
+    "1200": 0.034
+   },
+   "cont": [
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "h4",
+   "best": "exd4",
+   "bestUci": "e5d4",
+   "eval": 319,
+   "p": {
+    "800": 0.036,
+    "1000": 0.038,
+    "1200": 0.037,
+    "1400": 0.033
+   },
+   "cont": [
+    "exd4",
+    "cxd4",
+    "Nxd4"
+   ]
+  }
+ ],
+ "r1bq1rk1/ppp2pbp/6p1/4n1N1/4p3/1BP1B3/PP3PPP/R2QK2R w KQ -": [
+  {
+   "san": "Bd4",
+   "best": "Qxg5",
+   "bestUci": "d8g5",
+   "eval": 747,
+   "p": {
+    "800": 0.088,
+    "1000": 0.077,
+    "1200": 0.062,
+    "1400": 0.042
+   },
+   "cont": [
+    "Qxg5"
+   ]
+  },
+  {
+   "san": "Bxf7+",
+   "best": "Nxf7",
+   "bestUci": "e5f7",
+   "eval": 622,
+   "p": {
+    "800": 0.05,
+    "1000": 0.035
+   },
+   "cont": [
+    "Nxf7",
+    "Nxf7",
+    "Qxd1+",
+    "Rxd1",
+    "Rxf7"
+   ]
+  },
+  {
+   "san": "Qe2",
+   "best": "Bf5",
+   "bestUci": "c8f5",
+   "eval": 367,
+   "p": {
+    "800": 0.047,
+    "1000": 0.045,
+    "1200": 0.042,
+    "1400": 0.035
+   },
+   "cont": [
+    "Bf5"
+   ]
+  },
+  {
+   "san": "Qc2",
+   "best": "Nd3+",
+   "bestUci": "e5d3",
+   "eval": 372,
+   "p": {
+    "800": 0.037,
+    "1000": 0.043,
+    "1200": 0.041,
+    "1400": 0.036
+   },
+   "cont": [
+    "Nd3+"
+   ]
+  }
  ]
 };
 
@@ -18275,16 +23333,6 @@ export const ROUTES: Record<string, Route[]> = {
     "1400": 0.057,
     "1600": 0.033
    }
-  },
-  {
-   "lead": "b4",
-   "reply": "f5",
-   "p": {
-    "800": 0.061,
-    "1000": 0.049,
-    "1200": 0.038,
-    "1400": 0.031
-   }
   }
  ],
  "rnbq1rk1/ppp2pbp/5np1/4p3/2P1P3/2N2N2/PP2BPPP/R1BQK2R w KQ -": [
@@ -18299,16 +23347,6 @@ export const ROUTES: Record<string, Route[]> = {
     "1600": 0.417,
     "1800": 0.37,
     "2000": 0.321
-   }
-  },
-  {
-   "lead": "Nxe5",
-   "reply": "Qxd1+",
-   "p": {
-    "800": 0.099,
-    "1000": 0.077,
-    "1200": 0.057,
-    "1400": 0.038
    }
   }
  ],
@@ -18342,6 +23380,19 @@ export const ROUTES: Record<string, Route[]> = {
   }
  ],
  "rnbq1rk1/ppp1ppbp/3p1np1/8/2PPP3/2N2P2/PP4PP/R1BQKBNR w KQ -": [
+  {
+   "lead": "Bd3",
+   "reply": "e5",
+   "p": {
+    "800": 0.178,
+    "1000": 0.165,
+    "1200": 0.151,
+    "1400": 0.135,
+    "1600": 0.112,
+    "1800": 0.083,
+    "2000": 0.051
+   }
+  },
   {
    "lead": "Bg5",
    "reply": "c5",
@@ -18411,15 +23462,15 @@ export const ROUTES: Record<string, Route[]> = {
    }
   },
   {
-   "lead": "Qc2",
-   "reply": "Nc6",
+   "lead": "Nge2",
+   "reply": "b6",
    "p": {
-    "800": 0.08,
-    "1000": 0.105,
-    "1200": 0.112,
-    "1400": 0.109,
-    "1600": 0.087,
-    "1800": 0.053
+    "800": 0.046,
+    "1000": 0.052,
+    "1200": 0.054,
+    "1400": 0.052,
+    "1600": 0.044,
+    "1800": 0.038
    }
   }
  ],
@@ -18489,17 +23540,6 @@ export const ROUTES: Record<string, Route[]> = {
    }
   },
   {
-   "lead": "Bxf6",
-   "reply": "Bxf6",
-   "p": {
-    "800": 0.179,
-    "1000": 0.129,
-    "1200": 0.099,
-    "1400": 0.068,
-    "1600": 0.036
-   }
-  },
-  {
    "lead": "Bf4",
    "reply": "a6",
    "p": {
@@ -18510,6 +23550,16 @@ export const ROUTES: Record<string, Route[]> = {
     "1600": 0.12,
     "1800": 0.114,
     "2000": 0.11
+   }
+  },
+  {
+   "lead": "Bd2",
+   "reply": "e6",
+   "p": {
+    "800": 0.041,
+    "1000": 0.047,
+    "1200": 0.048,
+    "1400": 0.042
    }
   }
  ],
@@ -18529,7 +23579,7 @@ export const ROUTES: Record<string, Route[]> = {
  "rnbq1rk1/ppp1ppbp/3p1np1/8/2PP4/5NP1/PP2PPBP/RNBQK2R w KQ -": [
   {
    "lead": "Bg5",
-   "reply": "Nbd7",
+   "reply": "Ne4",
    "p": {
     "800": 0.04,
     "1000": 0.032
@@ -18583,19 +23633,6 @@ export const ROUTES: Record<string, Route[]> = {
  ],
  "r1bq1rk1/pppn1pb1/3p1npp/4p1B1/3P4/2P1PN2/PP1NBPPP/R2Q1RK1 w - -": [
   {
-   "lead": "Bxf6",
-   "reply": "Qxf6",
-   "p": {
-    "800": 0.378,
-    "1000": 0.308,
-    "1200": 0.261,
-    "1400": 0.212,
-    "1600": 0.168,
-    "1800": 0.14,
-    "2000": 0.129
-   }
-  },
-  {
    "lead": "dxe5",
    "reply": "hxg5",
    "p": {
@@ -18624,19 +23661,6 @@ export const ROUTES: Record<string, Route[]> = {
   }
  ],
  "rnbq1rk1/pp3pbp/2pp1np1/4p3/2P1P3/2N3P1/PP1PNPBP/R1BQ1RK1 w - -": [
-  {
-   "lead": "d4",
-   "reply": "Nbd7",
-   "p": {
-    "800": 0.305,
-    "1000": 0.289,
-    "1200": 0.282,
-    "1400": 0.287,
-    "1600": 0.306,
-    "1800": 0.335,
-    "2000": 0.37
-   }
-  },
   {
    "lead": "h3",
    "reply": "Be6",
@@ -18693,7 +23717,7 @@ export const ROUTES: Record<string, Route[]> = {
   },
   {
    "lead": "a4",
-   "reply": "Nf4",
+   "reply": "a5",
    "p": {
     "800": 0.092,
     "1000": 0.073,
@@ -18707,20 +23731,33 @@ export const ROUTES: Record<string, Route[]> = {
  ],
  "r1bq1rk1/ppp1n1bp/3p1np1/3PppN1/1PP1P3/2N5/P3BPPP/R1BQR1K1 w - -": [
   {
-   "lead": "exf5",
-   "reply": "gxf5",
+   "lead": "c5",
+   "reply": "h6",
    "p": {
-    "800": 0.221,
-    "1000": 0.203,
-    "1200": 0.173,
-    "1400": 0.137,
-    "1600": 0.099,
-    "1800": 0.059,
-    "2000": 0.033
+    "800": 0.13,
+    "1000": 0.153,
+    "1200": 0.179,
+    "1400": 0.206,
+    "1600": 0.217,
+    "1800": 0.179,
+    "2000": 0.126
    }
   }
  ],
  "r1bq1rk1/ppp3bp/2np1pp1/4p1B1/2PPP1n1/2N2N2/PP2BPPP/R2Q1RK1 w - -": [
+  {
+   "lead": "Bc1",
+   "reply": "Nxd4",
+   "p": {
+    "800": 0.052,
+    "1000": 0.058,
+    "1200": 0.067,
+    "1400": 0.081,
+    "1600": 0.107,
+    "1800": 0.143,
+    "2000": 0.197
+   }
+  },
   {
    "lead": "Bd2",
    "reply": "exd4",
@@ -18918,25 +23955,12 @@ export const ROUTES: Record<string, Route[]> = {
     "1800": 0.08,
     "2000": 0.068
    }
-  },
-  {
-   "lead": "Be3",
-   "reply": "Bxe3",
-   "p": {
-    "800": 0.049,
-    "1000": 0.048,
-    "1200": 0.047,
-    "1400": 0.044,
-    "1600": 0.042,
-    "1800": 0.041,
-    "2000": 0.041
-   }
   }
  ],
  "rnbqr1k1/ppp2pbp/3p1np1/8/2PNP3/2N5/PP2BPPP/R1BQ1RK1 w - -": [
   {
    "lead": "Bd3",
-   "reply": "Nc6",
+   "reply": "Nbd7",
    "p": {
     "800": 0.085,
     "1000": 0.07,
@@ -18946,19 +23970,6 @@ export const ROUTES: Record<string, Route[]> = {
   }
  ],
  "rnbqr1k1/pp3pbp/2pp1np1/8/2PNP3/2N2P2/PP2B1PP/R1BQ1RK1 w - -": [
-  {
-   "lead": "Be3",
-   "reply": "d5",
-   "p": {
-    "800": 0.203,
-    "1000": 0.255,
-    "1200": 0.314,
-    "1400": 0.381,
-    "1600": 0.433,
-    "1800": 0.432,
-    "2000": 0.336
-   }
-  },
   {
    "lead": "Bg5",
    "reply": "Qb6",
@@ -19003,6 +24014,19 @@ export const ROUTES: Record<string, Route[]> = {
  ],
  "rnbqr1k1/ppp2pbp/3p2p1/8/2PNn3/2N5/PPQ1BPPP/R1B2RK1 w - -": [
   {
+   "lead": "Be3",
+   "reply": "Nxc3",
+   "p": {
+    "800": 0.037,
+    "1000": 0.047,
+    "1200": 0.056,
+    "1400": 0.07,
+    "1600": 0.089,
+    "1800": 0.107,
+    "2000": 0.123
+   }
+  },
+  {
    "lead": "Ndb5",
    "reply": "Nxc3",
    "p": {
@@ -19013,6 +24037,30 @@ export const ROUTES: Record<string, Route[]> = {
   }
  ],
  "rnbqr1k1/ppp2p1p/3p2p1/8/2PbN3/8/PPQ1BPPP/R1B2RK1 w - -": [
+  {
+   "lead": "Bf3",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.091,
+    "1000": 0.104,
+    "1200": 0.112,
+    "1400": 0.117,
+    "1600": 0.112,
+    "1800": 0.094,
+    "2000": 0.063
+   }
+  },
+  {
+   "lead": "Qd3",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.087,
+    "1000": 0.08,
+    "1200": 0.071,
+    "1400": 0.062,
+    "1600": 0.046
+   }
+  },
   {
    "lead": "Bd3",
    "reply": "Nc6",
@@ -19114,7 +24162,7 @@ export const ROUTES: Record<string, Route[]> = {
   },
   {
    "lead": "Nd2",
-   "reply": "f6",
+   "reply": "Nf6",
    "p": {
     "800": 0.041,
     "1000": 0.037,
@@ -19244,19 +24292,6 @@ export const ROUTES: Record<string, Route[]> = {
     "1800": 0.107,
     "2000": 0.077
    }
-  },
-  {
-   "lead": "a3",
-   "reply": "Nc5",
-   "p": {
-    "800": 0.112,
-    "1000": 0.136,
-    "1200": 0.164,
-    "1400": 0.194,
-    "1600": 0.203,
-    "1800": 0.166,
-    "2000": 0.103
-   }
   }
  ],
  "r1br2k1/ppp2pbp/n4np1/4p3/2P1P3/2N2N2/PP2BPPP/R1B2RK1 w - -": [
@@ -19290,7 +24325,7 @@ export const ROUTES: Record<string, Route[]> = {
  "rnbqr1k1/pp3pbp/3p1np1/2pP4/4PP2/2N2N2/PP2B1PP/R1BQK2R w KQ -": [
   {
    "lead": "Nd2",
-   "reply": "Ng4",
+   "reply": "c4",
    "p": {
     "1400": 0.038,
     "1600": 0.066,
@@ -19451,7 +24486,7 @@ export const ROUTES: Record<string, Route[]> = {
   },
   {
    "lead": "Nxe5",
-   "reply": "Nxe5",
+   "reply": "Be6",
    "p": {
     "800": 0.093,
     "1000": 0.086,
@@ -19475,19 +24510,6 @@ export const ROUTES: Record<string, Route[]> = {
     "1600": 0.305,
     "1800": 0.334,
     "2000": 0.39
-   }
-  },
-  {
-   "lead": "Bb2",
-   "reply": "dxe5",
-   "p": {
-    "800": 0.158,
-    "1000": 0.184,
-    "1200": 0.197,
-    "1400": 0.193,
-    "1600": 0.166,
-    "1800": 0.125,
-    "2000": 0.095
    }
   },
   {
@@ -19519,6 +24541,19 @@ export const ROUTES: Record<string, Route[]> = {
  ],
  "rnbq1rk1/pp2ppbp/3p1np1/2p5/3P1B2/4PN1P/PPP1BPP1/RN1QK2R w KQ -": [
   {
+   "lead": "O-O",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.298,
+    "1000": 0.283,
+    "1200": 0.279,
+    "1400": 0.277,
+    "1600": 0.3,
+    "1800": 0.344,
+    "2000": 0.421
+   }
+  },
+  {
    "lead": "dxc5",
    "reply": "Nh5",
    "p": {
@@ -19532,7 +24567,7 @@ export const ROUTES: Record<string, Route[]> = {
  "rnb2rk1/pp2ppbp/1q1p1np1/2p5/3P1B2/2P1PN1P/PP2BPP1/RN1QK2R w KQ -": [
   {
    "lead": "b3",
-   "reply": "Nc6",
+   "reply": "cxd4",
    "p": {
     "800": 0.326,
     "1000": 0.308,
@@ -20846,6 +25881,1360 @@ export const ROUTES: Record<string, Route[]> = {
     "1600": 0.283,
     "1800": 0.239,
     "2000": 0.204
+   }
+  }
+ ],
+ "rnbq1rk1/ppp2pbp/3p1np1/4p3/2PPP3/2N2N2/PP2BPPP/R1BQK2R w KQ -": [
+  {
+   "lead": "Be3",
+   "reply": "Ng4",
+   "p": {
+    "800": 0.043,
+    "1000": 0.059,
+    "1200": 0.072,
+    "1400": 0.082,
+    "1600": 0.091,
+    "1800": 0.103,
+    "2000": 0.112
+   }
+  }
+ ],
+ "rnbq1rk1/1pp2pbp/3p1np1/p2Pp3/2P1P3/2N2N2/PP2BPPP/R1BQK2R w KQ -": [
+  {
+   "lead": "a4",
+   "reply": "Na6",
+   "p": {
+    "800": 0.122,
+    "1000": 0.104,
+    "1200": 0.077,
+    "1400": 0.046
+   }
+  }
+ ],
+ "rnbq1rk1/pp3pbp/3ppnp1/2pP4/2P1PP2/2N2N2/PP4PP/R1BQKB1R w KQ -": [
+  {
+   "lead": "e5",
+   "reply": "dxe5",
+   "p": {
+    "800": 0.276,
+    "1000": 0.252,
+    "1200": 0.236,
+    "1400": 0.216,
+    "1600": 0.183,
+    "1800": 0.133,
+    "2000": 0.073
+   }
+  },
+  {
+   "lead": "dxe6",
+   "reply": "fxe6",
+   "p": {
+    "800": 0.039,
+    "1600": 0.031,
+    "1800": 0.047,
+    "2000": 0.085
+   }
+  }
+ ],
+ "r1bq1rk1/pppnppbp/3p1np1/8/3P1B2/4PN2/PPP1BPPP/RN1Q1RK1 w - -": [
+  {
+   "lead": "c4",
+   "reply": "Nh5",
+   "p": {
+    "800": 0.189,
+    "1000": 0.194,
+    "1200": 0.199,
+    "1400": 0.198,
+    "1600": 0.198,
+    "1800": 0.206,
+    "2000": 0.208
+   }
+  },
+  {
+   "lead": "c3",
+   "reply": "Nh5",
+   "p": {
+    "800": 0.162,
+    "1000": 0.166,
+    "1200": 0.165,
+    "1400": 0.154,
+    "1600": 0.136,
+    "1800": 0.108,
+    "2000": 0.074
+   }
+  }
+ ],
+ "rnbq1rk1/ppp2pbp/3p1np1/4p3/2P1P3/2N3P1/PP1PNPBP/R1BQK2R w KQ -": [
+  {
+   "lead": "d4",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.073,
+    "1000": 0.062,
+    "1200": 0.052,
+    "1400": 0.046,
+    "1600": 0.042,
+    "1800": 0.043,
+    "2000": 0.045
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p1np1/8/2BPP3/2N2N2/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "lead": "h3",
+   "reply": "Nxe4",
+   "p": {
+    "800": 0.058,
+    "1000": 0.076,
+    "1200": 0.095,
+    "1400": 0.123,
+    "1600": 0.158,
+    "1800": 0.197,
+    "2000": 0.215
+   }
+  },
+  {
+   "lead": "Be3",
+   "reply": "c6",
+   "p": {
+    "800": 0.088,
+    "1000": 0.104,
+    "1200": 0.106,
+    "1400": 0.096,
+    "1600": 0.076,
+    "1800": 0.051
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6p1/3p4/2BPN3/5N2/PPP2PPP/R1BQ1RK1 w - -": [
+  {
+   "lead": "Bxd5",
+   "reply": "Qxd5",
+   "p": {
+    "800": 0.519,
+    "1000": 0.538,
+    "1200": 0.538,
+    "1400": 0.515,
+    "1600": 0.47,
+    "1800": 0.39,
+    "2000": 0.278
+   }
+  }
+ ],
+ "rnbq1rk1/pp2ppbp/6p1/2p5/3PB3/5N2/PPP2PPP/R1BQ1RK1 w - -": [
+  {
+   "lead": "dxc5",
+   "reply": "Qc7",
+   "p": {
+    "800": 0.577,
+    "1000": 0.593,
+    "1200": 0.616,
+    "1400": 0.645,
+    "1600": 0.682,
+    "1800": 0.736,
+    "2000": 0.787
+   }
+  },
+  {
+   "lead": "Be3",
+   "reply": "cxd4",
+   "p": {
+    "800": 0.071,
+    "1000": 0.068,
+    "1200": 0.064,
+    "1400": 0.061,
+    "1600": 0.064,
+    "1800": 0.074,
+    "2000": 0.086
+   }
+  }
+ ],
+ "rnbq1rk1/pppnppbp/6p1/4N3/2BP4/2N5/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "lead": "f4",
+   "reply": "c5",
+   "p": {
+    "800": 0.04,
+    "1000": 0.061,
+    "1200": 0.096,
+    "1400": 0.154,
+    "1600": 0.227,
+    "1800": 0.285,
+    "2000": 0.319
+   }
+  }
+ ],
+ "rnb2rk1/pppqppbp/6p1/8/2BP4/2N5/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "lead": "Be3",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.444,
+    "1000": 0.549,
+    "1200": 0.625,
+    "1400": 0.699,
+    "1600": 0.762,
+    "1800": 0.81,
+    "2000": 0.823
+   }
+  }
+ ],
+ "r1b2rk1/pppqppbp/2n3p1/8/2BP4/2N5/PPP2PPP/R1BQ1RK1 w - -": [
+  {
+   "lead": "Be3",
+   "reply": "Nxd4",
+   "p": {
+    "800": 0.214,
+    "1000": 0.222,
+    "1200": 0.222,
+    "1400": 0.214,
+    "1600": 0.205,
+    "1800": 0.194,
+    "2000": 0.199
+   }
+  },
+  {
+   "lead": "Bb5",
+   "reply": "Qxd4",
+   "p": {
+    "800": 0.052,
+    "1000": 0.047,
+    "1200": 0.043,
+    "1400": 0.038,
+    "1600": 0.033
+   }
+  },
+  {
+   "lead": "Ne2",
+   "reply": "Nxd4",
+   "p": {
+    "800": 0.033,
+    "1000": 0.031
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p1np1/8/3PP3/2N1B3/PPPQ1PPP/R3KBNR w KQ -": [
+  {
+   "lead": "f3",
+   "reply": "c5",
+   "p": {
+    "800": 0.102,
+    "1000": 0.142,
+    "1200": 0.187,
+    "1400": 0.24,
+    "1600": 0.306,
+    "1800": 0.355,
+    "2000": 0.381
+   }
+  }
+ ],
+ "rnbq1rk1/ppp2pbp/3p1npB/4p3/3PP3/2N5/PPPQ1PPP/R3KBNR w KQ -": [
+  {
+   "lead": "d5",
+   "reply": "Nbd7",
+   "p": {
+    "800": 0.155,
+    "1000": 0.194,
+    "1200": 0.231,
+    "1400": 0.266,
+    "1600": 0.287,
+    "1800": 0.311,
+    "2000": 0.325
+   }
+  },
+  {
+   "lead": "dxe5",
+   "reply": "dxe5",
+   "p": {
+    "800": 0.058,
+    "1000": 0.055,
+    "1200": 0.056,
+    "1400": 0.059,
+    "1600": 0.062,
+    "1800": 0.06,
+    "2000": 0.055
+   }
+  }
+ ],
+ "rnbq1r2/ppp2pkp/3p1np1/4p3/3PP3/2N5/PPPQ1PPP/R3KBNR w KQ -": [
+  {
+   "lead": "O-O-O",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.365,
+    "1000": 0.397,
+    "1200": 0.422,
+    "1400": 0.457,
+    "1600": 0.495,
+    "1800": 0.53,
+    "2000": 0.543
+   }
+  },
+  {
+   "lead": "d5",
+   "reply": "c6",
+   "p": {
+    "800": 0.267,
+    "1000": 0.264,
+    "1200": 0.26,
+    "1400": 0.233,
+    "1600": 0.197,
+    "1800": 0.157,
+    "2000": 0.114
+   }
+  }
+ ],
+ "r1bq1r2/ppp1npkp/3p1np1/3Pp3/4P3/2N2P2/PPPQ2PP/R3KBNR w KQ -": [
+  {
+   "lead": "Nge2",
+   "reply": "c6",
+   "p": {
+    "800": 0.038,
+    "1000": 0.037,
+    "1200": 0.035,
+    "1400": 0.033,
+    "1600": 0.032,
+    "1800": 0.032,
+    "2000": 0.034
+   }
+  }
+ ],
+ "rnbq1rk1/ppp2pbp/5np1/4p3/4P3/2N2N2/PPP1BPPP/R1BQ1RK1 w - -": [
+  {
+   "lead": "Nxe5",
+   "reply": "Nxe4",
+   "p": {
+    "800": 0.27,
+    "1000": 0.265,
+    "1200": 0.259,
+    "1400": 0.236,
+    "1600": 0.201,
+    "1800": 0.165,
+    "2000": 0.147
+   }
+  }
+ ],
+ "rnbr2k1/ppp2pbp/5np1/4p3/4P3/2N2N2/PPP1BPPP/R1B2RK1 w - -": [
+  {
+   "lead": "Nxe5",
+   "reply": "Nxe4",
+   "p": {
+    "800": 0.364,
+    "1000": 0.374,
+    "1200": 0.379,
+    "1400": 0.366,
+    "1600": 0.335,
+    "1800": 0.307,
+    "2000": 0.289
+   }
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/3p1n2/8/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq -": [
+  {
+   "lead": "e5",
+   "reply": "dxe5",
+   "p": {
+    "800": 0.081,
+    "1000": 0.084,
+    "1200": 0.088,
+    "1400": 0.088,
+    "1600": 0.082,
+    "1800": 0.069,
+    "2000": 0.057
+   }
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/3p1n2/8/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq -": [
+  {
+   "lead": "Qf3",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.073,
+    "1000": 0.049,
+    "1200": 0.031
+   }
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/3p1np1/8/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq -": [
+  {
+   "lead": "Ng5",
+   "reply": "O-O",
+   "p": {
+    "800": 0.247,
+    "1000": 0.158,
+    "1200": 0.109,
+    "1400": 0.075,
+    "1600": 0.05,
+    "1800": 0.032
+   }
+  }
+ ],
+ "rnbq1rk1/pp2ppbp/3p1np1/2p5/2B1P3/2PP1N2/PP3PPP/RNBQ1RK1 w - -": [
+  {
+   "lead": "Bg5",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.229,
+    "1000": 0.254,
+    "1200": 0.264,
+    "1400": 0.271,
+    "1600": 0.265,
+    "1800": 0.238,
+    "2000": 0.193
+   }
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/3p1n2/8/4P3/2N5/PPPP1PPP/R1BQKBNR w KQkq -": [
+  {
+   "lead": "f4",
+   "reply": "e5",
+   "p": {
+    "1000": 0.038,
+    "1200": 0.05,
+    "1400": 0.065,
+    "1600": 0.094,
+    "1800": 0.14,
+    "2000": 0.19
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p1np1/6N1/2B1P3/2N5/PPPP1PPP/R1BQK2R w KQ -": [
+  {
+   "lead": "d3",
+   "reply": "c6",
+   "p": {
+    "800": 0.256,
+    "1000": 0.284,
+    "1200": 0.298,
+    "1400": 0.305,
+    "1600": 0.313,
+    "1800": 0.326,
+    "2000": 0.303
+   }
+  },
+  {
+   "lead": "h4",
+   "reply": "h6",
+   "p": {
+    "800": 0.033,
+    "1000": 0.048,
+    "1200": 0.063,
+    "1400": 0.082,
+    "1600": 0.113,
+    "1800": 0.172,
+    "2000": 0.272
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppb1/3p1npp/6N1/2BPP3/2N5/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "lead": "Nxf7",
+   "reply": "Rxf7",
+   "p": {
+    "800": 0.273,
+    "1000": 0.278,
+    "1200": 0.285,
+    "1400": 0.295,
+    "1600": 0.301,
+    "1800": 0.295,
+    "2000": 0.279
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppb1/6pp/3p4/2BPN3/5N2/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "lead": "Bb3",
+   "reply": "dxe4",
+   "p": {
+    "800": 0.067,
+    "1000": 0.068,
+    "1200": 0.071,
+    "1400": 0.073,
+    "1600": 0.066,
+    "1800": 0.053,
+    "2000": 0.036
+   }
+  },
+  {
+   "lead": "O-O",
+   "reply": "dxc4",
+   "p": {
+    "1400": 0.031,
+    "1600": 0.033
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6p1/4P3/6n1/2NB1N2/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "lead": "Qe2",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.058,
+    "1000": 0.077,
+    "1200": 0.109,
+    "1400": 0.16,
+    "1600": 0.24,
+    "1800": 0.341,
+    "2000": 0.429
+   }
+  },
+  {
+   "lead": "O-O",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.41,
+    "1000": 0.364,
+    "1200": 0.3,
+    "1400": 0.216,
+    "1600": 0.133,
+    "1800": 0.065,
+    "2000": 0.031
+   }
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/3p1np1/8/3PPP2/2N5/PPP3PP/R1BQKBNR w KQkq -": [
+  {
+   "lead": "Bd3",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.046,
+    "1000": 0.049,
+    "1200": 0.052,
+    "1400": 0.057,
+    "1600": 0.062,
+    "1800": 0.066,
+    "2000": 0.073
+   }
+  },
+  {
+   "lead": "Be3",
+   "reply": "O-O",
+   "p": {
+    "800": 0.036,
+    "1000": 0.032
+   }
+  }
+ ],
+ "rnbqk2r/pp2ppbp/3p1np1/2p5/3PPP2/2N2N2/PPP3PP/R1BQKB1R w KQkq -": [
+  {
+   "lead": "d5",
+   "reply": "O-O",
+   "p": {
+    "800": 0.209,
+    "1000": 0.202,
+    "1200": 0.194,
+    "1400": 0.185,
+    "1600": 0.174,
+    "1800": 0.161,
+    "2000": 0.153
+   }
+  },
+  {
+   "lead": "Bb5+",
+   "reply": "Bd7",
+   "p": {
+    "800": 0.069,
+    "1000": 0.064,
+    "1200": 0.062,
+    "1400": 0.063,
+    "1600": 0.075,
+    "1800": 0.114,
+    "2000": 0.184
+   }
+  }
+ ],
+ "rnb1k2r/pp2ppbp/3p1np1/q1P5/4PP2/2N2N2/PPP3PP/R1BQKB1R w KQkq -": [
+  {
+   "lead": "Bb5+",
+   "reply": "Bd7",
+   "p": {
+    "800": 0.045,
+    "1000": 0.042,
+    "1200": 0.044,
+    "1400": 0.053,
+    "1600": 0.071,
+    "1800": 0.087,
+    "2000": 0.072
+   }
+  },
+  {
+   "lead": "e5",
+   "reply": "dxe5",
+   "p": {
+    "800": 0.039
+   }
+  }
+ ],
+ "rnb1k2r/pp2ppbp/3p1np1/2q5/4PP2/2NB1N2/PPP3PP/R1BQK2R w KQkq -": [
+  {
+   "lead": "Na4",
+   "reply": "Qa5+",
+   "p": {
+    "800": 0.047,
+    "1000": 0.041,
+    "1200": 0.036,
+    "1400": 0.03
+   }
+  }
+ ],
+ "rnb2rk1/pp2ppbp/3p1np1/q7/4PP2/2NBBN2/PPP1Q1PP/R3K2R w KQ -": [
+  {
+   "lead": "O-O-O",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.288,
+    "1000": 0.242,
+    "1200": 0.208,
+    "1400": 0.18,
+    "1600": 0.158,
+    "1800": 0.141,
+    "2000": 0.121
+   }
+  },
+  {
+   "lead": "h3",
+   "reply": "Nh5",
+   "p": {
+    "800": 0.048,
+    "1000": 0.06,
+    "1200": 0.073,
+    "1400": 0.093,
+    "1600": 0.12,
+    "1800": 0.143,
+    "2000": 0.153
+   }
+  }
+ ],
+ "rnbqk1nr/ppp1ppbp/3p2p1/8/3PP3/5N2/PPP2PPP/RNBQKB1R w KQkq -": [
+  {
+   "lead": "Bc4",
+   "reply": "Nf6",
+   "p": {
+    "800": 0.153,
+    "1000": 0.155,
+    "1200": 0.156,
+    "1400": 0.155,
+    "1600": 0.16,
+    "1800": 0.161,
+    "2000": 0.165
+   }
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/2np1np1/8/2PPP3/3B1N2/PP3PPP/RNBQ1RK1 w - -": [
+  {
+   "lead": "Nc3",
+   "reply": "e5",
+   "p": {
+    "800": 0.309,
+    "1000": 0.359,
+    "1200": 0.408,
+    "1400": 0.451,
+    "1600": 0.483,
+    "1800": 0.498,
+    "2000": 0.46
+   }
+  },
+  {
+   "lead": "a3",
+   "reply": "Bg4",
+   "p": {
+    "800": 0.063,
+    "1000": 0.079,
+    "1200": 0.093,
+    "1400": 0.101,
+    "1600": 0.091,
+    "1800": 0.06
+   }
+  }
+ ],
+ "rnbqk2r/ppppppbp/5np1/8/3P1B2/2N5/PPP1PPPP/R2QKBNR w KQkq -": [
+  {
+   "lead": "Nb5",
+   "reply": "d6",
+   "p": {
+    "800": 0.177,
+    "1000": 0.1,
+    "1200": 0.061,
+    "1400": 0.034
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/5npB/3p4/3P4/2N5/PPPQPPPP/R3KBNR w KQ -": [
+  {
+   "lead": "h4",
+   "reply": "c5",
+   "p": {
+    "800": 0.074,
+    "1000": 0.106,
+    "1200": 0.152,
+    "1400": 0.234,
+    "1600": 0.363,
+    "1800": 0.483,
+    "2000": 0.57
+   }
+  },
+  {
+   "lead": "O-O-O",
+   "reply": "c5",
+   "p": {
+    "800": 0.067,
+    "1000": 0.059,
+    "1200": 0.055,
+    "1400": 0.055,
+    "1600": 0.057,
+    "1800": 0.061,
+    "2000": 0.062
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6pB/3p4/3Pn3/2N2N2/PPPQPPPP/R3KB1R w KQ -": [
+  {
+   "lead": "Qe3",
+   "reply": "Nxc3",
+   "p": {
+    "800": 0.059,
+    "1000": 0.049,
+    "1200": 0.043,
+    "1400": 0.04,
+    "1600": 0.041,
+    "1800": 0.046,
+    "2000": 0.056
+   }
+  }
+ ],
+ "rnbq1r2/ppp1ppkp/6p1/8/3Pp3/5N2/PPPQPPPP/R3KB1R w KQ -": [
+  {
+   "lead": "Ne5",
+   "reply": "f6",
+   "p": {
+    "800": 0.429,
+    "1000": 0.44,
+    "1200": 0.444,
+    "1400": 0.429,
+    "1600": 0.404,
+    "1800": 0.373,
+    "2000": 0.343
+   }
+  },
+  {
+   "lead": "Ng1",
+   "reply": "c5",
+   "p": {
+    "1000": 0.036,
+    "1200": 0.042,
+    "1400": 0.05,
+    "1600": 0.054,
+    "1800": 0.057,
+    "2000": 0.06
+   }
+  }
+ ],
+ "rnbq1rk1/ppp2pbp/5pp1/8/2BP4/2N1P3/PP3PPP/R2QK1NR w KQ -": [
+  {
+   "lead": "Qb3",
+   "reply": "Nd7",
+   "p": {
+    "800": 0.112,
+    "1000": 0.12,
+    "1200": 0.118,
+    "1400": 0.107,
+    "1600": 0.087,
+    "1800": 0.066,
+    "2000": 0.045
+   }
+  }
+ ],
+ "r1bq1rk1/ppp2pb1/2np3p/6p1/2PNn3/2N3B1/PP2BPPP/R2Q1RK1 w - -": [
+  {
+   "lead": "Nxe4",
+   "reply": "Bxd4",
+   "p": {
+    "800": 0.631,
+    "1000": 0.516,
+    "1200": 0.407,
+    "1400": 0.299,
+    "1600": 0.204,
+    "1800": 0.129,
+    "2000": 0.084
+   }
+  }
+ ],
+ "rnbq1rk1/ppp2pbp/3p1np1/8/2PpP3/2N2N2/PP2BPPP/R1BQ1RK1 w - -": [
+  {
+   "lead": "Qxd4",
+   "reply": "Nbd7",
+   "p": {
+    "800": 0.049
+   }
+  }
+ ],
+ "r1bq1rk1/ppp2pbp/n2p2p1/4p3/2PPP1n1/2N1BN2/PP2BPPP/R2Q1RK1 w - -": [
+  {
+   "lead": "Bd2",
+   "reply": "exd4",
+   "p": {
+    "800": 0.078,
+    "1000": 0.063,
+    "1200": 0.043
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p1np1/8/3P1B2/4PN2/PPP1BPPP/RN1QK2R w KQ -": [
+  {
+   "lead": "h4",
+   "reply": "h5",
+   "p": {
+    "800": 0.059,
+    "1000": 0.066,
+    "1200": 0.062,
+    "1400": 0.051,
+    "1600": 0.038
+   }
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/3p1np1/4n1B1/4P3/2NP1N2/PPP1BPPP/R2Q1RK1 w - -": [
+  {
+   "lead": "Bxf6",
+   "reply": "Bxf6",
+   "p": {
+    "800": 0.095,
+    "1000": 0.066,
+    "1200": 0.049,
+    "1400": 0.035
+   }
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/5np1/4p1B1/4P3/2NP4/PPP1BPPP/R2Q1RK1 w - -": [
+  {
+   "lead": "Qd2",
+   "reply": "c6",
+   "p": {
+    "800": 0.163,
+    "1000": 0.194,
+    "1200": 0.209,
+    "1400": 0.228,
+    "1600": 0.258,
+    "1800": 0.32,
+    "2000": 0.411
+   }
+  },
+  {
+   "lead": "f4",
+   "reply": "exf4",
+   "p": {
+    "800": 0.161,
+    "1000": 0.227,
+    "1200": 0.277,
+    "1400": 0.316,
+    "1600": 0.332,
+    "1800": 0.306,
+    "2000": 0.253
+   }
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/6p1/4p1B1/4P1n1/2NP4/PPP2PPP/R2Q1RK1 w - -": [
+  {
+   "lead": "Qxg4",
+   "reply": "Bxg4",
+   "p": {
+    "800": 0.078,
+    "1000": 0.072,
+    "1200": 0.068,
+    "1400": 0.064,
+    "1600": 0.058,
+    "1800": 0.05,
+    "2000": 0.035
+   }
+  }
+ ],
+ "r1bq1rk1/ppp1ppb1/6pp/4p1B1/4P1n1/2NP3P/PPP2PP1/R2Q1RK1 w - -": [
+  {
+   "lead": "Bxe7",
+   "reply": "Qxe7",
+   "p": {
+    "800": 0.103,
+    "1000": 0.143,
+    "1200": 0.173,
+    "1400": 0.207,
+    "1600": 0.233,
+    "1800": 0.23,
+    "2000": 0.198
+   }
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/5n2/4p3/3P4/8/PPP2PPP/RNBQKBNR w KQkq -": [
+  {
+   "lead": "Nf3",
+   "reply": "exd4",
+   "p": {
+    "800": 0.151,
+    "1000": 0.158,
+    "1200": 0.16,
+    "1400": 0.159,
+    "1600": 0.159,
+    "1800": 0.168,
+    "2000": 0.211
+   }
+  }
+ ],
+ "rnb1kb1r/ppp1pppp/8/4P3/6n1/8/PPP2PPP/RNBK1BNR w kq -": [
+  {
+   "lead": "Be3",
+   "reply": "Nxe5",
+   "p": {
+    "800": 0.226,
+    "1000": 0.239,
+    "1200": 0.237,
+    "1400": 0.225,
+    "1600": 0.211,
+    "1800": 0.204,
+    "2000": 0.196
+   }
+  }
+ ],
+ "rnb1kb1r/ppp1pppp/8/4n3/8/8/PPP2PPP/RNB1KBNR w kq -": [
+  {
+   "lead": "f4",
+   "reply": "Nec6",
+   "p": {
+    "800": 0.044,
+    "1000": 0.037,
+    "1200": 0.036,
+    "1400": 0.036,
+    "1600": 0.036,
+    "1800": 0.032
+   }
+  }
+ ],
+ "rnbqkb1r/ppp1pp1p/3p1np1/8/3PP3/2N5/PPP2PPP/R1BQKBNR w KQkq -": [
+  {
+   "lead": "f3",
+   "reply": "Bg7",
+   "p": {
+    "1400": 0.036,
+    "1600": 0.053,
+    "1800": 0.073,
+    "2000": 0.081
+   }
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/5np1/4p3/3P4/2N2N2/PPP2PPP/R1BQKB1R w KQkq -": [
+  {
+   "lead": "Nxe5",
+   "reply": "O-O",
+   "p": {
+    "800": 0.27,
+    "1000": 0.263,
+    "1200": 0.258,
+    "1400": 0.261,
+    "1600": 0.28,
+    "1800": 0.328,
+    "2000": 0.427
+   }
+  }
+ ],
+ "rnb1k2r/ppp1ppbp/5np1/4P3/8/2N2N2/PPP2PPP/R1BqKB1R w KQkq -": [
+  {
+   "lead": "Kxd1",
+   "reply": "Ng4",
+   "p": {
+    "800": 0.111,
+    "1000": 0.116,
+    "1200": 0.129,
+    "1400": 0.15,
+    "1600": 0.178,
+    "1800": 0.22,
+    "2000": 0.266
+   }
+  }
+ ],
+ "rnb1k2r/ppp1ppbp/6p1/4P3/6n1/5N2/PPP2PPP/R1BNKB1R w KQkq -": [
+  {
+   "lead": "Bc4",
+   "reply": "Nxe5",
+   "p": {
+    "800": 0.044,
+    "1000": 0.038,
+    "1200": 0.031
+   }
+  }
+ ],
+ "rnb1k2r/ppp1ppbp/6p1/4n3/8/5N1P/PPP2PP1/R1BNKB1R w KQkq -": [
+  {
+   "lead": "Be2",
+   "reply": "Nbc6",
+   "p": {
+    "800": 0.052,
+    "1000": 0.062,
+    "1200": 0.069,
+    "1400": 0.08,
+    "1600": 0.094,
+    "1800": 0.105,
+    "2000": 0.102
+   }
+  }
+ ],
+ "rnbqkb1r/ppp1pppp/3p4/8/2B1n3/5N2/PPPP1PPP/RNBQK2R w KQkq -": [
+  {
+   "lead": "d3",
+   "reply": "Nf6",
+   "p": {
+    "800": 0.492,
+    "1000": 0.452,
+    "1200": 0.419,
+    "1400": 0.39,
+    "1600": 0.358,
+    "1800": 0.326,
+    "2000": 0.283
+   }
+  }
+ ],
+ "rnbqkb1r/ppp1pp1p/3p1np1/8/2B5/5N2/PPPP1PPP/RNBQR1K1 w kq -": [
+  {
+   "lead": "Ng5",
+   "reply": "d5",
+   "p": {
+    "800": 0.371,
+    "1000": 0.341,
+    "1200": 0.323,
+    "1400": 0.314,
+    "1600": 0.309,
+    "1800": 0.297,
+    "2000": 0.266
+   }
+  },
+  {
+   "lead": "c3",
+   "reply": "Bg7",
+   "p": {
+    "800": 0.081,
+    "1000": 0.085,
+    "1200": 0.086,
+    "1400": 0.082,
+    "1600": 0.071,
+    "1800": 0.054,
+    "2000": 0.036
+   }
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/3p1np1/8/2BP4/5N2/PPP2PPP/RNBQR1K1 w kq -": [
+  {
+   "lead": "Bg5",
+   "reply": "O-O",
+   "p": {
+    "800": 0.254,
+    "1000": 0.274,
+    "1200": 0.279,
+    "1400": 0.276,
+    "1600": 0.264,
+    "1800": 0.244,
+    "2000": 0.216
+   }
+  },
+  {
+   "lead": "Ng5",
+   "reply": "O-O",
+   "p": {
+    "800": 0.25,
+    "1000": 0.207,
+    "1200": 0.177,
+    "1400": 0.155,
+    "1600": 0.135,
+    "1800": 0.119,
+    "2000": 0.091
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p1np1/8/3PP3/2N2N1P/PPP2PP1/R1BQKB1R w KQ -": [
+  {
+   "lead": "Bc4",
+   "reply": "Nxe4",
+   "p": {
+    "800": 0.171,
+    "1000": 0.167,
+    "1200": 0.168,
+    "1400": 0.171,
+    "1600": 0.169,
+    "1800": 0.155,
+    "2000": 0.121
+   }
+  }
+ ],
+ "r1bq1rk1/pppnppbp/3p1np1/8/3PP3/2NB1N1P/PPP2PP1/R1BQK2R w KQ -": [
+  {
+   "lead": "e5",
+   "reply": "dxe5",
+   "p": {
+    "800": 0.06,
+    "1000": 0.045,
+    "1200": 0.034,
+    "2000": 0.053
+   }
+  }
+ ],
+ "r1bq1rk1/pppnppb1/3p1npp/6B1/3PP3/2NB1N1P/PPP2PP1/R2QK2R w KQ -": [
+  {
+   "lead": "Bf4",
+   "reply": "c5",
+   "p": {
+    "800": 0.062,
+    "1000": 0.063,
+    "1200": 0.067,
+    "1400": 0.07,
+    "1600": 0.073,
+    "1800": 0.075,
+    "2000": 0.068
+   }
+  }
+ ],
+ "r1bq1rk1/pppnppb1/3p1n1p/6p1/3PP2B/2NB1N1P/PPP2PP1/R2QK2R w KQ -": [
+  {
+   "lead": "Bg3",
+   "reply": "c5",
+   "p": {
+    "800": 0.847,
+    "1000": 0.836,
+    "1200": 0.838,
+    "1400": 0.849,
+    "1600": 0.87,
+    "1800": 0.893,
+    "2000": 0.913
+   }
+  },
+  {
+   "lead": "Bxg5",
+   "reply": "hxg5",
+   "p": {
+    "800": 0.03,
+    "1000": 0.032,
+    "1200": 0.031
+   }
+  }
+ ],
+ "r1bq1rk1/pp1nppb1/3p1n2/2p3B1/3PP3/2NB3P/PPP2PP1/R2QK2R w KQ -": [
+  {
+   "lead": "e5",
+   "reply": "dxe5",
+   "p": {
+    "800": 0.201,
+    "1000": 0.194,
+    "1200": 0.181,
+    "1400": 0.157,
+    "1600": 0.126,
+    "1800": 0.094,
+    "2000": 0.076
+   }
+  },
+  {
+   "lead": "dxc5",
+   "reply": "Nxc5",
+   "p": {
+    "800": 0.166,
+    "1000": 0.171,
+    "1200": 0.178,
+    "1400": 0.186,
+    "1600": 0.186,
+    "1800": 0.182,
+    "2000": 0.167
+   }
+  },
+  {
+   "lead": "Bxf6",
+   "reply": "exf6",
+   "p": {
+    "800": 0.07,
+    "1000": 0.044
+   }
+  }
+ ],
+ "rn1q1rk1/ppp1ppbp/4b1p1/8/6n1/2NB1N2/PPP2PPP/R1BQK2R w KQ -": [
+  {
+   "lead": "O-O",
+   "reply": "Nc6",
+   "p": {
+    "800": 0.522,
+    "1000": 0.513,
+    "1200": 0.512,
+    "1400": 0.517,
+    "1600": 0.52,
+    "1800": 0.51,
+    "2000": 0.48
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6p1/3p4/2BPN3/4BN2/PPP2PPP/R2QK2R w KQ -": [
+  {
+   "lead": "Bxd5",
+   "reply": "Qxd5",
+   "p": {
+    "800": 0.522,
+    "1000": 0.534,
+    "1200": 0.531,
+    "1400": 0.512,
+    "1600": 0.457,
+    "1800": 0.374,
+    "2000": 0.268
+   }
+  }
+ ],
+ "r1bq1rk1/pppnppbp/6p1/8/3PB3/4BN2/PPP2PPP/R2QK2R w KQ -": [
+  {
+   "lead": "Qd2",
+   "reply": "Nf6",
+   "p": {
+    "800": 0.216,
+    "1000": 0.246,
+    "1200": 0.26,
+    "1400": 0.261,
+    "1600": 0.263,
+    "1800": 0.273,
+    "2000": 0.279
+   }
+  },
+  {
+   "lead": "c3",
+   "reply": "Nf6",
+   "p": {
+    "800": 0.127,
+    "1000": 0.152,
+    "1200": 0.176,
+    "1400": 0.204,
+    "1600": 0.225,
+    "1800": 0.226,
+    "2000": 0.217
+   }
+  },
+  {
+   "lead": "Qd3",
+   "reply": "Nf6",
+   "p": {
+    "800": 0.048,
+    "1000": 0.04,
+    "1200": 0.031
+   }
+  }
+ ],
+ "rnbqkbnr/ppp1pp1p/3p2p1/8/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq -": [
+  {
+   "lead": "c3",
+   "reply": "Nf6",
+   "p": {
+    "800": 0.032,
+    "1000": 0.037,
+    "1200": 0.043,
+    "1400": 0.049,
+    "1600": 0.054,
+    "1800": 0.054,
+    "2000": 0.047
+   }
+  }
+ ],
+ "r1bq1rk1/ppp2pbp/3p1np1/3Pp3/2P1P3/2NQ1N2/PP3PPP/R1B2RK1 w - e6": [
+  {
+   "lead": "h3",
+   "reply": "Nh5",
+   "p": {
+    "800": 0.074,
+    "1000": 0.082,
+    "1200": 0.099,
+    "1400": 0.128,
+    "1600": 0.155,
+    "1800": 0.156,
+    "2000": 0.109
+   }
+  }
+ ],
+ "rnbqk2r/ppp1ppbp/5np1/3p4/3P1B2/2N5/PPPQPPPP/R3KBNR w KQkq -": [
+  {
+   "lead": "Nb5",
+   "reply": "Ne4",
+   "p": {
+    "800": 0.073,
+    "1000": 0.058,
+    "1200": 0.044,
+    "1400": 0.033
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/3p1np1/8/3PP3/2N1BN2/PPP2PPP/R2QKB1R w KQ -": [
+  {
+   "lead": "Qd2",
+   "reply": "d5",
+   "p": {
+    "800": 0.201,
+    "1000": 0.233,
+    "1200": 0.258,
+    "1400": 0.282,
+    "1600": 0.312,
+    "1800": 0.365,
+    "2000": 0.461
+   }
+  }
+ ],
+ "rnbq1rk1/ppp1ppbp/6p1/8/3Pp3/1B2BN2/PPP2PPP/R2QK2R w KQ -": [
+  {
+   "lead": "Nd2",
+   "reply": "Bxd4",
+   "p": {
+    "800": 0.302,
+    "1000": 0.342,
+    "1200": 0.359,
+    "1400": 0.356,
+    "1600": 0.321,
+    "1800": 0.234,
+    "2000": 0.116
+   }
+  },
+  {
+   "lead": "Ne5",
+   "reply": "c5",
+   "p": {
+    "800": 0.235,
+    "1000": 0.204,
+    "1200": 0.178,
+    "1400": 0.153,
+    "1600": 0.136,
+    "1800": 0.127,
+    "2000": 0.118
+   }
+  }
+ ],
+ "r1bq1rk1/ppp1ppbp/2n3p1/6N1/3Pp3/1B2B3/PPP2PPP/R2QK2R w KQ -": [
+  {
+   "lead": "d5",
+   "reply": "Na5",
+   "p": {
+    "800": 0.043,
+    "1000": 0.039,
+    "1200": 0.04,
+    "1400": 0.043,
+    "1600": 0.043,
+    "1800": 0.032
+   }
+  },
+  {
+   "lead": "Qd2",
+   "reply": "a5",
+   "p": {
+    "800": 0.033,
+    "1000": 0.038,
+    "1200": 0.037,
+    "1400": 0.031
+   }
+  }
+ ],
+ "r1bq1rk1/ppp2pbp/2n3p1/4p1N1/3Pp3/1BP1B3/PP3PPP/R2QK2R w KQ -": [
+  {
+   "lead": "dxe5",
+   "reply": "Nxe5",
+   "p": {
+    "800": 0.101,
+    "1000": 0.101,
+    "1200": 0.105,
+    "1400": 0.118,
+    "1600": 0.155,
+    "1800": 0.234,
+    "2000": 0.35
    }
   }
  ]

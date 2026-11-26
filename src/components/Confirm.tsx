@@ -2,6 +2,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { create } from "zustand";
 import { Modal } from "./GameDialogs";
+import { touchNote } from "../touchLog";
 
 interface Request {
   title: string;
@@ -15,6 +16,7 @@ interface Request {
 const useConfirm = create<{ request: Request | null }>(() => ({ request: null }));
 
 export function askConfirm(opts: Omit<Request, "resolve">): Promise<boolean> {
+  touchNote(`dialog open: ${opts.title}`);
   useConfirm.getState().request?.resolve(false);
   return new Promise((resolve) => useConfirm.setState({ request: { ...opts, resolve } }));
 }
@@ -24,16 +26,17 @@ export function ConfirmHost() {
   const ok = useRef<HTMLButtonElement>(null);
   useEffect(() => ok.current?.focus(), [request]);
   if (!request) return null;
-  const answer = (yes: boolean) => {
+  const answer = (yes: boolean, how: string) => {
+    touchNote(`dialog closed: ${how}`);
     useConfirm.setState({ request: null });
     request.resolve(yes);
   };
   return (
-    <Modal title={request.title} onClose={() => answer(false)} className="confirm">
+    <Modal title={request.title} onClose={(how) => answer(false, how ?? "closed")} className="confirm">
       {request.body && <div className="confirm-body">{request.body}</div>}
       <footer>
-        <button onClick={() => answer(false)}>Cancel</button>
-        <button ref={ok} className={request.danger ? "danger" : "primary"} onClick={() => answer(true)}>
+        <button onClick={() => answer(false, "cancel")}>Cancel</button>
+        <button ref={ok} className={request.danger ? "danger" : "primary"} onClick={() => answer(true, "confirm")}>
           {request.confirmLabel}
         </button>
       </footer>

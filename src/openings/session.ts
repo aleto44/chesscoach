@@ -20,10 +20,12 @@ import { planOf, type PlanIdea } from "./plans";
 import { hasBackend } from "../backend";
 import { moveLabel } from "../chess/line";
 import { clearTrainerChat, pushTrainer, trainerGeneration } from "../coach/trainerChat";
-import { judgePunish, planTrap, positionKey, trapPlay, type Blunder, type Detour } from "./blunders";
+import { judgePunish, planTrap, positionKey, trapHint, trapPlay, type Blunder, type Detour } from "./blunders";
 import { settingRating, useSettings } from "../settings";
 import { START_RATING } from "../rating";
 import { keepSession } from "../persist";
+import { structureById, structuresAt } from "./structures";
+import { courseContext, courseHint, courseMove, resumeCourse, type CourseRun } from "./courseSession";
 
 /** The student's move that left the line, the book move, and the engine on both (under the board). */
 export interface OffLineWhy {
@@ -60,6 +62,14 @@ export interface OpeningSession {
   detour?: Detour | null;
   /** The ply whose move note (guides.ts) the student asked for with Hint; notes stay hidden otherwise. */
   noteAt?: number | null;
+  /** The structure card (structures.ts) open under the board, if any. */
+  structure?: string | null;
+  /** The structures the board has already turned into this session. */
+  structuresMet?: string[];
+  /** The ones the latest move turned it into: their buttons are highlighted until the next move. */
+  structuresNew?: string[];
+  /** A study run through an opening course (courseSession.ts): its moves and hints go there. */
+  course?: CourseRun | null;
 }
 
 export const useOpening = create<OpeningSession | null>(() => null);
@@ -96,11 +106,32 @@ export function startOpening(setId: string, target: TrainingLine) {
 }
 
 /** Restores the last session (if any) and keeps saving it, for a phone that dropped the page. Call once at startup. */
-export const initOpeningSession = () =>
+export function initOpeningSession() {
   keepSession(useOpening, "cc-opening", (s) => !!(s.setId && s.target?.moves && s.line?.fens), resume);
+  useOpening.subscribe(noticeStructures);
+}
+
+/**
+ * When the board turns into a structure the session hasn't met yet (a Pirc, a King's Indian, Bc4 in
+ * the Pirc...), its button under the board lights up for a move: whatever move order got there, the
+ * student sees what kind of game it is now. The card itself opens only when asked: opening it by
+ * itself took over the board in the middle of the line.
+ */
+function noticeStructures(s: OpeningSession | null, prev: OpeningSession | null) {
+  if (!s || s.line === prev?.line) return;
+  const met = s.structuresMet ?? [];
+  const here = structuresAt(s.line.fens[s.line.sans.length], openingSetOf(s).color);
+  const fresh = here.filter((x) => !met.includes(x.id)).map((x) => x.id);
+  if (fresh.length) set({ structuresMet: [...met, ...fresh], structuresNew: fresh });
+  else if (s.structuresNew?.length) set({ structuresNew: [] });
+}
+
+export const openStructure = (id: string) => set({ structure: id });
+export const closeStructure = () => set({ structure: null });
 
 /** Picks a saved session back up, redoing whatever the computer was in the middle of when the page went away. */
 function resume(saved: OpeningSession) {
+  if (saved.course) return resumeCourse(saved);
   // The set's own line object: the session tells lines apart by identity.
   const target =
     findSet(saved.setId)?.lines.find((l) => l.name === saved.target.name && l.moves.join(" ") === saved.target.moves.join(" ")) ??
@@ -180,6 +211,7 @@ const playedMatches = (p: Planned, from: Key, to: Key) => p.from === from && p.t
 
 export async function openingMove(from: Key, to: Key, promotion?: string) {
   const s = get();
+  if (s?.course) return courseMove(from, to, promotion);
   if (!s || s.status !== "playing" || s.view !== null) return;
   const lines = openingSetOf(s).lines;
   const color = openingSetOf(s).color;
@@ -273,7 +305,7 @@ function contReply(b: Blunder, line: Line, k: number) {
 }
 
 const punishedText = (b: Blunder) =>
-  `Punished. ${b.san} was a mistake (${common(b)}): ${numberedFrom(b.at, b.cont)} wins it (${evalText(b.bestEval)} for you). Off the book, but that's a line you want.`;
+  `Punished. ${b.san} was a mistake (${common(b)}): ${numberedFrom(b.at, b.cont)} wins it (${evalText(b.bestEval)} for you).`;
 
 /**
  * The student's answer to the opponent's blunder. The stored punishment is played out to where the
@@ -309,7 +341,7 @@ async function punishMove(s: OpeningSession, b: Blunder, line: Line, san: string
       status: "done",
       message:
         san === b.best
-          ? `Punished. ${b.san} was a mistake (${common(b)}) and ${san} cashes in (${evalText(verdict?.eval ?? b.bestEval)} for you). Off the book, but that's a line you want.`
+          ? `Punished. ${b.san} was a mistake (${common(b)}) and ${san} cashes in (${evalText(verdict?.eval ?? b.bestEval)} for you).`
           : `Punished. ${b.san} was a mistake (${common(b)}); ${san} keeps the gain (${evalText(verdict?.eval ?? b.bestEval)} for you; the engine's choice was ${b.best}).`,
       shapes: [],
     });
@@ -521,10 +553,25 @@ export function openingTakeBack() {
   set({ line: lineBefore(s.line), status: "playing", message: "", view: null, why: null, shapes: [] });
 }
 
+/**
+ * The note under the board: the one the student asked for with Hint (the trap's or detour's while
+ * one is on the board, else the line's move note), or after a wrong move the line's note for it.
+ */
+export function shownNote(s: OpeningSession): { text: string; draw: string } | null {
+  const len = s.line.sans.length;
+  if (s.status === "playing" && s.noteAt === len) return trapHint(s.blunder, s.detour, len) ?? (s.blunder || s.detour ? null : guideAt(s.target, len));
+  if (s.status === "off" && s.why) return guideAt(s.target, len - 1);
+  return null;
+}
+
 /** The student's next book move, as an arrow. */
 export function openingHint() {
   const s = get();
+  if (s?.course) return courseHint();
   if (!s || s.status !== "playing") return;
+  // Off the book (the opponent's mistake or detour): what it's about first, the arrow on a second press.
+  if ((s.blunder || s.detour) && s.noteAt !== s.line.sans.length && trapHint(s.blunder, s.detour, s.line.sans.length))
+    return set({ noteAt: s.line.sans.length, shapes: [] });
   if (s.blunder) {
     // The continuation's move due now (the first is the punishment itself).
     const due = s.blunder.cont?.[s.line.sans.length - (s.blunder.at ?? s.line.sans.length)] ?? s.blunder.best;
@@ -545,6 +592,8 @@ export function openingHint() {
 export function openingStep(delta: Step) {
   const s = get();
   if (!s) return;
+  // Looking back at the moves holds a right course answer that was about to move on.
+  if (s.course?.autoNextAt) set({ course: { ...s.course, autoNextAt: null } });
   set({ view: stepView(s.line.sans.length, s.view, delta) });
 }
 
@@ -557,19 +606,18 @@ export function openingContext(): { title: string; fen: string; detail: string }
   const plan = openingPlan(s);
   const shown = plan ? `; the trainer shows this plan for the student's side: ${plan.map((i) => `${i.title}: ${i.text}`).join(" | ")}` : "";
   const why = s.why?.ideas ? `; the trainer explained why ${s.why.book}, not ${s.why.played}: ${s.why.ideas.map((i) => `${i.title}: ${i.text}`).join(" | ")}` : "";
+  // What the student is reading under the board: the trainer's message, and the hint they asked for.
+  const note = shownNote(s);
+  const trapWhy = s.blunder?.note && s.status !== "playing" && s.status !== "thinking" ? `; why the opponent's mistake ${s.blunder.san} loses: "${s.blunder.note.why}"` : "";
+  const message = s.message ? `; the trainer's message: "${s.message}"` : "";
+  const hint = note ? `; the move note shown (Hint): "${note.text}"` : "";
+  const card = s.structure ? structureById(s.structure) : null;
+  const structure = card ? `; the trainer shows a card "${card.name}": ${card.ideas.map((i) => `${i.title}: ${i.text}`).join(" | ")}` : "";
+  const course = s.course ? courseContext(s.course) : "";
+  const arrows = s.shapes.length ? `; the trainer's arrow on the board shows ${s.shapes.map((a) => `${a.orig}-${a.dest}`).join(", ")} (the book move: from Hint, or after a wrong move)` : "";
   return {
     title: `Opening trainer: ${s.target.name}`,
     fen: s.line.fens[viewedPly(s.line.sans.length, s.view)],
-    detail: `student plays the ${set.name} as ${set.color} against the book line ${s.target.moves.join(" ")}; moves so far: ${s.line.sans.join(" ") || "(none)"}; ${s.status}${shown}${why}`,
+    detail: `student plays the ${set.name} as ${set.color} against the book line ${s.target.moves.join(" ")}; moves so far: ${s.line.sans.join(" ") || "(none)"}; ${s.status}${message}${hint}${trapWhy}${structure}${arrows}${shown}${why}${course}`,
   };
 }
-
-export const openingQuestion = () => {
-  const s = get()!;
-  if (s.blunder && s.status === "off")
-    return `In the opening trainer my opponent blundered with ${s.blunder.san} and I didn't punish it. Why does ${s.blunder.best} win? Show it on the board, briefly.`;
-  if (openingPlan(s)) return `I finished the ${s.target.name} line. Walk me through the plan for my side here, briefly, and show it on the board.`;
-  return s.status === "off"
-    ? `In the opening trainer (${s.target.name}) I went off the line: ${s.message} Why is the book move better? Show it on the board, briefly.`
-    : `I'm practising ${s.target.name}. What are the ideas behind this line for my side? Keep it short and show it on the board.`;
-};

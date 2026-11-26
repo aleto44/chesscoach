@@ -956,6 +956,15 @@ button.link {
   background: color-mix(in srgb, var(--warn) 16%, transparent);
   white-space: nowrap;
 }
+.tail-chip {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  text-decoration: none;
+  white-space: nowrap;
+}
 .offline-chip.syncing {
   color: var(--accent);
   background: var(--accent-soft);
@@ -1134,11 +1143,37 @@ button.link {
     scrollbar-gutter: stable both-edges;
   }
 }
+/* The opening, endgame and find-the-plan trainers' status and cards: under the board in a narrow panel; beside it in a wide
+   one (the drills' grid, .drill-body), so the plan is readable without scrolling past the board. */
+.trainer-feedback {
+  display: contents;
+}
+@media (min-width: 761px) {
+  @container (min-width: 820px) {
+    .drill-body > .trainer-feedback {
+      grid-area: feedback;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: var(--board-w);
+      overflow-y: auto;
+    }
+    .drill-body > .trainer-feedback > * {
+      width: auto;
+      margin-top: 0;
+    }
+  }
+}
 /* Phones: these trainers' status changes length move to move, so the board sits at the top instead
    of centred (centred, every longer message pushed the board up). */
 @media (max-width: 760px) {
-  .board-panel.drills.tall-status > :first-child:not(.drill-body) {
+  .board-panel.drills.tall-status > :first-child:not(.drill-body),
+  .board-panel.drills.tall-status > .drill-body > :first-child {
     margin-top: 0;
+  }
+  /* The status and cards are in .trainer-feedback (display: contents): full width like the rest. */
+  .drill-body > .trainer-feedback > * {
+    width: calc(100vw - 16px);
   }
 }
 .status-extra {
@@ -1190,6 +1225,27 @@ button.link {
 }
 .opening-plan p {
   margin: 4px 0 0;
+}
+.opening-plan-close {
+  padding: 0 8px;
+  line-height: 1.4;
+}
+/* The structures the board is in, whose cards are closed: one button each to read them again. */
+.structure-chips {
+  width: var(--board-w);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.structure-chips button {
+  padding: 2px 10px;
+  font-size: 0.85em;
+}
+/* The structure the last move turned the game into. */
+.structure-chips button.new {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Puzzle feedback: badges, bursts, rating ticker, auto-next, theme mastery */
@@ -2559,6 +2615,18 @@ button.link {
 }
 
 /* ---- Profile › Saved games ---- */
+.saved-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.saved-import {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .saved-filters {
   display: flex;
   flex-direction: column;
@@ -2706,4 +2774,434 @@ button.link {
   min-width: 0;
   overflow: visible;
   white-space: nowrap;
+}
+
+/* ---- Utility → Load game: text or a picture in, a board to check, then the analysis board ---- */
+.load-game {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 10px;
+  outline: 2px dashed transparent;
+  outline-offset: 6px;
+}
+.load-game.dragging {
+  outline-color: var(--accent);
+}
+.load-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.load-error {
+  color: var(--error);
+  margin: 0;
+}
+.load-reading {
+  margin: 0;
+  color: var(--muted);
+}
+.load-games {
+  max-height: 260px;
+  overflow: auto;
+}
+.load-games .history-row {
+  text-align: left;
+  width: 100%;
+}
+.load-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+.load-board {
+  flex: 1 1 320px;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.load-board .cg-board-wrap {
+  width: 100%;
+  aspect-ratio: 1;
+}
+.load-image {
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.load-side {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.load-moves {
+  max-height: 300px;
+  overflow: auto;
+}
+.load-side .segmented button {
+  flex: 1;
+}
+.load-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.load-palette-row {
+  display: flex;
+  gap: 4px;
+}
+.load-palette-row button {
+  flex: 1;
+  min-width: 0;
+  padding: 2px;
+  height: 40px;
+}
+.load-palette-row button img {
+  height: 32px;
+  width: 32px;
+}
+.load-palette-row button.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.load-fen {
+  font-family: ui-monospace, Consolas, monospace;
+  word-break: break-all;
+  margin: 0;
+}
+.load-history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.load-history .history-list {
+  max-height: 420px;
+  overflow: auto;
+}
+.load-history-row {
+  padding: 4px 8px;
+}
+.load-history-row.on {
+  background: var(--accent-soft);
+}
+.load-history-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 4px;
+}
+.load-history-open .history-main {
+  display: flex;
+  flex-direction: column;
+}
+.load-history-open .history-main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.load-history-thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.load-analyze {
+  align-self: flex-start;
+}
+
+/* Opening course (CourseMap): the progress bar, the ways to study, then White's setups as cards with a
+   dot per decision, coloured by how well the student knows it. */
+.course-map {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.course-map .opening-start {
+  gap: 8px;
+}
+.course-map .opening-start > button {
+  font-size: 14px;
+  padding: 9px 16px;
+}
+.course-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.course-bar {
+  flex: 1;
+  min-width: 160px;
+  height: 8px;
+  display: flex;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--border);
+}
+.course-bar .known {
+  background: var(--accent);
+}
+.course-bar .learning {
+  background: var(--warn);
+}
+.course-bar .fresh {
+  background: var(--border);
+}
+.course-chapters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.course-chapter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.course-chapter.open {
+  grid-column: 1 / -1;
+}
+.course-chapter-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: inherit;
+}
+.course-chapter-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 15px;
+}
+.course-blurb {
+  margin: 0;
+  line-height: 1.4;
+}
+.course-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.course-dot {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--panel);
+  background: var(--border);
+}
+.course-dot.new {
+  color: var(--muted);
+}
+.course-dot.learning {
+  background: var(--warn);
+}
+.course-dot.known {
+  background: var(--accent);
+}
+.course-dot.due {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--warn);
+}
+.course-chapter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.course-chapter-actions button {
+  padding: 5px 12px;
+}
+.course-nodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 4px;
+}
+.course-node {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  text-align: left;
+  border-radius: 8px;
+}
+.course-node-title {
+  flex: 1;
+  min-width: 0;
+}
+.course-kind {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.course-kind.danger {
+  color: var(--warn);
+  border: 1px solid var(--warn);
+}
+.course-kind.punish {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+/* The course card on the board (CoursePanel): what White's doing, why the move, and what not to play. */
+.course-card .course-recognize {
+  color: var(--muted);
+}
+.course-watch {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.course-watch strong {
+  color: var(--warn);
+}
+.course-watch ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.course-watch li + li {
+  margin-top: 4px;
+}
+
+/* The coach's closer look at a decision the student keeps missing (courseMemo.ts). */
+.course-memo {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.course-memo > strong {
+  color: var(--accent);
+}
+.course-memo p {
+  margin: 4px 0 0;
+}
+
+/* The opening course reuses the puzzles' board cues (CueFrame): its frame lights up on a right answer. */
+.board-frame.drill {
+  transition: background 0.35s;
+}
+.board-frame.drill.solved {
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.board-frame.drill.failed {
+  background: color-mix(in srgb, var(--error) 45%, transparent);
+}
+.course-legend {
+  margin: -4px 0 0;
+  line-height: 1.6;
+}
+.course-legend .course-dot {
+  width: 10px;
+  height: 10px;
+  vertical-align: -1px;
+  margin-left: 4px;
+}
+.course-node-stage {
+  display: block;
+}
+
+/* Puzzle rush history: one tile per puzzle of the run, then the one on the board. */
+.rush-history {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 1px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  /* About four rows; a long run scrolls, keeping the latest in view. */
+  max-height: 128px;
+  overflow-y: auto;
+}
+
+.rush-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 30px;
+  padding: 2px 1px 1px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rush-tile .rush-mark {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 0.7em;
+  line-height: 1;
+  color: #fff;
+}
+
+.rush-tile .rush-rating {
+  font-size: 0.65em;
+  line-height: 1.1;
+}
+
+.rush-tile.good .rush-mark {
+  background: var(--accent);
+}
+
+.rush-tile.good .rush-rating {
+  color: var(--accent);
+}
+
+.rush-tile.bad .rush-mark {
+  background: var(--error);
+}
+
+.rush-tile.bad .rush-rating {
+  color: var(--error);
+}
+
+.rush-tile.now .rush-mark {
+  border: 1px dashed currentColor;
+  color: inherit;
+  font-weight: 500;
+}
+
+.rush-tile:not(:disabled):hover {
+  border-color: color-mix(in srgb, currentColor 30%, transparent);
+}
+
+.rush-tile.on,
+.rush-tile.on:not(:disabled):hover {
+  border-color: var(--accent);
 }

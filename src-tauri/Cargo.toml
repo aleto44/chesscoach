@@ -28,7 +28,7 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 hyper = "1"
 hyper-util = { version = "0.1", features = ["tokio"] }
 uuid = { version = "1", features = ["v4"] }
-rusqlite = { version = "0.41.1", features = ["bundled"] }
+rusqlite = { version = "0.41.1", features = ["bundled", "functions"] }
 ureq = "3"
 zstd = "0.13"
 csv = "1"

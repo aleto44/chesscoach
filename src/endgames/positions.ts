@@ -2,6 +2,7 @@
 // against best defence. Each was checked with Stockfish (scripts/check-endgames.mjs): the wins
 // are wins, the draws are draws.
 import type { Color } from "../store";
+import type { PlanIdea } from "../openings/plans";
 
 export type EndgameGoal =
   /** Deliver checkmate. */
@@ -27,7 +28,7 @@ export interface Endgame {
   hint: string;
   level: 1 | 2 | 3;
   /** Positions from the student's games (convert/positions.ts) set their own bars, student's view, centipawns. */
-  /** Convert: below this the advantage is gone (default 150). */
+  /** Convert or promote: below this the advantage is gone (default 150 for convert, 200 for promote). */
   failBelow?: number;
   /** Convert: at or above this it's decisive and the try is won (default 600). */
   winAt?: number;
@@ -35,6 +36,8 @@ export interface Endgame {
   lostAt?: number;
   /** Where the position came from, shown above the board ("Your game, 12 Oct: you drew it"). */
   note?: string;
+  /** Surprise endings (surprise.ts): what to think about, one idea per hint, with drawings on the start position. */
+  ideas?: PlanIdea[];
 }
 
 export const ENDGAMES: Endgame[] = [

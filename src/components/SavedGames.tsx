@@ -9,6 +9,7 @@ import { ratingPool } from "../rating";
 import { StackBar } from "./Bars";
 import { GameRow, outcome } from "./GameDialogs";
 import { ImportDialog } from "./ImportDialog";
+import { loadAccounts, refreshAllAccounts, useAccounts, useImport } from "../games/import";
 
 type Source = "chesscom" | "lichess" | "rated" | "practice";
 const SOURCES: { id: Source; label: string }[] = [
@@ -118,12 +119,32 @@ export function SavedGames() {
   const [picked, setPicked] = useState<Bucket | null>(null);
   const [shown, setShown] = useState(50);
 
-  useEffect(() => {
+  const reload = () =>
     db.listGames(100_000).then(
       (list) => setGames([...list].sort((a, b) => playedAt(b) - playedAt(a) || b.id - a.id)),
       (e) => setError(String(e)),
     );
+  useEffect(() => {
+    reload();
+    loadAccounts().catch(() => undefined);
   }, []);
+
+  const accounts = useAccounts((s) => s.list?.filter((a) => a.account !== null).length ?? 0);
+  const busy = useImport((s) => Object.values(s).some((x) => x?.running));
+  const [fetchNote, setFetchNote] = useState<string | null>(null);
+  /** Every saved chess.com and Lichess account at once; with none yet, the import dialog to add one. */
+  const getNewGames = async () => {
+    if (!accounts) return setImporting(true);
+    setFetchNote(null);
+    const r = await refreshAllAccounts();
+    const failed = r.failed ? ` ${r.failed} account${r.failed > 1 ? "s" : ""} couldn't be reached.` : "";
+    setFetchNote((r.added ? `Added ${r.added} new game${r.added > 1 ? "s" : ""}.` : "No new games.") + failed);
+    if (r.added) reload();
+  };
+  const closeImport = () => {
+    setImporting(false);
+    reload();
+  };
 
   const since = useMemo(() => Date.now() - RANGES.find((r) => r.id === f.range)!.days * 86400_000, [f.range]);
   const filtered = useMemo(() => games?.filter((g) => matches(g, f, since)) ?? [], [games, f, since]);
@@ -155,7 +176,26 @@ export function SavedGames() {
 
   return (
     <>
-      <h2 className="section-title">Saved games</h2>
+      <div className="saved-head">
+        <h2 className="section-title">Saved games</h2>
+        {games && games.length > 0 && (
+          <div className="saved-import">
+            <button
+              onClick={getNewGames}
+              disabled={busy}
+              title={accounts ? "Bring in new games from every saved chess.com and Lichess account" : "Add a chess.com or Lichess account"}
+            >
+              {busy ? "Getting games…" : accounts ? "↻ Get new games" : "Import games"}
+            </button>
+            {accounts > 0 && (
+              <button className="link-button" onClick={() => setImporting(true)}>
+                Accounts
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {fetchNote && !busy && <p className="muted small">{fetchNote}</p>}
       {error && <p className="error">{error}</p>}
       {games?.length === 0 && (
         <div className="empty-state">
@@ -269,7 +309,7 @@ export function SavedGames() {
           )}
         </>
       )}
-      {importing && <ImportDialog onClose={() => setImporting(false)} />}
+      {importing && <ImportDialog onClose={closeImport} />}
     </>
   );
 }

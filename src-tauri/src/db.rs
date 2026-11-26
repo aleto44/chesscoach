@@ -284,7 +284,17 @@ WHERE kind = 'mistake' AND retired = 0 AND id IN (
 -- was bad, what the best move does, the theme. JSON from src/analysis/lesson.ts. NULL = not worked
 -- out yet (drills made before this; the computer fills them in).
 ALTER TABLE drills ADD COLUMN lesson TEXT;
-"#];
+"#, r#"
+-- What sort of position a drill is, for the drills menu (src/analysis/drillCategory.ts: 'hung',
+-- 'walked-into', 'missed-material', ...). Worked out by the app; NULL until it has, then the kind
+-- stands in. Opening-line drills are dropped (the student didn't find them useful): retired, so
+-- their history stays.
+ALTER TABLE drills ADD COLUMN category TEXT;
+UPDATE drills SET retired = 1 WHERE kind = 'opening';
+"#,
+    // Utility › Load game's history, shared by the computer and the phone (src-tauri/src/loads.rs).
+    crate::loads::LOADS_TABLE,
+];
 
 impl Db {
     pub fn open(path: &Path) -> rusqlite::Result<Self> {
@@ -332,9 +342,57 @@ pub fn db_get_settings(db: State<Db>) -> Result<serde_json::Map<String, serde_js
     Ok(out)
 }
 
-/// A null value deletes the setting (back to the default).
+/// A null value deletes the setting (back to the default). The other devices are told, so a phone's
+/// progress (course decisions, say) shows on the computer without a restart, and a
+/// stale copy there can't save over it.
 #[tauri::command]
-pub fn db_set_setting(db: State<Db>, key: String, value: serde_json::Value) -> Result<(), String> {
+pub fn db_set_setting(app: tauri::AppHandle, db: State<Db>, key: String, value: serde_json::Value) -> Result<(), String> {
+    store_setting(&db, &key, &value)?;
+    crate::notify_setting_changed(&app, crate::relay::DESKTOP, &key, &value);
+    Ok(())
+}
+
+/// One opening-course decision's progress (openings/progress.ts), merged into the `openingCourse`
+/// setting rather than sent as the whole map: a phone that studied offline sends these later, from
+/// its outbox, and must not write its old copy of the other decisions over the computer's. Where
+/// both devices answered the same decision, the later answer (`at`, ms) wins. Every device, the
+/// sender included, is sent the merged map.
+#[tauri::command]
+pub fn db_course_progress(app: tauri::AppHandle, db: State<Db>, id: String, progress: serde_json::Value) -> Result<(), String> {
+    merge_course_progress(&app, &db, &id, progress)
+}
+
+pub fn merge_course_progress(app: &tauri::AppHandle, db: &Db, id: &str, progress: serde_json::Value) -> Result<(), String> {
+    let merged = merge_course(&db.0.lock().unwrap(), id, progress)?;
+    crate::notify_setting_changed(app, "merged", "openingCourse", &merged);
+    Ok(())
+}
+
+/// Stores one decision's progress unless the stored one is newer; returns the whole map.
+fn merge_course(conn: &Connection, id: &str, progress: serde_json::Value) -> Result<serde_json::Value, String> {
+    let raw: Option<String> = conn
+        .query_row("SELECT value FROM settings WHERE key = 'openingCourse'", [], |r| r.get(0))
+        .optional()
+        .map_err(err)?;
+    let mut map = raw
+        .and_then(|v| serde_json::from_str::<serde_json::Value>(&v).ok())
+        .filter(|v| v.is_object())
+        .unwrap_or_else(|| serde_json::json!({}));
+    let at = |v: &serde_json::Value| v.get("at").and_then(|a| a.as_f64()).unwrap_or(0.0);
+    let newer = map.get(id).is_none_or(|old| at(&progress) >= at(old));
+    if newer {
+        map[id] = progress;
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES ('openingCourse', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [map.to_string()],
+        )
+        .map_err(err)?;
+    }
+    Ok(map)
+}
+
+pub fn store_setting(db: &Db, key: &str, value: &serde_json::Value) -> Result<(), String> {
     let conn = db.0.lock().unwrap();
     if value.is_null() {
         conn.execute("DELETE FROM settings WHERE key = ?1", [key]).map_err(err)?;
@@ -535,11 +593,22 @@ pub fn db_create_game(db: State<Db>, game: NewGame) -> Result<i64, String> {
 }
 
 #[tauri::command]
-pub fn db_update_game(db: State<Db>, id: i64, patch: GamePatch) -> Result<(), String> {
-    update_game(&mut db.0.lock().unwrap(), id, patch)
+pub fn db_update_game(app: tauri::AppHandle, db: State<Db>, id: i64, patch: GamePatch) -> Result<(), String> {
+    update_game_from(&app, &db, crate::relay::DESKTOP, id, patch)
 }
 
-fn update_game(conn: &mut Connection, id: i64, patch: GamePatch) -> Result<(), String> {
+/// Saves the patch; a rated game's result moves a rating setting, which the other devices are told
+/// about like any setting (they'd otherwise pair and teach by the old rating).
+pub fn update_game_from(app: &tauri::AppHandle, db: &Db, client: &str, id: i64, patch: GamePatch) -> Result<(), String> {
+    let rated = update_game(&mut db.0.lock().unwrap(), id, patch)?;
+    if let Some((key, after)) = rated {
+        crate::notify_setting_changed(app, client, key, &serde_json::json!(after));
+    }
+    Ok(())
+}
+
+/// The rating setting the result moved, and its new value, if it moved one.
+fn update_game(conn: &mut Connection, id: i64, patch: GamePatch) -> Result<Option<(&'static str, i64)>, String> {
     let tx = conn.transaction().map_err(err)?;
     let was_over: bool = tx
         .query_row("SELECT result IS NOT NULL FROM games WHERE id = ?1", [id], |r| r.get(0))
@@ -561,10 +630,9 @@ fn update_game(conn: &mut Connection, id: i64, patch: GamePatch) -> Result<(), S
     .map_err(err)?;
     // Rated once, when the result first arrives: a second device saving the same result
     // (both saw the game end) finds it already over.
-    if !was_over && patch.result.is_some() {
-        rate_game(&tx, id)?;
-    }
-    tx.commit().map_err(err)
+    let rated = if !was_over && patch.result.is_some() { rate_game(&tx, id)? } else { None };
+    tx.commit().map_err(err)?;
+    Ok(rated)
 }
 
 /// Where a player's rating starts until they set their own (Settings), chess.com scale.
@@ -623,7 +691,7 @@ pub fn player_rating(conn: &Connection, pool: &str) -> Result<(i64, i64), String
 /// Elo against the opponent's rating (the bot's chess.com-scale strength), in the pool the game's
 /// clock belongs to, stored on the game and in that pool's setting. Mirrors `eloChange` in
 /// src/rating.ts, which previews it before a game.
-fn rate_game(conn: &Connection, id: i64) -> Result<(), String> {
+fn rate_game(conn: &Connection, id: i64) -> Result<Option<(&'static str, i64)>, String> {
     let (mode, color, opponent, result, time_control): (String, String, Option<String>, Option<String>, Option<String>) = conn
         .query_row("SELECT mode, student_color, opponent, result, time_control FROM games WHERE id = ?1", [id], |r| {
             Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
@@ -631,9 +699,9 @@ fn rate_game(conn: &Connection, id: i64) -> Result<(), String> {
         .map_err(err)?;
     // Only "stockfish-cc:" keys are on the chess.com scale (older "stockfish:" games never get here).
     let opp = opponent.as_deref().and_then(|o| o.strip_prefix("stockfish-cc:")).and_then(|r| r.parse::<i64>().ok());
-    let (Some(opp), Some(result)) = (opp, result) else { return Ok(()) };
+    let (Some(opp), Some(result)) = (opp, result) else { return Ok(None) };
     if mode != "rated" || color == "both" {
-        return Ok(());
+        return Ok(None);
     }
     let score = match (result.as_str(), color.as_str()) {
         ("1/2-1/2", _) => 0.5,
@@ -654,7 +722,7 @@ fn rate_game(conn: &Connection, id: i64) -> Result<(), String> {
         [rating_key(pool), &after.to_string()],
     )
     .map_err(err)?;
-    Ok(())
+    Ok(Some((rating_key(pool), after)))
 }
 
 /// Bigger steps for the first games, so a rating that was set wrong settles quickly.
@@ -958,6 +1026,29 @@ mod tests {
         assert_eq!(rating_pool(Some("300+0")), "blitz");
         assert_eq!(rating_pool(Some("600+0")), "rapid");
         assert_eq!(rating_pool(Some("900+10")), "rapid");
+    }
+
+    #[test]
+    fn course_answers_merge_by_decision() {
+        let path = std::env::temp_dir().join(format!("cc-course-test-{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let db = Db::open(&path).unwrap();
+        let conn = db.conn();
+        let p = |box_: i64, at: i64| serde_json::json!({ "box": box_, "due": 0, "right": 0, "wrong": 0, "at": at });
+        merge_course(&conn, "a", p(1, 100)).unwrap();
+        merge_course(&conn, "b", p(2, 200)).unwrap();
+        // An older answer sent late (a phone's outbox) doesn't undo a newer one; the rest stays.
+        let map = merge_course(&conn, "a", p(0, 50)).unwrap();
+        assert_eq!(map["a"]["box"], 1);
+        assert_eq!(map["b"]["box"], 2);
+        let map = merge_course(&conn, "a", p(3, 300)).unwrap();
+        assert_eq!(map["a"]["box"], 3);
+        drop(conn);
+        let stored = db.setting("openingCourse").unwrap();
+        assert_eq!(stored["a"]["box"], 3);
+        assert_eq!(stored["b"]["box"], 2);
+        drop(db);
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

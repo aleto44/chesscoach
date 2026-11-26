@@ -41,7 +41,7 @@ export function VoiceSettings() {
       <label className="field">
         <span className="muted small">Ask me to confirm a move</span>
         <select value={voiceConfirm} onChange={(e) => saveSetting("voiceConfirm", e.target.value as typeof voiceConfirm)}>
-          <option value="rated">In rated games, and when it isn't sure</option>
+          <option value="rated">In rated games and rated puzzles, and when it isn't sure</option>
           <option value="unsure">Only when it isn't sure</option>
           <option value="always">Every move</option>
         </select>

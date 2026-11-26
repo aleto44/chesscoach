@@ -47,7 +47,8 @@ export type Color = "white" | "black";
 
 /**
  * Fixed when a game starts (a rated game can only be downgraded to practice).
- * rated: no engine, coach or takebacks until it's over, so it shows the student's real play.
+ * rated: no engine or coach until it's over, so it shows the student's real play (a misclick can be
+ * taken back; the student polices that themselves, and `takebacks` counts it).
  * practice: everything allowed.
  */
 export type GameMode = "rated" | "practice";
@@ -169,7 +170,7 @@ useStore.subscribe((s, prev) => {
   if (s.game !== prev.game && s.gameFork) useStore.setState({ gameFork: null });
 });
 
-/** A rated game still being played: engine, coach, takebacks and side boards are off. */
+/** A rated game still being played: engine, coach and side boards are off (a misclick can still be taken back). */
 export function isLocked(meta: GameMeta = get().meta): boolean {
   return meta.mode === "rated" && !meta.result;
 }
@@ -213,7 +214,7 @@ export function gameDescription(): string {
   const focus = meta.openingFocus ? `, practicing the opening ${meta.openingFocus.join(" ")}` : "";
   const mode =
     meta.mode === "rated"
-      ? "rated game (played without engine, coach or takebacks)"
+      ? `rated game (played without engine or coach${meta.takebacks ? `; the student took back ${meta.takebacks} misclick${meta.takebacks > 1 ? "s" : ""}` : ""})`
       : `practice game (help allowed${meta.takebacks ? `, ${meta.takebacks} takeback${meta.takebacks > 1 ? "s" : ""}` : ""})`;
   const maia = meta.opponentElo && meta.opponentElo <= MAIA_MAX_RATING ? " (a bot trained to play like humans of that rating)" : "";
   return `${mode}: student plays ${side} vs ${opponentLabel(meta)}${maia}${clock}${focus}, ${state}`;

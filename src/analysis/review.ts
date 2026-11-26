@@ -287,7 +287,16 @@ export function labelOf(a: MoveAnnotation): MoveLabel {
   return a.class;
 }
 
-export async function analyzeGame(g: GameInput, onProgress?: (done: number, total: number) => void) {
+/**
+ * `onAnnotated` gets the review as soon as the moves are judged: saving it and working out the
+ * drills' lessons (deep searches, one per mistake) can take a while longer, and the student
+ * shouldn't wait on that to see the report.
+ */
+export async function analyzeGame(
+  g: GameInput,
+  onProgress?: (done: number, total: number) => void,
+  onAnnotated?: (annotations: MoveAnnotation[]) => void,
+) {
   const { fens } = g.line;
   const evals: Eval[] = [];
   for (let i = 0; i < fens.length; i++) {
@@ -316,6 +325,7 @@ export async function analyzeGame(g: GameInput, onProgress?: (done: number, tota
       secondLoss: before.second ? lossPoints(before, before.second, mover) : undefined,
     };
   });
+  onAnnotated?.(annotations);
 
   if (hasBackend()) {
     const args = {
@@ -344,13 +354,31 @@ export async function analyzeGame(g: GameInput, onProgress?: (done: number, tota
 
 let queue: Promise<unknown> = Promise.resolve();
 
+/** Games this page has already queued for analysis: a game is analyzed (and its report popped open) once. */
+const queued = new Set<number>();
+
+/** Every move already has its verdict (e.g. the review came in with a reload from the database). */
+const fullyAnalyzed = (s: { game: Line; annotations: (MoveAnnotation | null | undefined)[] }) =>
+  s.game.sans.length > 0 && s.game.sans.every((_, i) => s.annotations[i]);
+
 /** Analyzes the open game (when it ends) and any finished games still unanalyzed, one at a time. */
 export function initReview() {
   useStore.subscribe((s, prev) => {
     if (s.gameId !== prev.gameId && s.reportOpen) useStore.setState({ reportOpen: false });
     // A game ended on the other device is analyzed there; this one picks up the saved review.
     // (If that device goes away first, the game is analyzed with the backlog at the next launch.)
-    if (s.gameId !== null && s.gameId === prev.gameId && s.meta.result && !prev.meta.result && !isFollowing()) {
+    // The result can also appear when the game is reread with it already saved (a reload, a phone
+    // catching up on its snapshot); a game that's analyzed already is left alone, so the student
+    // stepping through the review isn't thrown back to the report by a second analysis.
+    if (
+      s.gameId !== null &&
+      s.gameId === prev.gameId &&
+      s.meta.result &&
+      !prev.meta.result &&
+      !isFollowing() &&
+      !queued.has(s.gameId) &&
+      !fullyAnalyzed(s)
+    ) {
       enqueueCurrent();
     }
   });
@@ -385,18 +413,26 @@ export function analyzeBacklog() {
 function enqueueCurrent() {
   const { gameId, game, meta, clocks } = useStore.getState();
   if (gameId === null || game.sans.length === 0) return;
+  queued.add(gameId);
   const input: GameInput = { gameId, line: game, meta, clocks };
   queue = queue.then(async () => {
     const isOpen = () => useStore.getState().gameId === gameId;
     if (isOpen()) useStore.setState({ review: { done: 0, total: game.fens.length } });
     try {
-      const annotations = await analyzeGame(input, (done, total) => {
-        if (isOpen()) useStore.setState({ review: { done, total } });
-      });
-      // The report opens by itself when the game just played has been analyzed.
-      if (isOpen()) useStore.setState({ annotations, review: null, reportOpen: !useStore.getState().active });
+      await analyzeGame(
+        input,
+        (done, total) => {
+          if (isOpen()) useStore.setState({ review: { done, total } });
+        },
+        // The report opens by itself when the game just played has been analyzed; drills are
+        // still being made after this, in the background (the queue waits for them).
+        (annotations) => {
+          if (isOpen()) useStore.setState({ annotations, review: null, reportOpen: !useStore.getState().active });
+        },
+      );
     } catch (e) {
       console.error("analysis failed", e);
+      queued.delete(gameId);
       if (isOpen()) useStore.setState({ review: null });
     }
   });
@@ -409,7 +445,7 @@ async function analyzeStored(id: number) {
   if (!("line" in built)) return;
   const tc = record.game.timeControl?.match(/^(\d+)\+(\d+)$/);
   try {
-    const annotations = await analyzeGame({
+    await analyzeGame({
       gameId: id,
       line: built.line,
       meta: {
@@ -418,8 +454,9 @@ async function analyzeStored(id: number) {
         timeControl: tc ? { initial: Number(tc[1]), increment: Number(tc[2]) } : null,
       },
       clocks: record.moves.map((m) => m.clockMs),
+    }, undefined, (annotations) => {
+      if (useStore.getState().gameId === id) useStore.setState({ annotations });
     });
-    if (useStore.getState().gameId === id) useStore.setState({ annotations });
   } catch (e) {
     console.error(`analysis of game ${id} failed`, e);
   }

@@ -1,8 +1,9 @@
 // App settings, saved in SQLite (settings table). The coach reads coachModel when it starts.
-import { invoke } from "./backend";
+import { clientId, invoke, listen } from "./backend";
 import { create } from "zustand";
 import { hasBackend } from "./db";
 import type { RatingPool } from "./rating";
+import { pendingCourse } from "./offline";
 
 export interface Settings {
   /** Passed to `claude --model`; "" = the CLI's default. */
@@ -51,6 +52,16 @@ export interface Settings {
   voicePushToTalk: boolean;
   /** Opening trainer: the chance (0..1) a line gets one of the opponent's stored mistakes (openings/blunders.ts). */
   openingBlunders: number;
+  /** Opening courses (openings/progress.ts): how well the student knows each decision, by node id. */
+  openingCourse: Record<string, import("./openings/progress").NodeProgress>;
+  /** The coach's closer look at decisions the student keeps missing (openings/courseMemo.ts), by node id. */
+  openingCourseMemos: Record<string, import("./openings/courseMemo").CourseMemo>;
+  /** Endgame trainer results (endgames/session.ts), by position id. */
+  endgameRecords: Record<string, import("./endgames/session").EndgameRecord>;
+  /** Guess the move: the best score (percent) per game id (guess/session.ts). */
+  guessBest: Record<string, number>;
+  /** Legacy opening trainer: how many times each line has come up, by its moves (openings/training.ts). */
+  openingSeen: Record<string, number>;
 }
 
 const DEFAULTS: Settings = {
@@ -78,6 +89,11 @@ const DEFAULTS: Settings = {
   voiceGate: 0,
   voicePushToTalk: false,
   openingBlunders: 0.2,
+  openingCourse: {},
+  openingCourseMemos: {},
+  endgameRecords: {},
+  guessBest: {},
+  openingSeen: {},
 };
 
 /** The setting each rating pool lives in (rating_key in src-tauri/src/db.rs). */
@@ -120,7 +136,79 @@ export async function loadSettings() {
 
 /** The settings as the database has them (absent = default). */
 export function applySettings(saved: Partial<Settings>) {
-  useSettings.setState({ ...DEFAULTS, ...saved, loaded: true });
+  useSettings.setState({ ...withPending({ ...DEFAULTS, ...saved }), loaded: true });
+  adoptDeviceProgress();
+}
+
+/**
+ * Endgame results, guess-the-move best scores and the legacy trainer's seen counts used to be kept
+ * in each device's localStorage, so the phone and the computer each had their own. Whatever a device
+ * still has is merged into the shared setting once (counts added, best scores the higher), then dropped.
+ */
+const DEVICE_PROGRESS = [
+  { key: "endgameRecords", local: "cc-endgames" },
+  { key: "guessBest", local: "cc-guess-best" },
+  { key: "openingSeen", local: "cc-opening-seen" },
+] as const;
+let adopted = false;
+function adoptDeviceProgress() {
+  if (adopted) return;
+  adopted = true;
+  for (const { key, local } of DEVICE_PROGRESS) {
+    let kept: Record<string, unknown> | null = null;
+    try {
+      kept = JSON.parse(localStorage.getItem(local) ?? "null");
+    } catch {
+      // Unreadable: nothing to bring over.
+    }
+    if (!kept || typeof kept !== "object") continue;
+    const merged: Record<string, unknown> = { ...useSettings.getState()[key] };
+    for (const [id, v] of Object.entries(kept)) merged[id] = mergeProgress(key, merged[id], v);
+    // No computer to keep it (a plain browser): show it, and leave the device's copy where it is.
+    if (!hasBackend()) {
+      useSettings.setState({ [key]: merged } as Partial<Settings>);
+      continue;
+    }
+    saveSetting(key, merged as never).then(
+      () => localStorage.removeItem(local),
+      (e) => console.error("could not bring over", local, e),
+    );
+  }
+}
+function mergeProgress(key: (typeof DEVICE_PROGRESS)[number]["key"], a: unknown, b: unknown): unknown {
+  if (a === undefined) return b;
+  if (key === "guessBest") return Math.max(Number(a), Number(b));
+  if (key === "openingSeen") return Number(a) + Number(b);
+  const x = a as { tries: number; wins: number; last: unknown };
+  const y = b as typeof x;
+  return { tries: x.tries + y.tries, wins: x.wins + y.wins, last: y.last ?? x.last };
+}
+
+/** The computer's copy, with the course answers this phone gave offline and hasn't sent yet on top. */
+function withPending<T extends Partial<Settings>>(s: T): T {
+  if (!s.openingCourse) return s;
+  const pending = pendingCourse();
+  return Object.keys(pending).length ? { ...s, openingCourse: { ...s.openingCourse, ...pending } } : s;
+}
+
+/**
+ * Takes the settings other devices save (the phone's course progress, say) as they're saved. Without
+ * it a device keeps what it loaded at startup, and its next save of a whole map (openingCourse) would
+ * write the stale copy over the other device's progress.
+ */
+export function initSettingsSync() {
+  if (!hasBackend()) return;
+  listen<{ key: keyof Settings; value: unknown; from: string }>("setting-changed", ({ payload }) => {
+    if (payload.from === clientId || !(payload.key in DEFAULTS)) return;
+    useSettings.setState(withPending({ [payload.key]: payload.value ?? DEFAULTS[payload.key] } as Partial<Settings>));
+  });
+  // A phone that missed announcements (backend.ts resync) reads them all again.
+  listen("resync", () => {
+    invoke<Partial<Settings>>("db_get_settings").then(
+      (saved) => useSettings.setState(withPending({ ...DEFAULTS, ...saved })),
+      () => {}, // Out of reach: the next resync tries again.
+    );
+  });
 }
 
 export async function saveSetting<K extends keyof Settings>(key: K, value: Settings[K]) {

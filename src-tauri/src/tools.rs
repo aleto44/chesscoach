@@ -250,6 +250,62 @@ pub fn definitions() -> Value {
             }
         },
         {
+            "name": "query_data",
+            "description": "Read the student's Chess Coach data with one SQL SELECT (SQLite, read-only: nothing \
+                can be changed). Call with no sql to get every table's CREATE statement. Main tables: \
+                games (id, started_at, ended_at, student_color, opponent, result '1-0'/'0-1'/'1/2-1/2', \
+                termination, mode 'rated'/'practice', time_control 'secs+inc', opening_name, opening_focus \
+                (JSON SAN of an opening the student chose to practise), rating_before/rating_after/rating_pool \
+                (in-app rated games), source 'chesscom'/'lichess'/NULL (NULL = played here), url, opponent_name, \
+                opponent_rating, student_rating, speed); moves (game_id, ply 1-based, san, uci, fen_before, \
+                fen_after, by_student, eval_before/eval_after centipawns from White's view, cp_loss from the \
+                mover's view, best_uci, class, label (chess.com-style verdict), phase, tags JSON, clock_ms); \
+                drills (spaced-repetition cards: kind, category, title, fen, color, answer_uci, line, note, lesson JSON, \
+                source_game_id/source_ply, due_at, reps, lapses, retired) and drill_attempts (drill_id, at, \
+                correct, played, ms); puzzle_attempts (puzzle_id, at, correct, ms, puzzle_rating, rated, \
+                rating_after, themes); observations (your saved notes); tangents (boards made in a game: \
+                title, author, start_fen, sans JSON); chat_items (a game's chat, data JSON); settings \
+                (key, value JSON: playerRating = rapid, playerRatingBlitz, playerRatingBullet); \
+                import_accounts; view rated_games. Puzzle file (attached as pz, if downloaded): pz.puzzles \
+                (lichess_id, fen, moves UCI, rating, themes, openings). Real games = mode 'rated' (in-app \
+                rated plus imported); practice games are not evidence of strength. Ratings in games are \
+                already chess.com scale; puzzle ratings (puzzle_rating, rating_after, pz.puzzles.rating) are \
+                Lichess scale: wrap them in chesscom(x) before telling the student. Up to 200 rows; \
+                aggregate in SQL rather than pulling many rows. Use it for anything the other tools don't \
+                answer: which moves the student plays in a position (moves.fen_before LIKE 'board part%'), \
+                results by opening or color, how often they blunder under time pressure, a past game's moves.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "sql": { "type": "string", "description": "One SELECT (or WITH ... SELECT). Omit to get the schema." }
+                }
+            }
+        },
+        {
+            "name": "opening_lines",
+            "description": "The opening trainer's built-in material (School > Openings), which isn't in the database. \
+                No arguments: every opening set (id, name, the side the student plays, how many lines, how often \
+                each line has come up on this device). With set: that set's lines (name, ECO, moves, how common, \
+                times seen, whether it has a plan and move notes). With set and line (a name or part of one): \
+                the line in full, its plan for the student's side, the move notes the Hint button shows, and the \
+                stored opponent mistakes (traps) along it with their punishment.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "set": { "type": "string", "description": "A set's id or name, e.g. \"london\" or \"Caro-Kann\"." },
+                    "line": { "type": "string", "description": "A line's name or part of it, e.g. \"Advance Variation\"." }
+                }
+            }
+        },
+        {
+            "name": "training_progress",
+            "description": "The student's progress in the School trainers that is kept on this device rather than \
+                in the database: opening lines practised (times each came up), endgame trainer results per \
+                position (tries, wins, last), find-the-plan results, guess-the-move best scores per master game, \
+                and puzzle rush best. Drills and puzzles are in query_data.",
+            "inputSchema": { "type": "object", "properties": {} }
+        },
+        {
             "name": "record_observation",
             "description": "Save a short note about the student's play for future sessions, e.g. tag \"endgames\",                 note \"Doesn't activate the king in rook endings\". Use it when you notice a pattern, not for                 one-off slips. Notes show up in get_profile.",
             "inputSchema": {

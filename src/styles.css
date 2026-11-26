@@ -3295,3 +3295,11 @@ cg-board square.chat-hover {
     max-width: calc(var(--screen-h) - 210px);
   }
 }
+
+/* ◀ can be held (the fat-finger recall): no text selection or phone callout while it is. */
+button.back-step {
+  -webkit-touch-callout: none;
+  user-select: none;
+  /* A held finger that drifts would otherwise start a page scroll, which cancels the hold. */
+  touch-action: none;
+}

@@ -20,7 +20,7 @@ import {
 } from "../store";
 import { Board } from "./Board";
 import { sessionName, useNav } from "../nav";
-import { BoardSteps } from "./StepButtons";
+import { BackButton, BoardSteps } from "./StepButtons";
 import { askConfirm } from "./Confirm";
 import { EvalBar } from "./EvalBar";
 import { EngineLines, useEngineLines } from "./Analysis";
@@ -124,10 +124,24 @@ export function BoardPanel() {
     if (await askConfirm({ title: "Resign this game?", body: `${opponentLabel(meta)} wins.`, confirmLabel: "Resign", danger: true }))
       resign();
   };
+  /**
+   * A rated game has no takeback button on purpose: holding ◀ for three seconds opens this, for a
+   * misclick, without putting it in front of anyone who isn't looking for it.
+   */
+  const recall = locked && !tangent && !fork && canTakeBack
+    ? async () => {
+        const ok = await askConfirm({
+          title: "Fat-finger recall",
+          body: "Take back your last move? For a misclick only: the game stays rated, and its record shows the takeback.",
+          confirmLabel: "Take it back",
+        });
+        if (ok) takeBack();
+      }
+    : undefined;
   const confirmHelp = async () => {
     const ok = await askConfirm({
       title: "Switch to practice?",
-      body: "The engine, coach and takebacks turn on, and this game stops counting as rated. This can't be undone.",
+      body: "The engine and coach turn on, and this game stops counting as rated. This can't be undone.",
       confirmLabel: "Switch to practice",
     });
     if (ok) switchToPractice();
@@ -184,7 +198,7 @@ export function BoardPanel() {
           }
         />
         <MaterialStrip fen={line.fens[ply]} side={orientation} />
-        <BoardSteps onStep={(s) => (s === "start" ? goto(0) : s === "end" ? goto(line.sans.length) : step(s))}>
+        <BoardSteps onStep={(s) => (s === "start" ? goto(0) : s === "end" ? goto(line.sans.length) : step(s))} onHoldBack={recall}>
           <button className="icon" onClick={flip} title="Flip board" aria-label="Flip board">⇅</button>
         </BoardSteps>
       </div>
@@ -251,7 +265,7 @@ export function BoardPanel() {
         <div className="side-controls">
           <div className="nav-buttons">
             <button onClick={() => goto(0)} title="Start (Home)" aria-label="Start">⏮</button>
-            <button onClick={() => step(-1)} title="Back (←)" aria-label="Back">◀</button>
+            <BackButton onStep={() => step(-1)} onHold={recall} />
             <button onClick={() => step(1)} title="Forward (→)" aria-label="Forward">▶</button>
             <button onClick={() => goto(line.sans.length)} title="End (End)" aria-label="End">⏭</button>
           </div>
@@ -266,7 +280,7 @@ export function BoardPanel() {
               </button>
             )}
             {locked && (
-              <button onClick={confirmHelp} title="Turn on the engine, coach and takebacks for this game">
+              <button onClick={confirmHelp} title="Turn on the engine and coach for this game">
                 Get help
               </button>
             )}

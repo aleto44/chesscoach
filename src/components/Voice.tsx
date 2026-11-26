@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import "../voice.css";
 import { useSettings } from "../settings";
 import { setHeld, toggleVoice, useVoice, voiceOn, voiceUnavailable } from "../voice/listen";
+import { ratedConfirms, ratedOnScreen, toggleRatedConfirm } from "../voice/confirm";
+import { touchNote } from "../touchLog";
 
 /** A press on the mic button shorter than this is a tap (on/off); longer, with push-to-talk, it was talking. */
 const TAP_MS = 250;
+/** A touch held this long on the mic in a rated game or puzzle flips confirmations (the phone's right-click). */
+const LONG_PRESS_MS = 550;
 
 /**
  * The top bar's mic: voice moves on or off. With push-to-talk, Space (desktop) or holding this
@@ -19,6 +23,21 @@ export function VoiceButton() {
   const unavailable = voiceUnavailable();
   const on = status === "listening" || status === "loading";
   const pressedAt = useRef(0);
+  useSettings((s) => s.voiceConfirm); // re-render the title when confirmations flip
+  const longPress = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const flipped = useRef(false);
+  const pointer = useRef("mouse");
+  const [note, setNote] = useState<{ text: string; at: number } | null>(null);
+  useEffect(() => {
+    if (!note) return;
+    const t = setTimeout(() => setNote(null), 2500);
+    return () => clearTimeout(t);
+  }, [note]);
+  const flipConfirm = () => {
+    const on = toggleRatedConfirm();
+    setNote({ text: on ? "Rated games and puzzles: confirm moves on" : "Rated games and puzzles: confirm moves off", at: Date.now() });
+    navigator.vibrate?.(30);
+  };
 
   // Space held = talking, when push-to-talk is on and nothing else wants the key.
   useEffect(() => {
@@ -42,7 +61,11 @@ export function VoiceButton() {
     };
   }, [pushToTalk, status]);
 
-  const title = unavailable
+  const rated = ratedOnScreen();
+  const confirmHint = rated
+    ? ` ${pushToTalk ? "Right-click" : "Right-click or long-press"} to turn confirmations ${ratedConfirms() ? "off" : "on"}.`
+    : "";
+  const title = (unavailable
     ? unavailable
     : status === "error"
       ? `Voice moves: ${error}`
@@ -52,18 +75,33 @@ export function VoiceButton() {
           ? pushToTalk
             ? "Voice moves on: hold Space (or hold this button) and say a move. Tap to turn off."
             : 'Voice moves on: say a move ("knight f3", "castles"). Click to turn off.'
-          : 'Voice moves: say your moves ("e4", "knight takes d5", "castles king side")';
+          : 'Voice moves: say your moves ("e4", "knight takes d5", "castles king side")') + confirmHint;
 
   // Push-to-talk on a phone: holding the button talks, a quick tap turns voice on or off.
-  const press = () => {
+  const press = (e: React.PointerEvent) => {
     pressedAt.current = performance.now();
-    if (pushToTalk && status === "listening") setHeld(true);
+    pointer.current = e.pointerType;
+    flipped.current = false;
+    touchNote(`MIC down ${e.pointerType} btn=${e.button} rated=${ratedOnScreen()} ptt=${pushToTalk} ${status}`);
+    if (e.button !== 0) return; // the right button is the confirm toggle, not talking
+    if (pushToTalk && status === "listening") return setHeld(true);
+    // A held touch in a rated game flips confirmations (with push-to-talk on, holding talks instead).
+    if (e.pointerType !== "mouse" && ratedOnScreen()) {
+      longPress.current = setTimeout(() => {
+        touchNote("MIC long-press: flip confirmations");
+        flipped.current = true;
+        flipConfirm();
+      }, LONG_PRESS_MS);
+    }
   };
-  const release = () => {
+  const release = (e: React.PointerEvent) => {
+    touchNote(`MIC ${e.type} after ${Math.round(performance.now() - pressedAt.current)}ms`);
+    clearTimeout(longPress.current);
     if (!pushToTalk || status !== "listening") return;
     setHeld(false);
   };
   const click = () => {
+    if (flipped.current) return void (flipped.current = false);
     // Phones have no hover, so a disabled button couldn't say why: the tap shows it.
     if (unavailable) return useVoice.setState({ status: "error", error: unavailable, lastAt: Date.now() });
     const quick = performance.now() - pressedAt.current < TAP_MS;
@@ -81,7 +119,12 @@ export function VoiceButton() {
         onPointerDown={press}
         onPointerUp={release}
         onPointerLeave={release}
-        onContextMenu={(e) => e.preventDefault()}
+        onPointerCancel={release}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          // Touch long-presses are timed in `press`; this is the mouse's right-click.
+          if (pointer.current === "mouse" && ratedOnScreen()) flipConfirm();
+        }}
         title={title}
         aria-label="Voice moves"
         aria-pressed={on}
@@ -93,7 +136,7 @@ export function VoiceButton() {
           {status === "error" && <path d="M4 4l16 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}
         </svg>
       </button>
-      <Heard />
+      {note ? <span className="voice-heard" role="status">{note.text}</span> : <Heard />}
     </span>
   );
 }

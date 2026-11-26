@@ -254,16 +254,20 @@ async function moveOffDeletedGame() {
   else await newGame({ mode: "practice", studentColor: "white", opponentElo: 1500 });
 }
 
-/** Where a takeback would rewind the game to: before the student's last move. Null = nothing to take back. */
+/**
+ * Where a takeback would rewind the game to: before the student's last move. Null = nothing to take
+ * back. Rated games allow it too, for misclicks: the student polices themselves, and the game's
+ * record counts every takeback.
+ */
 export function takebackPly(game: Line, meta: GameMeta): number | null {
-  if (meta.mode !== "practice" || meta.result || meta.studentColor === "both") return null;
+  if (meta.result || meta.studentColor === "both") return null;
   for (let ply = game.sans.length - 1; ply >= 0; ply--) {
     if (sideToMove(game.fens[ply]) === meta.studentColor) return ply;
   }
   return null;
 }
 
-/** Practice games: undo the student's last move (and the opponent's reply), and count it. */
+/** Undoes the student's last move (and the opponent's reply), and counts it. */
 export async function takeBack() {
   const { game, meta, gameId } = useStore.getState();
   const ply = takebackPly(game, meta);

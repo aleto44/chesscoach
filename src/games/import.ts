@@ -206,6 +206,25 @@ export function refreshAccount(a: ImportAccount & { account: string }) {
   return runImport(a.site, a.account, since === null ? 25 : REFRESH_MAX, since);
 }
 
+/**
+ * Gets new games on every saved account, one after another (one failing doesn't stop the rest).
+ * Returns how many accounts there were, how many games came in, and how many accounts failed.
+ */
+export async function refreshAllAccounts(): Promise<{ accounts: number; added: number; failed: number }> {
+  if (useAccounts.getState().list === null) await loadAccounts();
+  const named = (useAccounts.getState().list ?? []).filter((a): a is ImportAccount & { account: string } => a.account !== null);
+  let added = 0;
+  let failed = 0;
+  for (const a of named) {
+    try {
+      added += (await refreshAccount(a)).added;
+    } catch {
+      failed++;
+    }
+  }
+  return { accounts: named.length, added, failed };
+}
+
 function summary(r: ImportResult, refresh: boolean): string {
   if (r.fetched === 0) return refresh ? "No new games since the last one here." : "No games found on that account.";
   const parts = [r.added ? `Added ${r.added} new game${r.added > 1 ? "s" : ""}` : "No new games"];

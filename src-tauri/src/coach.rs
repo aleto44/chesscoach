@@ -144,6 +144,60 @@ fn system_prompt() -> String {
     include_str!("../../coach.md").to_string()
 }
 
+/// What `read_board` asks about a picture: the position only, as JSON the frontend checks.
+const READ_BOARD_PROMPT: &str = "Read the chess position in this image (a screenshot, a diagram or a photo of a real board). \
+Reply with only JSON, no other text: {\"placement\": the FEN piece placement from rank 8 to rank 1 as seen from White's side, \
+whichever way the board is shown, \"bottom\": \"white\" or \"black\" (whose pieces start at the bottom of the picture), \
+\"toMove\": \"w\" or \"b\" if the image shows whose turn it is (a highlighted last move, a clock, text), else null, \
+\"moves\": the game's moves in SAN as an array if the image shows a move list from the start, else null}. \
+Use the board's coordinates when they are shown. If there is no chessboard, reply {\"error\": \"what the image shows instead\"}.";
+
+/// Reads a chessboard from an image (base64) with the coach's model: one call, no tools. The answer
+/// is the model's JSON as text; the frontend validates it, since a misread square is always possible.
+pub async fn read_board(app: &AppHandle, image: String, media_type: String) -> Result<String, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let model = app.state::<crate::db::Db>().setting("coachModel");
+    let model = model.as_ref().and_then(|m| m.as_str()).filter(|m| !m.is_empty()).map(str::to_string);
+    tauri::async_runtime::spawn_blocking(move || {
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let mut cmd = claude_command();
+        // An image needs a content block, so the message goes in as stream-json (which needs stream-json out).
+        cmd.current_dir(&dir)
+            .args(["-p", "--verbose", "--input-format", "stream-json", "--output-format", "stream-json"])
+            .args(["--tools", "", "--strict-mcp-config"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if let Some(model) = &model {
+            cmd.args(["--model", model]);
+        }
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("could not start {}: {e}", claude_exe().display()))?;
+        let msg = json!({ "type": "user", "message": { "role": "user", "content": [
+            { "type": "image", "source": { "type": "base64", "media_type": media_type, "data": image } },
+            { "type": "text", "text": READ_BOARD_PROMPT },
+        ] } });
+        let mut stdin = child.stdin.take().unwrap();
+        writeln!(stdin, "{msg}").map_err(|e| e.to_string())?;
+        drop(stdin);
+        let out = child.wait_with_output().map_err(|e| e.to_string())?;
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        // The last line of the stream is the result.
+        let result = stdout
+            .lines()
+            .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+            .find(|v| v["type"] == "result");
+        match result {
+            Some(r) if r["is_error"] != true => Ok(r["result"].as_str().unwrap_or_default().trim().to_string()),
+            Some(r) => Err(format!("the coach couldn't read the image: {}", r["result"].as_str().unwrap_or("error"))),
+            None => Err(format!("the coach couldn't read the image: {}", String::from_utf8_lossy(&out.stderr).trim())),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// The instructions for one-off explanations (`coach_explain`): no tools, no conversation.
 const EXPLAIN_PROMPT: &str = "You are a chess coach explaining opening theory to a club player. \
 Answer in plain prose with short Markdown headings when asked for sections. Use the engine numbers \

@@ -16,6 +16,7 @@ import { stopEndgame } from "../endgames/session";
 import { stopOpening } from "../openings/session";
 import { keepSession } from "../persist";
 import { stopPlans } from "../plans/session";
+import { saveSetting, useSettings } from "../settings";
 
 export interface GuessGame {
   /** Saved best scores are kept per id; pasted games have none. */
@@ -52,25 +53,13 @@ const set = (patch: Partial<GuessSession>) => useGuess.setState(patch);
 export const score = (s: GuessSession) => s.results.reduce((n, r) => n + r.points, 0);
 export const maxScore = (s: GuessSession) => s.results.length * 3;
 
-// ---- Best scores, kept on this device ----
+// ---- Best scores, kept in the settings (guessBest) so every device has them ----
 
-const BEST_KEY = "cc-guess-best";
-export function bestScores(): Record<string, number> {
-  try {
-    return JSON.parse(localStorage.getItem(BEST_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
-}
+export const bestScores = (): Record<string, number> => useSettings.getState().guessBest;
 function saveBest(id: string, pct: number) {
   const all = bestScores();
   if ((all[id] ?? -1) >= pct) return;
-  all[id] = pct;
-  try {
-    localStorage.setItem(BEST_KEY, JSON.stringify(all));
-  } catch {
-    // Private mode: not kept.
-  }
+  saveSetting("guessBest", { ...all, [id]: pct }).catch((e) => console.error("saving the best score failed", e));
 }
 
 // ---- The session ----
@@ -232,8 +221,5 @@ export function guessContext(): { title: string; fen: string; detail: string } |
 export function guessQuestion(): string {
   const s = get()!;
   const last = s.results[s.results.length - 1];
-  const fen = s.line.fens[last ? last.ply : s.line.sans.length];
-  return last && last.guess !== last.master
-    ? `In "${s.game.title}" (position before the move: FEN ${fen}) I guessed ${last.guess} but the master played ${last.master}. What's the idea behind ${last.master}, and what's wrong with mine? Show it on the board, briefly.`
-    : `In "${s.game.title}", what's the plan for ${s.side} here? Keep it short.`;
+  return `In "${s.game.title}" (position before the move: FEN ${s.line.fens[last.ply]}) I guessed ${last.guess} but the master played ${last.master}. What's the idea behind ${last.master}, and what's wrong with mine? Show it on the board, briefly.`;
 }

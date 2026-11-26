@@ -351,14 +351,7 @@ export function planContext(): { title: string; fen: string; detail: string } | 
       `the student plays ${p.color} and looks for the plan in a quiet position; in the game they played ${p.gameMove}` +
       (answered(s) && s.best && s.played
         ? `. They now played ${s.played.san}; the engine's move is ${s.best.san}`
-        : ". It's the student's turn: don't reveal the engine's move"),
+        : ". It's the student's turn: don't reveal the engine's move") +
+      (s.hint && !answered(s) ? `; the student took the hint: the piece to move (${s.best?.uci.slice(0, 2) ?? "?"}) is circled` : ""),
   };
-}
-
-export function planQuestion(): string {
-  const s = get()!;
-  const p = planOf(s)!;
-  return answered(s) && s.best && s.played
-    ? `In this position from my game (FEN ${p.fen}) I played ${s.played.san}, the engine prefers ${s.best.san}. What's the plan, and what does mine miss? Show it on the board, briefly.`
-    : `I'm looking for a plan in this position from my game (FEN ${p.fen}), playing ${p.color}. Without telling me the move, what should I be thinking about?`;
 }

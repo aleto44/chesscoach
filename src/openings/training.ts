@@ -3,6 +3,7 @@
 // student stays on the line, then plays on its own. The lines also feed the book (game names, the
 // coach's book_lookup). Every line is checked for legality by scripts/check-book.mjs.
 import type { Color } from "../store";
+import { saveSetting, useSettings } from "../settings";
 
 export interface TrainingLine {
   eco: string;
@@ -112,7 +113,7 @@ export const TRAINING_SETS: TrainingSet[] = [
       T("D02", "London System: hxg3, g4-g5 and ...hxg5?", "d4 d5 Bf4 Nf6 e3 e6 Nf3 Bd6 Bg3 Bxg3 hxg3 O-O Bd3 Nbd7 g4 h6 g5 hxg5 Nxg5", 5),
       T("D02", "London System: ...Qb6 and ...c4, 6...Bf5? Qxf5", "d4 d5 Bf4 Nf6 e3 c5 c3 Qb6 Qb3 c4 Qc2 Bf5 Qxf5 e5 dxe5", 6),
       T("D02", "London System: ...Qb6 and ...Qxc5?, Qxb7", "d4 d5 Bf4 Nf6 e3 c5 c3 Nc6 Nd2 Qb6 Qb3 Bf5 dxc5 Qxc5 Qxb7 Rc8 Nb3 Qb6 Qxb6 axb6", 5),
-      T("A48", "London System: King's Indian, ...e5? and the e5 pawn", "d4 Nf6 Bf4 g6 e3 Bg7 Nf3 O-O Be2 d6 h3 Nc6 O-O e5 dxe5 dxe5 Nxe5 Nxe5 Qxd8 Rxd8 Bxe5", 6),
+      T("A48", "London System: King's Indian, ...dxe5? and the e5 pawn", "d4 Nf6 Bf4 g6 e3 Bg7 Nf3 O-O Be2 d6 h3 Nc6 O-O e5 dxe5 dxe5 Nxe5 Nxe5 Qxd8 Rxd8 Bxe5", 6),
       T("D02", "London System: Bb5 and Ne5, ...bxc6? Bxc6+", "d4 d5 Bf4 Nf6 e3 Nc6 Nf3 Bf5 Bb5 e6 Ne5 Bd6 Nxc6 bxc6 Bxc6+ Ke7 Bxa8 Qxa8", 4),
       T("D00", "London System: Mirror, ...c5 Bb5+ and ...a6?", "d4 d5 Bf4 Bf5 e3 e6 Nf3 c5 Bb5+ Nd7 c4 a6 Bxd7+ Qxd7 Ne5 Qd8 Qa4+ Ke7 cxd5", 4),
     ], false),
@@ -185,7 +186,8 @@ export const TRAINING_SETS: TrainingSet[] = [
     name: "King's Indian",
     color: "black",
     mode: "Main lines",
-    blurb: "...Nf6, ...g6, ...Bg7, ...d6 and ...O-O, then ...e5 (or ...c5) to hit the center. These are White's setups against it.",
+    blurb:
+      "...Nf6, ...g6, ...Bg7, ...d6 and ...O-O, then ...e5 (or ...c5) to hit the center. These are White's setups against it: the c4 lines, and the 1.e4 lines (the Pirc), the Jobava London and the Trompowsky you meet in your own games.",
     lines: [
       T("E99", "King's Indian Defense: Mar del Plata, ...Ne7 and ...f5", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7 Ne1 Nd7 Nd3 f5", 14),
       T("E92", "King's Indian Defense: Exchange, queens off", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 dxe5 dxe5 Qxd8 Rxd8 Bg5 Re8", 5),
@@ -197,6 +199,20 @@ export const TRAINING_SETS: TrainingSet[] = [
       T("A48", "London System: King's Indian setup, ...Nbd7 and ...e5", "d4 Nf6 Bf4 g6 e3 Bg7 Nf3 O-O Be2 d6 O-O Nbd7 h3 Qe8 Bh2 e5", 6),
       T("A48", "Torre Attack: King's Indian setup", "d4 Nf6 Nf3 g6 Bg5 Bg7 Nbd2 O-O e3 d6 Be2 Nbd7 O-O e5 c3 h6 Bh4", 4),
       T("A26", "English Opening: Botvinnik setup vs the King's Indian", "c4 Nf6 Nc3 g6 g3 Bg7 Bg2 O-O e4 d6 Nge2 e5 O-O c6 d3", 4),
+      // The same setup against 1.e4 (the Pirc) and the 1.d4 sidelines: the student's own games as Black.
+      T("B08", "Pirc Defense: Bc4 and O-O, the ...Nxe4 fork trick", "e4 d6 d4 Nf6 Nc3 g6 Nf3 Bg7 Bc4 O-O O-O Nxe4 Nxe4 d5 Bd3 dxe4 Bxe4 c5 c3 cxd4 Nxd4 Nd7", 10),
+      T("B08", "Pirc Defense: Bc4 and an early e5", "e4 d6 d4 Nf6 Nc3 g6 Nf3 Bg7 Bc4 O-O e5 dxe5 Nxe5 Nfd7 Nxd7 Qxd7 O-O Nc6 d5 Na5", 5),
+      T("B07", "Pirc Defense: 150 Attack, Bh6 and ...e5", "e4 d6 d4 Nf6 Nc3 g6 Be3 Bg7 Qd2 O-O Bh6 e5 Bxg7 Kxg7 f3 Nc6 d5 Ne7 O-O-O a6", 6),
+      T("B07", "Pirc Defense: Be3, Nf3 and Bc4, the ...Nxe4 fork trick", "e4 d6 d4 Nf6 Nc3 g6 Be3 Bg7 Nf3 O-O Bc4 Nxe4 Nxe4 d5 Bd3 dxe4 Bxe4 Nd7 O-O e5", 5),
+      T("B08", "Pirc Defense: Classical, Be2 and ...e5", "e4 d6 d4 Nf6 Nc3 g6 Nf3 Bg7 Be2 O-O O-O e5 dxe5 dxe5 Qxd8 Rxd8 Bg5 Bg4", 5),
+      T("B07", "Pirc Defense: quiet d3 setup, ...e5 and ...c5", "e4 d6 Nf3 Nf6 Nc3 g6 d3 Bg7 Be2 O-O O-O e5 Be3 c5 Qd2 Nc6", 7),
+      T("B07", "Pirc Defense: Bc4 and d3, ...c5 and ...Nc6", "e4 d6 Bc4 Nf6 d3 g6 Nf3 Bg7 O-O O-O c3 c5 a4 Nc6 Nbd2 a6", 4),
+      T("B07", "Pirc Defense: Bc4 and Ng5, ...O-O and the fork trick", "e4 d6 Nc3 Nf6 Bc4 g6 Nf3 Bg7 Ng5 O-O d4 h6 Nf3 Nxe4 Nxe4 d5 Bd3 dxe4 Bxe4 c5", 3),
+      T("B08", "Pirc Defense: Bd3 and e5, ...dxe5 and ...Ng4", "d4 Nf6 Nc3 g6 Nf3 Bg7 e4 d6 Bd3 O-O e5 dxe5 dxe5 Ng4 h3 Nxe5 Nxe5 Bxe5 Bh6 Re8", 5),
+      T("B09", "Pirc Defense: Austrian Attack, ...c5 and ...Qa5", "e4 d6 d4 Nf6 Nc3 g6 f4 Bg7 Nf3 c5 dxc5 Qa5 Bd3 Qxc5 Qe2 O-O Be3 Qa5 O-O Bg4", 3),
+      T("E70", "King's Indian Defense: Bd3 setup, ...Nc6-b4", "e4 d6 Nf3 g6 d4 Bg7 c4 Nf6 Bd3 O-O O-O Nc6 d5 Nb4 Nc3 Nxd3 Qxd3 e5 dxe6 Bxe6", 3),
+      T("A45", "Jobava London: 4.Qd2 d5 and ...Ne4", "d4 Nf6 Nc3 g6 Bf4 Bg7 Qd2 d5 Bh6 O-O Nf3 Ne4 Nxe4 dxe4 Bxg7 Kxg7 Ng5 e5", 4),
+      T("A45", "Trompowsky Attack: 2...g6 3.Bxf6 exf6", "d4 Nf6 Bg5 g6 Bxf6 exf6 e3 Bg7 c4 d5 Nc3 dxc4 Bxc4 O-O Nf3 c6", 4),
     ],
   },
   {
@@ -209,7 +225,7 @@ export const TRAINING_SETS: TrainingSet[] = [
     parent: "kid",
     mode: "Punish mistakes",
     blurb:
-      "Deeper King's Indian lines: the Orthodox 6...e5, the Glek 7...Na6, the Four Pawns and the London. Some are main lines to know; the rest are natural White moves that lose something, and how the g7 bishop cashes in.",
+      "Deeper King's Indian lines: the Orthodox 6...e5, the Glek 7...Na6, the Four Pawns and the London, plus the 1.e4 lines from your own games: early e5 pushes, queen trades and loose pieces. Some are main lines to know; the rest are natural White moves that lose something, and how to cash in.",
     lines: startNearSplit([
       // Orthodox 7.O-O Nc6: main lines to know.
       T("E99", "King's Indian Defense: Mar del Plata, 10.f3 and the ...g5 storm", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7 Ne1 Nd7 f3 f5 Be3 f4 Bf2 g5 Nd3 Ng6 c5 Nf6", 12),
@@ -235,6 +251,16 @@ export const TRAINING_SETS: TrainingSet[] = [
       // London.
       T("A48", "London System: King's Indian, 7.c4 Nh5", "d4 Nf6 Bf4 g6 e3 Bg7 Nf3 O-O Be2 d6 O-O Nbd7 c4 Nh5 Bg5 h6 Bh4 g5 Bg3 Nxg3 hxg3", 5),
       T("A48", "London System: King's Indian, ...Qb6 and ...Be6", "d4 Nf6 Bf4 g6 e3 Bg7 Nf3 O-O Be2 d6 h3 c5 c3 Qb6 Qb3 Be6 Qxb6 axb6", 5),
+      // The setup against 1.e4 and the quiet 1.d4 lines, from the student's own games. 7...Ne5 in the
+      // 9.Bg4? line and 6...Nbd7 / 7...h6 in the 9.Nxg5? line are ~0.3-0.5 below the engine's best,
+      // kept because they're the student's own moves and the trap that follows is what they met.
+      T("B07", "Pirc Defense: quiet Bg5, 9.Bg4? Nxg4", "e4 d6 Nf3 Nf6 Nc3 g6 Be2 Bg7 d3 O-O O-O Nbd7 Bg5 Ne5 Nxe5 dxe5 Bg4 Nxg4 h3 h6 Bd2 Nf6", 4),
+      T("B07", "Pirc Defense: 3.e5?, queens off and ...Ng4", "e4 d6 d4 Nf6 e5 dxe5 dxe5 Qxd1+ Kxd1 Ng4 Ke1 Nxe5 Nc3 Bd7", 3),
+      T("B08", "Pirc Defense: queens off, 8.h3? Nxe5", "e4 d6 d4 Nf6 Nc3 g6 Nf3 Bg7 e5 dxe5 dxe5 Qxd1+ Nxd1 Ng4 h3 Nxe5 Nxe5 Bxe5", 5),
+      T("B07", "Pirc Defense: 3.Bc4?, ...Nxe4", "e4 d6 Nf3 Nf6 Bc4 Nxe4 O-O Nf6 Re1 g6 d4 Bg7 h3 O-O", 3),
+      T("B08", "Pirc Defense: h3 and Bg5, 9.Nxg5? hxg5", "e4 d6 d4 Nf6 Nc3 g6 Nf3 Bg7 h3 O-O Bd3 Nbd7 Bg5 h6 Bh4 g5 Nxg5 hxg5 Bxg5 c5 d5 Ne5", 3),
+      T("B08", "Pirc Defense: Bd3 and e5, 8.e6? Bxe6", "d4 Nf6 Nc3 g6 Nf3 Bg7 e4 d6 Bd3 O-O e5 dxe5 dxe5 Ng4 e6 Bxe6 h3 Nf6", 4),
+      T("B07", "Pirc Defense: Be3 and Bc4, the fork trick and 8.Bb3?", "e4 d6 d4 Nf6 Nc3 g6 Be3 Bg7 Nf3 O-O Bc4 Nxe4 Nxe4 d5 Bb3 dxe4 Ng5 Nc6 c3 e5 d5 Na5", 3),
     ], true),
   },
   {
@@ -326,25 +352,13 @@ export function pickLine(set: TrainingSet, avoid?: TrainingLine): TrainingLine {
   return lines[lines.length - 1];
 }
 
-/** How many times each line has come up, per device: enough to show which ones are still new. */
-const SEEN_KEY = "cc-opening-seen";
-
-export function seenCounts(): Record<string, number> {
-  try {
-    return JSON.parse(localStorage.getItem(SEEN_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
-}
+/** How many times each line has come up, in the settings (openingSeen): enough to show which ones are still new. */
+export const seenCounts = (): Record<string, number> => useSettings.getState().openingSeen;
 
 export function markSeen(line: TrainingLine) {
+  const key = line.moves.join(" ");
   const seen = seenCounts();
-  seen[line.moves.join(" ")] = (seen[line.moves.join(" ")] ?? 0) + 1;
-  try {
-    localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
-  } catch {
-    // Private mode: nothing to keep.
-  }
+  saveSetting("openingSeen", { ...seen, [key]: (seen[key] ?? 0) + 1 }).catch((e) => console.error("saving seen lines failed", e));
 }
 
 /** The training line a game's opening focus came from, if any. */
