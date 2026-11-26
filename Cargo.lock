@@ -510,18 +510,23 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "chesscoach"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
- "axum",
- "csv",
- "hyper",
- "hyper-util",
- "rusqlite",
- "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+]
+
+[[package]]
+name = "chesscoach-server"
+version = "0.2.0"
+dependencies = [
+ "axum",
+ "csv",
+ "rusqlite",
+ "serde",
+ "serde_json",
  "tokio",
  "tokio-stream",
  "ureq",

@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { buildLine } from "../chess/line";
 import type { Key } from "chessground/types";
 import { openAnalysis } from "../analysis/layer";
-import { hasBackend } from "../backend";
 import { useSettings } from "../settings";
 import {
   castlingFor,
@@ -125,7 +124,6 @@ export function LoadGame() {
         )}
         <span className="muted small">You can also paste or drop a picture here.</span>
       </div>
-      {!hasBackend() && <p className="muted small">Reading pictures needs the computer: open the app there or from the home server.</p>}
       {reading && <p className="load-reading">Reading the board in the picture…</p>}
       {error && <p className="load-error">{error}</p>}
       {games.length > 0 && <GamePicker games={games} />}

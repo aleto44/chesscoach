@@ -1,19 +1,17 @@
-//! Event delivery to every connected frontend: the desktop window (Tauri events) and phones
-//! talking to the home server (server-sent events, see `remote.rs`). The coach belongs to one
-//! client at a time, the one that last sent it a turn; its stream and tool calls go only there.
+//! Event delivery to every connected client (the desktop app and phones alike) as server-sent
+//! events (see `remote.rs`). The coach belongs to one client at a time, the one that last sent it
+//! a turn; its stream and tool calls go only there.
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
 use serde::Serialize;
 use serde_json::Value;
-use tauri::{AppHandle, Emitter, Manager};
+
+use crate::ctx::AppHandle;
 use tokio::sync::broadcast;
 
-/// Client id of the desktop window. Remote clients pick their own random ids.
-pub const DESKTOP: &str = "desktop";
-
-/// Remote events kept for replay when a phone's connection drops (screen off, Wi-Fi hiccup).
+/// Events kept for replay when a client's connection drops (screen off, Wi-Fi hiccup).
 const BACKLOG: usize = 2000;
 
 #[derive(Clone, Serialize)]
@@ -38,7 +36,7 @@ impl Default for Relay {
         Self {
             tx: broadcast::channel(256).0,
             log: Mutex::new((0, VecDeque::new())),
-            owner: Mutex::new(DESKTOP.to_string()),
+            owner: Mutex::new(String::new()),
         }
     }
 }
@@ -82,7 +80,6 @@ pub fn wants(msg: &Msg, client: &str) -> bool {
 
 /// To every client.
 pub fn emit_all<S: Serialize + Clone>(app: &AppHandle, event: &str, payload: S) {
-    let _ = app.emit(event, payload.clone());
     if let Ok(v) = serde_json::to_value(payload) {
         app.state::<Relay>().push(None, event, v);
     }
@@ -90,9 +87,7 @@ pub fn emit_all<S: Serialize + Clone>(app: &AppHandle, event: &str, payload: S) 
 
 /// To one client.
 pub fn emit_to<S: Serialize + Clone>(app: &AppHandle, client: &str, event: &str, payload: S) {
-    if client == DESKTOP {
-        let _ = app.emit(event, payload);
-    } else if let Ok(v) = serde_json::to_value(payload) {
+    if let Ok(v) = serde_json::to_value(payload) {
         app.state::<Relay>().push(Some(client.to_string()), event, v);
     }
 }

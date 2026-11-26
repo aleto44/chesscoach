@@ -1,7 +1,10 @@
 # Chess Coach: instructions for AI assistants
 
-Chess Coach is a Tauri 2 desktop app (Rust backend in `src-tauri/`, React + TypeScript + Vite frontend in
-`src/`) with a phone client served from the computer. It has practice and rated games against Maia /
+Chess Coach is a server (`server/`, Rust: the SQLite database, the coach and an HTTP API, run in Docker on
+laptop-server) with two clients of the same React + TypeScript + Vite frontend (`src/`): a desktop app
+(`src-tauri/`, a thin Tauri window over the bundled frontend) and the phone's web app, served by the
+server. Both talk HTTP to the server (`src/backend.ts`); see `docs/server-migration.md` for how it fits
+together and `scripts/deploy.ps1` to ship server changes. It has practice and rated games against Maia /
 Stockfish, a post-game review, spaced-repetition drills, a Lichess puzzle trainer, and an AI coach in the
 chat column.
 
@@ -28,7 +31,7 @@ Rules:
 - Rating *changes* are the difference of the converted values, not a converted difference.
 - Add new scales to `src/rating.ts` (or next to the engine they belong to) rather than inlining numbers.
 - The student has three game ratings here, bullet, blitz and rapid (`ratingPool` in `src/rating.ts`,
-  `rating_pool` in `src-tauri/src/db.rs`, split by base + 40 × increment like chess.com); a game with no
+  `rating_pool` in `server/src/db.rs`, split by base + 40 × increment like chess.com); a game with no
   clock counts as rapid. Each lives in its own setting (`RATING_KEYS` in `src/settings.ts`), set in
   Settings; unset bullet and blitz start from rapid.
 
@@ -112,7 +115,7 @@ Rules:
   `openingCourse`). `node scripts/check-course.mjs` checks every answer against Stockfish, and
   `node scripts/find-pitfalls.mjs` (Maia + Stockfish) writes `src/openings/pitfalls.ts`; run both after
   editing a course.
-- Screens that aren't a game ask the coach one-off questions with `coach_explain` (`src/coach.rs` `explain`):
+- Screens that aren't a game ask the coach one-off questions with `coach_explain` (`server/src/coach.rs` `explain`):
   no tools, no conversation, so it works during a rated game. Its answers show in the chat column through
   `src/coach/trainerChat.ts`, a thread of their own that is never saved into the game's chat. Hand it computed
   facts (engine evals) the way the chat coach gets them; the opening trainer's "why not" is the example
@@ -132,17 +135,28 @@ Rules:
   so the rating and theme XP replay without it). Both are the student's own honesty.
 - "Real games" are rated games here plus imported ones (`games.source` set, stored as rated, never moving
   the in-app rating). The Profile and the coach's profile judge the student on those, never on practice.
-- Phones keep working offline for puzzles, drills and opening courses (`src/offline.ts`; a course
-  answer is saved per decision with `db_course_progress`, merged on the computer, later answer wins): calls fall back to a pack kept on
-  the phone and writes wait in an outbox. A new puzzle or drill call should go through `orOffline`.
-- The phone and the computer share one database, and the student's progress must look the same on
-  both. Keep progress (results, scores, spaced-repetition state) in the database or a setting, never in
+- Every client keeps working offline for whatever runs on the device (`src/offline.ts`): puzzles, drills
+  and opening courses (a course answer is saved per decision with `db_course_progress`, merged on the
+  server, later answer wins) answer from a pack kept on the device, and writes wait in an outbox. A new
+  puzzle or drill call should go through `orOffline`. Games against the engines play offline too, rated
+  ones included: a game started while the server is away gets a local (negative) id and is kept on the
+  device (`src/game/local.ts`), then sent, rated and reviewed once the server is back. The coach and
+  imports need the server.
+- Every device shares the server's database, and the student's progress must look the same on
+  all of them. Keep progress (results, scores, spaced-repetition state) in the database or a setting, never in
   localStorage, which is per device (fine for UI choices like filters or the last screen). A device holds
   what it loaded at startup, so every write that changes what another device shows is announced:
   settings via `setting-changed` (`initSettingsSync` in `src/settings.ts`, including ratings moved by
-  `rate_game`), puzzle and drill progress via `data-changed` (`notify_data_changed` in `lib.rs`), games
-  via `game-changed`. A phone that may have missed them rereads on `resync` (`src/backend.ts`). A new
+  `rate_game`), puzzle and drill progress via `data-changed` (`notify_data_changed` in `server/src/lib.rs`),
+  games via `game-changed`. A device that may have missed them rereads on `resync` (`src/backend.ts`). A new
   kind of shared progress needs the same.
+- Whatever is in progress is mirrored live between devices (`src/live.ts`, `server/src/live.rs`): each
+  session store (puzzles, drills, the opening, endgame, guess-the-move and find-the-plan trainers, the
+  trainers' coach thread) is sent to the server after every change, with the version it started from; a
+  stale one is refused and that device takes the server's state. Other devices that are in the session
+  mirror it; the rest offer "Continue" on Home and never jump in by themselves. A new session store must
+  hold plain JSON data and be added to `STORES` there. The engine answers only in the code that handled
+  the student's move, never from a store subscription, so a mirroring device can't move twice.
 - Board sounds (`src/sound.ts`) follow whichever board is on screen: game, puzzle, drill, endgame or guess.
 
 ## Boards: the student can always draw
@@ -153,7 +167,7 @@ arrow; a press off the boards or on the pencil ends it and keeps the drawings, a
 tap on the board clears them. There is no two-finger drawing any more (phones cancel held touches). That covers the game board, analysis and review,
   Phone touch bugs can't be reproduced with scripted touches: set `SEND_FROM_PHONES` in `src/touchLog.ts`
   (dev builds; phones reload by themselves) and each phone streams its touches, holds, dialogs and errors to
-  `phone-debug.log` in the project (`dev_log`, `src-tauri/src/devlog.rs`). `?touchlog` also shows it on screen.
+  `phone-debug.log` in the project (`dev_log`, `server/src/devlog.rs`, when the server runs from the repo). `?touchlog` also shows it on screen.
 drills, puzzles, the why-screen, the coach's scenario boards and any board added later.
 
 - Use `src/components/Board.tsx` for every board. `viewOnly` there only stops piece moves; drawing still

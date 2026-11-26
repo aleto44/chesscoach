@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use crate::ctx::State;
 
 pub struct Db(Mutex<Connection>);
 
@@ -225,7 +225,7 @@ UPDATE games SET analyzed_at = NULL;
 ALTER TABLE games ADD COLUMN rating_before INTEGER;
 ALTER TABLE games ADD COLUMN rating_after INTEGER;
 "#, r#"
--- Games imported from the student's chess.com and Lichess accounts (src-tauri/src/import.rs).
+-- Games imported from the student's chess.com and Lichess accounts (server/src/import.rs).
 -- They're stored as rated games (real play, no help) but never move the in-app rating: their
 -- opponent key is 'chesscom:<name>' / 'lichess:<name>', which rate_game ignores.
 ALTER TABLE games ADD COLUMN source TEXT;            -- 'chesscom' | 'lichess'; NULL = played in this app
@@ -240,7 +240,7 @@ DROP VIEW rated_games;
 CREATE VIEW rated_games AS SELECT * FROM games WHERE mode = 'rated';
 "#, r#"
 -- Which of the student's accounts an imported game came from, so a whole account can be
--- refreshed or removed (src-tauri/src/import.rs). NULL on games imported before this: an
+-- refreshed or removed (server/src/import.rs). NULL on games imported before this: an
 -- account's refresh claims the ones it sees again.
 ALTER TABLE games ADD COLUMN account TEXT;
 CREATE INDEX games_account ON games(source, account) WHERE source IS NOT NULL;
@@ -292,8 +292,10 @@ ALTER TABLE drills ADD COLUMN lesson TEXT;
 ALTER TABLE drills ADD COLUMN category TEXT;
 UPDATE drills SET retired = 1 WHERE kind = 'opening';
 "#,
-    // Utility › Load game's history, shared by the computer and the phone (src-tauri/src/loads.rs).
+    // Utility › Load game's history, shared by the computer and the phone (server/src/loads.rs).
     crate::loads::LOADS_TABLE,
+    // What's in progress on any device, mirrored live between them (server/src/live.rs).
+    crate::live::LIVE_TABLE,
 ];
 
 impl Db {
@@ -327,7 +329,6 @@ impl Db {
     }
 }
 
-#[tauri::command]
 pub fn db_get_settings(db: State<Db>) -> Result<serde_json::Map<String, serde_json::Value>, String> {
     let conn = db.0.lock().unwrap();
     let mut stmt = conn.prepare("SELECT key, value FROM settings").map_err(err)?;
@@ -342,27 +343,12 @@ pub fn db_get_settings(db: State<Db>) -> Result<serde_json::Map<String, serde_js
     Ok(out)
 }
 
-/// A null value deletes the setting (back to the default). The other devices are told, so a phone's
-/// progress (course decisions, say) shows on the computer without a restart, and a
-/// stale copy there can't save over it.
-#[tauri::command]
-pub fn db_set_setting(app: tauri::AppHandle, db: State<Db>, key: String, value: serde_json::Value) -> Result<(), String> {
-    store_setting(&db, &key, &value)?;
-    crate::notify_setting_changed(&app, crate::relay::DESKTOP, &key, &value);
-    Ok(())
-}
-
 /// One opening-course decision's progress (openings/progress.ts), merged into the `openingCourse`
 /// setting rather than sent as the whole map: a phone that studied offline sends these later, from
 /// its outbox, and must not write its old copy of the other decisions over the computer's. Where
 /// both devices answered the same decision, the later answer (`at`, ms) wins. Every device, the
 /// sender included, is sent the merged map.
-#[tauri::command]
-pub fn db_course_progress(app: tauri::AppHandle, db: State<Db>, id: String, progress: serde_json::Value) -> Result<(), String> {
-    merge_course_progress(&app, &db, &id, progress)
-}
-
-pub fn merge_course_progress(app: &tauri::AppHandle, db: &Db, id: &str, progress: serde_json::Value) -> Result<(), String> {
+pub fn merge_course_progress(app: &crate::ctx::AppHandle, db: &Db, id: &str, progress: serde_json::Value) -> Result<(), String> {
     let merged = merge_course(&db.0.lock().unwrap(), id, progress)?;
     crate::notify_setting_changed(app, "merged", "openingCourse", &merged);
     Ok(())
@@ -570,7 +556,6 @@ pub(crate) fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
 
-#[tauri::command]
 pub fn db_create_game(db: State<Db>, game: NewGame) -> Result<i64, String> {
     if game.mode == "rated" && (game.opponent.is_none() || game.student_color == "both") {
         return Err("a rated game needs an opponent".into());
@@ -592,14 +577,9 @@ pub fn db_create_game(db: State<Db>, game: NewGame) -> Result<i64, String> {
     Ok(conn.last_insert_rowid())
 }
 
-#[tauri::command]
-pub fn db_update_game(app: tauri::AppHandle, db: State<Db>, id: i64, patch: GamePatch) -> Result<(), String> {
-    update_game_from(&app, &db, crate::relay::DESKTOP, id, patch)
-}
-
 /// Saves the patch; a rated game's result moves a rating setting, which the other devices are told
 /// about like any setting (they'd otherwise pair and teach by the old rating).
-pub fn update_game_from(app: &tauri::AppHandle, db: &Db, client: &str, id: i64, patch: GamePatch) -> Result<(), String> {
+pub fn update_game_from(app: &crate::ctx::AppHandle, db: &Db, client: &str, id: i64, patch: GamePatch) -> Result<(), String> {
     let rated = update_game(&mut db.0.lock().unwrap(), id, patch)?;
     if let Some((key, after)) = rated {
         crate::notify_setting_changed(app, client, key, &serde_json::json!(after));
@@ -735,7 +715,6 @@ fn elo_change(player: i64, opponent: i64, score: f64, games_so_far: i64) -> i64 
 /// For the games menu and the new-game dialogs, per pool: the rating, how many games it rests on,
 /// whether the student set it, and the rating after each of its last 100 rated games (oldest
 /// first), each with the one before it. `latest`: the pool of the last rated game, if any.
-#[tauri::command]
 pub fn db_player_rating(db: State<Db>) -> Result<serde_json::Value, String> {
     let conn = db.0.lock().unwrap();
     let mut pools = serde_json::Map::new();
@@ -771,7 +750,6 @@ pub fn db_player_rating(db: State<Db>) -> Result<serde_json::Value, String> {
 
 /// Makes the stored move list match `moves` (takebacks truncate it). A move's analysis survives
 /// only while that ply still holds the same move from the same position.
-#[tauri::command]
 pub fn db_set_moves(db: State<Db>, game_id: i64, moves: Vec<MoveRow>) -> Result<(), String> {
     let mut conn = db.0.lock().unwrap();
     let tx = conn.transaction().map_err(err)?;
@@ -808,7 +786,6 @@ pub fn db_set_moves(db: State<Db>, game_id: i64, moves: Vec<MoveRow>) -> Result<
     tx.commit().map_err(err)
 }
 
-#[tauri::command]
 pub fn db_upsert_tangent(db: State<Db>, game_id: i64, tangent: TangentRow) -> Result<(), String> {
     db.0.lock()
         .unwrap()
@@ -831,7 +808,6 @@ pub fn db_upsert_tangent(db: State<Db>, game_id: i64, tangent: TangentRow) -> Re
         .map_err(err)
 }
 
-#[tauri::command]
 pub fn db_upsert_chat(db: State<Db>, game_id: i64, item: ChatRow) -> Result<(), String> {
     db.0.lock()
         .unwrap()
@@ -845,7 +821,6 @@ pub fn db_upsert_chat(db: State<Db>, game_id: i64, item: ChatRow) -> Result<(), 
 }
 
 /// The chat's `/clear`: drops the game's saved messages (its scenarios stay, nothing links to them).
-#[tauri::command]
 pub fn db_clear_chat(db: State<Db>, game_id: i64) -> Result<(), String> {
     db.0.lock()
         .unwrap()
@@ -854,7 +829,6 @@ pub fn db_clear_chat(db: State<Db>, game_id: i64) -> Result<(), String> {
         .map_err(err)
 }
 
-#[tauri::command]
 pub fn db_list_games(db: State<Db>, limit: Option<i64>) -> Result<Vec<GameSummary>, String> {
     let conn = db.0.lock().unwrap();
     let mut stmt = conn
@@ -868,7 +842,6 @@ pub fn db_list_games(db: State<Db>, limit: Option<i64>) -> Result<Vec<GameSummar
     Ok(rows)
 }
 
-#[tauri::command]
 pub fn db_load_game(db: State<Db>, id: i64) -> Result<Option<GameRecord>, String> {
     let conn = db.0.lock().unwrap();
     let Some(game) = conn
@@ -960,7 +933,6 @@ pub fn db_load_game(db: State<Db>, id: i64) -> Result<Option<GameRecord>, String
 }
 
 /// Deletes a game and (via ON DELETE CASCADE) its moves, tangents and chat.
-#[tauri::command]
 pub fn db_delete_game(db: State<Db>, id: i64) -> Result<(), String> {
     db.0.lock()
         .unwrap()
@@ -975,7 +947,6 @@ pub fn db_delete_game(db: State<Db>, id: i64) -> Result<(), String> {
 /// Games touched in the last half hour are spared too: one may have just been started on the
 /// other device (phone or desktop), where the student hasn't moved yet. Deleting it there left
 /// that device playing into a game the database no longer had, and nothing it did was saved.
-#[tauri::command]
 pub fn db_prune_empty_games(db: State<Db>, keep: Option<i64>) -> Result<usize, String> {
     db.0.lock()
         .unwrap()
@@ -1093,4 +1064,21 @@ mod tests {
         drop(db);
         let _ = std::fs::remove_file(&path);
     }
+}
+
+/// A consistent copy of the database at `dest` (replaced if it's there), taken while the server may
+/// be writing: `VACUUM INTO` reads one snapshot of the WAL database. `chesscoach-server backup`.
+pub fn backup(src: &Path, dest: &Path) -> Result<(), String> {
+    if !src.exists() {
+        return Err(format!("{} doesn't exist", src.display()));
+    }
+    let _ = std::fs::remove_file(dest);
+    let conn = Connection::open_with_flags(src, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|e| e.to_string())?;
+    conn.execute("VACUUM INTO ?1", [dest.to_string_lossy()]).map_err(|e| e.to_string())?;
+    let copy = Connection::open(dest).map_err(|e| e.to_string())?;
+    let check: String = copy.query_row("PRAGMA integrity_check", [], |r| r.get(0)).map_err(|e| e.to_string())?;
+    if check != "ok" {
+        return Err(format!("the copy failed its integrity check: {check}"));
+    }
+    Ok(())
 }

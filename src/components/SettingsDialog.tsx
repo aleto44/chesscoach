@@ -1,6 +1,5 @@
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
-import { invoke, isRemote, isTauri, openUrl } from "../backend";
+import { invoke, isShell, pair, serverUrl, setServer } from "../backend";
 import { useLaunches } from "../perf";
 import { hasBackend } from "../db";
 import { MODEL_CHOICES, RATING_KEYS, saveSetting, useSettings } from "../settings";
@@ -141,12 +140,12 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           <option value="off">Off</option>
         </select>
         <span className="muted small">
-          Checked on your computer right after you move. Asking the coach about it is up to you, so it costs no usage
+          Checked on this device right after you move. Asking the coach about it is up to you, so it costs no usage
           by itself. Never in rated games.
         </span>
       </label>
-      {isTauri && <PhoneAccess />}
-      {isRemote && <StartupTimes />}
+      <ServerAccess />
+      <StartupTimes />
       <footer>
         <button className="primary" onClick={save} disabled={(choice === "custom" && !custom.trim()) || !ratingValid}>
           {changed ? "Save" : "Done"}
@@ -156,7 +155,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Phones: how long the last few launches took, step by step (perf.ts). */
+/** How long the last few launches took, step by step (perf.ts). */
 function StartupTimes() {
   const launches = useLaunches();
   return (
@@ -185,142 +184,77 @@ function StartupTimes() {
   );
 }
 
-interface RemoteInfo {
-  enabled: boolean;
-  running: boolean;
-  port: number;
-  code: string;
-  urls: string[];
-  /** Null when Tailscale isn't installed on this computer. */
-  tailscale: { state: string; url: string | null; serving: boolean } | null;
+interface ServerInfo {
+  apiVersion: number;
+  version: string;
+  /** The https address phones open (CHESSCOACH_PUBLIC_URL on the server), if it's set. */
+  publicUrl: string | null;
 }
 
-const TAILSCALE_DOWNLOAD = "https://tailscale.com/download";
-
-/** Desktop only: the server phones connect to (src-tauri/src/remote.rs, tailscale.rs). */
-function PhoneAccess() {
-  const [info, setInfo] = useState<RemoteInfo | null>(null);
+/**
+ * The server every device talks to: its address (the desktop app can change it), and the code
+ * that pairs another device with it.
+ */
+function ServerAccess() {
+  const [info, setInfo] = useState<ServerInfo | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+  const [address, setAddress] = useState(serverUrl());
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    invoke<RemoteInfo>("remote_info").then(setInfo, (e) => setError(String(e)));
+    invoke<ServerInfo>("server_info").then(setInfo, (e) => setError(String(e)));
+    invoke<string>("pairing_code").then(setCode, () => setCode(null));
   }, []);
 
-  const run = (cmd: string, args?: Record<string, unknown>) => {
-    setBusy(true);
-    return invoke<RemoteInfo>(cmd, args)
-      .then(
-        (i) => (setInfo(i), setError(null)),
-        (e) => setError(String(e)),
-      )
-      .finally(() => setBusy(false));
+  const newCode = async () => {
+    if (!confirm("A new code unpairs every other device; each has to enter the new code. Go ahead?")) return;
+    try {
+      const fresh = await invoke<string>("pairing_new_code");
+      // This device pairs again straight away with the new code.
+      await pair(fresh);
+      setCode(fresh);
+    } catch (e) {
+      setError(String(e));
+    }
   };
 
-  if (!info) return error ? <span className="error small">{error}</span> : null;
-  const code = (
+  const connect = () => {
+    setServer(address);
+    location.reload();
+  };
+
+  const shown = code && (
     <code className="pair-code">
-      {info.code.slice(0, 4)}-{info.code.slice(4)}
+      {code.slice(0, 4)}-{code.slice(4)}
     </code>
   );
   return (
     <div className="field phone-access">
-      <label className="toggle">
-        <input type="checkbox" checked={info.enabled} onChange={(e) => run("remote_set_enabled", { enabled: e.target.checked })} />
-        <span>Play from my phone</span>
-      </label>
-      {info.enabled && (
-        <>
-          <span className="muted small">
-            {info.running ? "On. " : "Not running. "}
-            Keep this app open on your computer. At home, open{" "}
-            {info.urls.map((u, i) => (
-              <span key={u}>
-                {i > 0 && " or "}
-                <code>{u}</code>
-              </span>
-            ))}{" "}
-            on your phone and enter the code {code}.{" "}
-            <a href="#" onClick={(e) => (e.preventDefault(), run("remote_new_code"))}>
-              New code
-            </a>{" "}
-            unpairs every phone.
-          </span>
-          <span className="muted small">
-            <b>Anywhere: </b>
-            <Anywhere info={info} busy={busy} code={code} onSetUp={() => run("remote_tailscale_serve")} onRecheck={() => run("remote_info")} />
-          </span>
-        </>
+      <span>Server</span>
+      {isShell ? (
+        <span className="server-address">
+          <input className="text-input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="https://laptop-server…" spellCheck={false} />
+          <button onClick={connect} disabled={!address.trim() || address.trim() === serverUrl()}>
+            Connect
+          </button>
+        </span>
+      ) : null}
+      <span className="muted small">
+        Your games, ratings, drills and the coach live on the server; every device shows the same thing.
+        {info && ` Server version ${info.version}.`}
+      </span>
+      {shown && (
+        <span className="muted small">
+          To add a device, open {info?.publicUrl ? <code>{info.publicUrl}</code> : "the server's address"} there (with Tailscale on)
+          and enter {shown}.{" "}
+          <a href="#" onClick={(e) => (e.preventDefault(), newCode())}>
+            New code
+          </a>{" "}
+          unpairs every other device.
+        </span>
       )}
-      {error && <Problem text={error} />}
+      {error && <span className="error small">{error}</span>}
     </div>
-  );
-}
-
-/** The Tailscale steps, showing only the next one to do. */
-function Anywhere({ info, busy, code, onSetUp, onRecheck }: {
-  info: RemoteInfo;
-  busy: boolean;
-  code: React.ReactNode;
-  onSetUp: () => void;
-  onRecheck: () => void;
-}) {
-  const recheck = (
-    <a href="#" onClick={(e) => (e.preventDefault(), onRecheck())}>
-      Check again
-    </a>
-  );
-  const ts = info.tailscale;
-  if (!ts)
-    return (
-      <>
-        install{" "}
-        <a href="#" onClick={(e) => (e.preventDefault(), openUrl(TAILSCALE_DOWNLOAD))}>
-          Tailscale
-        </a>{" "}
-        (free) on this computer and on your phone, and sign in with the same account on both. It joins them into a private
-        network only your devices can reach, over any internet connection. {recheck}
-      </>
-    );
-  if (ts.state !== "Running")
-    return (
-      <>
-        Tailscale is installed but not connected ({ts.state}). Open Tailscale on this computer and sign in. {recheck}
-      </>
-    );
-  if (!ts.serving || !ts.url)
-    return (
-      <>
-        Tailscale is connected. One more step gives this computer a private https address for the app.{" "}
-        <button onClick={onSetUp} disabled={busy}>
-          {busy ? "Setting up…" : "Set up"}
-        </button>
-      </>
-    );
-  return (
-    <>
-      with Tailscale on in your phone, open <code>{ts.url}</code> and enter the code {code} (once per address). Then use the
-      browser menu's <i>Add to Home screen</i> to install it as an app.
-    </>
-  );
-}
-
-/** An error, with any link in it clickable (Tailscale asks to turn on https this way). */
-function Problem({ text }: { text: string }) {
-  const url = text.match(/https:\/\/\S+/)?.[0];
-  return (
-    <span className="error small">
-      {text}
-      {url && (
-        <>
-          {" "}
-          <a href="#" onClick={(e) => (e.preventDefault(), openUrl(url))}>
-            Open that page
-          </a>
-          , approve it, then press Set up again.
-        </>
-      )}
-    </span>
   );
 }
 
@@ -363,15 +297,7 @@ function SoundOptions() {
       )}
       {folder && (
         <span className="muted small">
-          Sound files go in{" "}
-          {isTauri ? (
-            <a href="#" onClick={(e) => (e.preventDefault(), revealItemInDir(folder))}>
-              this folder
-            </a>
-          ) : (
-            <code>{folder}</code>
-          )}
-          , named after the event (e.g. <code>move-self.mp3</code>);{" "}
+          Sound files go in <code>{folder}</code> on the server, named after the event (e.g. <code>move-self.mp3</code>);{" "}
           <a href="#" onClick={(e) => (e.preventDefault(), reload())}>reload sounds</a> after changing them.
           {` ${loaded.length} of ${SOUND_NAMES.length} found.`}
         </span>

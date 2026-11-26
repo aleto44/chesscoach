@@ -1,11 +1,16 @@
-//! Home server for phones: serves the app itself plus an HTTP version of the Tauri commands, so a
-//! phone browser (installed as a PWA) plays against the database, Claude login and coach running
-//! on this computer. Off by default; turned on from Settings on the desktop.
+//! The HTTP side of the server: every client (the desktop app and phones) reaches the database,
+//! the Claude login and the coach through it.
 //!
-//! - `POST /api/pair` trades the pairing code shown on the desktop for a long-lived cookie.
+//! - `POST /api/pair` trades a pairing code for the server's token (JSON, plus a cookie for the
+//!   phone's web app, which is served from here).
 //! - `POST /api/invoke/{cmd}` runs a command (JSON args in, JSON result out).
-//! - `GET /api/events` streams the events the desktop gets as Tauri events (server-sent events).
-//! - Everything else is the built frontend.
+//! - `GET /api/events` streams events (server-sent events).
+//! - `GET /api/ping` answers without pairing, for "is the server there?".
+//! - Everything else is the built frontend (`--web`), for phones.
+//!
+//! A client proves it's paired with the cookie (phones), an `Authorization: Bearer` header (the
+//! desktop app, whose page comes from its own bundle and so can't hold the server's cookie) or,
+//! for the event stream, `?token=`. Tailscale and the server's firewall are the outer wall.
 
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -15,49 +20,48 @@ use std::time::{Duration, Instant};
 
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::{header, HeaderMap, StatusCode, Uri};
+use axum::http::{header, HeaderMap, HeaderValue, Method, StatusCode, Uri};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use tauri::async_runtime::JoinHandle;
-use tauri::{AppHandle, Manager};
+use serde_json::{json, Value};
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 
+use crate::ctx::AppHandle;
 use crate::relay::{self, Msg, Relay};
-use crate::tailscale::{self, Tailscale};
-use crate::{auth, db, puzzles, sounds, stats};
+use crate::{auth, db, live, puzzles, sounds, stats};
 
-const DEFAULT_PORT: u16 = 8765;
 const COOKIE: &str = "cc_auth";
 /// No I/O/0/1, so codes survive being read off a screen.
 const CODE_ALPHABET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+/// Bumped when a command or event changes shape, so a desktop app built against another version
+/// says so instead of writing what the server doesn't expect (src/backend.ts, API_VERSION).
+pub const API_VERSION: u32 = 2;
 
 #[derive(Clone, Serialize, Deserialize)]
 struct Config {
-    enabled: bool,
     code: String,
-    /// The cookie value paired phones hold. Rotated with the code, which unpairs them.
+    /// The token paired devices hold. Rotated with the code, which unpairs them.
     secret: String,
 }
 
 impl Config {
-    fn fresh(enabled: bool) -> Self {
-        Self { enabled, code: new_code(), secret: uuid::Uuid::new_v4().simple().to_string() }
+    fn fresh() -> Self {
+        Self { code: new_code(), secret: uuid::Uuid::new_v4().simple().to_string() }
     }
 }
 
 pub struct Remote {
     path: PathBuf,
-    port: u16,
     config: Mutex<Config>,
-    server: Mutex<Option<JoinHandle<()>>>,
     /// Wrong pairing codes since the last success, and when the last one came in.
     failures: Mutex<(u32, Instant)>,
+    /// The built frontend served to phones; None serves the API only.
+    web: Option<PathBuf>,
 }
 
 fn new_code() -> String {
@@ -68,23 +72,22 @@ fn new_code() -> String {
 }
 
 impl Remote {
-    pub fn load(dir: &std::path::Path) -> Self {
+    /// `remote.json` in the data folder holds the code and token. The desktop app's old one works
+    /// as it is (its `enabled` flag is ignored), so devices paired before the move stay paired.
+    pub fn load(dir: &std::path::Path, web: Option<PathBuf>) -> Self {
         let path = dir.join("remote.json");
-        let loaded = std::fs::read(&path)
-            .map_err(|e| e.to_string())
-            .and_then(|b| serde_json::from_slice::<Config>(&b).map_err(|e| e.to_string()));
-        let problem = loaded.as_ref().err().cloned();
-        let config = loaded.unwrap_or_else(|_| Config::fresh(false));
-        let port = std::env::var("CHESSCOACH_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(DEFAULT_PORT);
+        let loaded = std::fs::read(&path).ok().and_then(|b| serde_json::from_slice::<Config>(&b).ok());
         let remote = Self {
             path,
-            port,
-            config: Mutex::new(config),
-            server: Mutex::new(None),
+            config: Mutex::new(loaded.clone().unwrap_or_else(Config::fresh)),
             failures: Mutex::new((0, Instant::now())),
+            web,
         };
-        if let Some(problem) = problem {
-            remote.log(&format!("remote.json not loaded ({problem}), starting with phone access off"));
+        if loaded.is_none() {
+            let config = remote.config.lock().unwrap().clone();
+            if let Err(e) = remote.save(config) {
+                eprintln!("could not save remote.json: {e}");
+            }
         }
         remote
     }
@@ -95,155 +98,62 @@ impl Remote {
         Ok(())
     }
 
-    /// Appends to phone-server.log next to remote.json, for "why can't my phone connect?".
-    fn log(&self, text: &str) {
-        use std::io::Write;
-        let path = self.path.with_file_name("phone-server.log");
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-            let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
-            let _ = writeln!(f, "[{secs}] {text}");
-        }
+    pub fn code(&self) -> String {
+        self.config.lock().unwrap().code.clone()
     }
 
-    fn running(&self) -> bool {
-        self.server.lock().unwrap().is_some()
+    /// A new code and token: every paired device has to pair again.
+    pub fn rotate(&self) -> Result<String, String> {
+        let config = Config::fresh();
+        let code = config.code.clone();
+        self.save(config)?;
+        Ok(code)
     }
 
-    fn authed(&self, headers: &HeaderMap) -> bool {
+    fn authed(&self, headers: &HeaderMap, query_token: Option<&str>) -> bool {
         let secret = self.config.lock().unwrap().secret.clone();
-        headers
+        let bearer = headers
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .is_some_and(|t| t.trim() == secret);
+        let cookie = headers
             .get_all(header::COOKIE)
             .iter()
             .filter_map(|v| v.to_str().ok())
             .flat_map(|v| v.split(';'))
-            .any(|c| c.trim().strip_prefix(COOKIE).and_then(|c| c.strip_prefix('=')) == Some(secret.as_str()))
+            .any(|c| c.trim().strip_prefix(COOKIE).and_then(|c| c.strip_prefix('=')) == Some(secret.as_str()));
+        bearer || cookie || query_token == Some(secret.as_str())
     }
 }
 
-/// Starts the server if it was left on.
-pub async fn start_if_enabled(app: &AppHandle) {
-    let remote = app.state::<Remote>();
-    if !remote.config.lock().unwrap().enabled {
-        remote.log("phone access is off");
-        return;
-    }
-    // After a restart (tauri dev rebuilds), the old process can hold the port for a moment.
-    for attempt in 1..=20 {
-        match start(app).await {
-            Ok(()) => return,
-            Err(e) if attempt == 20 => remote.log(&format!("not started: {e}")),
-            Err(e) => {
-                remote.log(&format!("attempt {attempt}: {e}"));
-                tokio::time::sleep(Duration::from_millis(500)).await
-            }
-        }
-    }
-}
-
-async fn start(app: &AppHandle) -> Result<(), String> {
-    let remote = app.state::<Remote>();
-    if remote.running() {
-        return Ok(());
-    }
-    let listener = tokio::net::TcpListener::bind(("0.0.0.0", remote.port))
+pub async fn serve(app: AppHandle, port: u16) -> Result<(), String> {
+    let listener = tokio::net::TcpListener::bind(("0.0.0.0", port))
         .await
-        .map_err(|e| format!("could not listen on port {}: {e}", remote.port))?;
+        .map_err(|e| format!("could not listen on port {port}: {e}"))?;
     let router = Router::new()
         .route("/api/pair", post(pair))
         .route("/api/events", get(events))
         .route("/api/invoke/{cmd}", post(invoke))
-        // "Is the computer there?" for a phone's offline screens; no pairing needed, says nothing.
         .route("/api/ping", get(|| async { StatusCode::NO_CONTENT }))
-        .fallback(get(page))
-        .with_state(app.clone());
-    remote.log(&format!("listening on port {}", remote.port));
-    let log_app = app.clone();
-    let handle = tauri::async_runtime::spawn(async move {
-        let result = axum::serve(listener, router).await;
-        log_app.state::<Remote>().log(&format!("stopped: {result:?}"));
-    });
-    *remote.server.lock().unwrap() = Some(handle);
-    Ok(())
+        .fallback(get(asset))
+        .layer(axum::middleware::from_fn(cors))
+        .with_state(app);
+    eprintln!("chesscoach-server listening on port {port}");
+    axum::serve(listener, router).await.map_err(|e| e.to_string())
 }
 
-fn stop(app: &AppHandle) {
-    if let Some(handle) = app.state::<Remote>().server.lock().unwrap().take() {
-        handle.abort();
-    }
-}
-
-// Desktop-only commands (not reachable over HTTP).
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoteInfo {
-    enabled: bool,
-    running: bool,
-    port: u16,
-    code: String,
-    /// Addresses a phone on the same network can open.
-    urls: Vec<String>,
-    /// For playing away from home; None when Tailscale isn't installed.
-    tailscale: Option<Tailscale>,
-}
-
-async fn info(app: &AppHandle) -> RemoteInfo {
-    let remote = app.state::<Remote>();
-    let config = remote.config.lock().unwrap().clone();
-    let (port, running) = (remote.port, remote.running());
-    let mut urls = Vec::new();
-    if let Some(ip) = lan_ip() {
-        urls.push(format!("http://{ip}:{port}"));
-    }
-    if let Ok(host) = std::env::var("COMPUTERNAME").or_else(|_| std::env::var("HOSTNAME")) {
-        urls.push(format!("http://{}:{port}", host.to_lowercase()));
-    }
-    let tailscale = tauri::async_runtime::spawn_blocking(move || tailscale::status(port)).await.ok().flatten();
-    RemoteInfo { enabled: config.enabled, running, port, code: config.code, urls, tailscale }
-}
-
-/// The address this computer uses on its network (no packets are sent).
-fn lan_ip() -> Option<std::net::IpAddr> {
-    let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
-    socket.connect("8.8.8.8:80").ok()?;
-    Some(socket.local_addr().ok()?.ip())
-}
-
-#[tauri::command]
-pub async fn remote_info(app: AppHandle) -> RemoteInfo {
-    info(&app).await
-}
-
-#[tauri::command]
-pub async fn remote_set_enabled(app: AppHandle, enabled: bool) -> Result<RemoteInfo, String> {
-    if enabled {
-        start(&app).await?;
-    } else {
-        stop(&app);
-    }
-    let remote = app.state::<Remote>();
-    let config = Config { enabled, ..remote.config.lock().unwrap().clone() };
-    remote.save(config)?;
-    Ok(info(&app).await)
-}
-
-/// New pairing code; every paired phone has to pair again.
-#[tauri::command]
-pub async fn remote_new_code(app: AppHandle) -> Result<RemoteInfo, String> {
-    let remote = app.state::<Remote>();
-    let enabled = remote.config.lock().unwrap().enabled;
-    remote.save(Config::fresh(enabled))?;
-    Ok(info(&app).await)
-}
-
-/// Points this computer's Tailscale https address at the phone server (see tailscale.rs).
-#[tauri::command]
-pub async fn remote_tailscale_serve(app: AppHandle) -> Result<RemoteInfo, String> {
-    let port = app.state::<Remote>().port;
-    tauri::async_runtime::spawn_blocking(move || tailscale::serve(port))
-        .await
-        .map_err(|e| e.to_string())??;
-    Ok(info(&app).await)
+/// The desktop app's page comes from its own bundle (another origin), so the API answers any
+/// origin. That's safe because nothing rides on cookies cross-origin: the desktop sends its token.
+async fn cors(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    let preflight = req.method() == Method::OPTIONS;
+    let mut res = if preflight { StatusCode::NO_CONTENT.into_response() } else { next.run(req).await };
+    let h = res.headers_mut();
+    h.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
+    h.insert(header::ACCESS_CONTROL_ALLOW_HEADERS, HeaderValue::from_static("authorization, content-type, x-client"));
+    h.insert(header::ACCESS_CONTROL_ALLOW_METHODS, HeaderValue::from_static("GET, POST, OPTIONS"));
+    h.insert(header::ACCESS_CONTROL_MAX_AGE, HeaderValue::from_static("86400"));
+    res
 }
 
 // HTTP handlers.
@@ -263,7 +173,7 @@ async fn pair(State(app): State<AppHandle>, headers: HeaderMap, Json(req): Json<
     let config = remote.config.lock().unwrap().clone();
     if code != config.code {
         *failures = (failures.0 + 1, Instant::now());
-        return (StatusCode::UNAUTHORIZED, "That code doesn't match the one in Settings on your computer.").into_response();
+        return (StatusCode::UNAUTHORIZED, "That code doesn't match. A paired device shows it in Settings.").into_response();
     }
     *failures = (0, Instant::now());
     // Over Tailscale's https address the cookie never travels unencrypted.
@@ -271,11 +181,11 @@ async fn pair(State(app): State<AppHandle>, headers: HeaderMap, Json(req): Json<
         || headers.get(header::HOST).and_then(|h| h.to_str().ok()).is_some_and(|h| h.ends_with(".ts.net"));
     let secure = if https { "; Secure" } else { "" };
     let cookie = format!("{COOKIE}={}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict{secure}", config.secret);
-    ([(header::SET_COOKIE, cookie)], StatusCode::NO_CONTENT).into_response()
+    ([(header::SET_COOKIE, cookie)], Json(json!({ "token": config.secret }))).into_response()
 }
 
 async fn events(State(app): State<AppHandle>, headers: HeaderMap, Query(q): Query<HashMap<String, String>>) -> Response {
-    if !app.state::<Remote>().authed(&headers) {
+    if !app.state::<Remote>().authed(&headers, q.get("token").map(String::as_str)) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
     let client = q.get("client").cloned().unwrap_or_default();
@@ -304,13 +214,13 @@ fn to_event(m: &Msg) -> Event {
 }
 
 async fn invoke(State(app): State<AppHandle>, Path(cmd): Path<String>, headers: HeaderMap, Json(args): Json<Value>) -> Response {
-    if !app.state::<Remote>().authed(&headers) {
+    if !app.state::<Remote>().authed(&headers, None) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
     let client = headers
         .get("x-client")
         .and_then(|v| v.to_str().ok())
-        .filter(|c| !c.is_empty() && *c != relay::DESKTOP)
+        .filter(|c| !c.is_empty())
         .unwrap_or("remote")
         .to_string();
     if cmd == "custom_sound" {
@@ -333,10 +243,19 @@ fn out<T: Serialize>(r: Result<T, String>) -> Result<Value, String> {
     r.and_then(|v| serde_json::to_value(v).map_err(|e| e.to_string()))
 }
 
-/// The Tauri commands, called with camelCase args the way `invoke` sends them.
-async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result<Value, String> {
+/// Every command, called with camelCase args the way the frontend's `invoke` sends them.
+pub async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result<Value, String> {
     let st = || app.state::<db::Db>();
     match cmd {
+        "server_info" => out(Ok(json!({
+            "apiVersion": API_VERSION,
+            "version": env!("CARGO_PKG_VERSION"),
+            "publicUrl": std::env::var("CHESSCOACH_PUBLIC_URL").ok(),
+        }))),
+        "pairing_code" => out(Ok(app.state::<Remote>().code())),
+        "pairing_new_code" => out(app.state::<Remote>().rotate()),
+        "live_get" => out(live::live_get(&st())),
+        "live_update" => out(live::live_update(app, client, &arg::<String>(a, "kind")?, arg(a, "id")?, arg(a, "state")?, arg(a, "baseVersion")?)),
         "coach_send" => out(crate::send_turn(app, client, &arg::<String>(a, "text")?, arg::<Option<String>>(a, "resume")?.as_deref())),
         "coach_reset" => out(Ok(crate::reset_coach(app, client))),
         "coach_explain" => out(crate::coach::explain(app, arg(a, "prompt")?).await),
@@ -356,7 +275,7 @@ async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result
         "db_upsert_tangent" => out(db::db_upsert_tangent(st(), arg(a, "gameId")?, arg(a, "tangent")?)),
         "db_upsert_chat" => out(db::db_upsert_chat(st(), arg(a, "gameId")?, arg(a, "item")?)),
         "db_clear_chat" => out(db::db_clear_chat(st(), arg(a, "gameId")?)),
-        "db_list_games" =>out(db::db_list_games(st(), arg(a, "limit")?)),
+        "db_list_games" => out(db::db_list_games(st(), arg(a, "limit")?)),
         "db_load_game" => out(db::db_load_game(st(), arg(a, "id")?)),
         "db_delete_game" => out(db::db_delete_game(st(), arg(a, "id")?)),
         "db_prune_empty_games" => out(db::db_prune_empty_games(st(), arg(a, "keep")?)),
@@ -427,144 +346,48 @@ async fn dispatch(app: &AppHandle, client: &str, cmd: &str, a: &Value) -> Result
     }
 }
 
-/// Everything that isn't the API: the frontend, plus (under `tauri dev`) Vite's live-reload socket.
-async fn page(State(app): State<AppHandle>, req: axum::extract::Request) -> Response {
-    #[cfg(debug_assertions)]
-    if req.headers().get(header::UPGRADE).is_some_and(|v| v.as_bytes().eq_ignore_ascii_case(b"websocket")) {
-        if !app.state::<Remote>().authed(req.headers()) {
-            return StatusCode::UNAUTHORIZED.into_response();
-        }
-        return dev_socket(&app, req).await.unwrap_or_else(|e| (StatusCode::BAD_GATEWAY, e).into_response());
-    }
-    asset(&app, req.uri()).await
-}
-
-/// The frontend, from the same assets the desktop window uses. index.html gets a flag so the
-/// frontend knows to talk HTTP instead of Tauri IPC.
-async fn asset(app: &AppHandle, uri: &Uri) -> Response {
+/// The built frontend, for phones. The page itself and the service worker are never cached, so
+/// reopening the app always loads what the server runs now.
+async fn asset(State(app): State<AppHandle>, uri: Uri) -> Response {
+    let Some(web) = &app.state::<Remote>().web else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
     let path = match uri.path() {
         "/" => "/index.html",
         p => p,
     };
-    // Under `tauri dev`, phones get the live frontend from Vite, like the desktop window does.
-    #[cfg(debug_assertions)]
-    if let Some(res) = from_dev_server(app, uri).await {
-        return res;
+    let rel = path.trim_start_matches('/');
+    if rel.split('/').any(|part| part == ".." || part.contains('\\')) {
+        return StatusCode::NOT_FOUND.into_response();
     }
-    let Some(asset) = app.asset_resolver().get(path.to_string()) else {
+    let Ok(bytes) = tokio::fs::read(web.join(rel)).await else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    let mime = match path.rsplit('.').next() {
-        Some("wasm") => "application/wasm",
-        Some("webmanifest") => "application/manifest+json",
-        Some("js" | "mjs") => "text/javascript",
-        _ => asset.mime_type(),
-    }
-    .to_string();
-    // The page itself is never kept, so reopening the app always loads what the computer runs now.
+    let mime = match rel.rsplit('.').next().unwrap_or_default() {
+        "html" => "text/html; charset=utf-8",
+        "js" | "mjs" => "text/javascript",
+        "css" => "text/css",
+        "json" => "application/json",
+        "webmanifest" => "application/manifest+json",
+        "wasm" => "application/wasm",
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "ico" => "image/x-icon",
+        "mp3" => "audio/mpeg",
+        "ogg" => "audio/ogg",
+        "wav" => "audio/wav",
+        "woff2" => "font/woff2",
+        "txt" => "text/plain; charset=utf-8",
+        _ => "application/octet-stream",
+    };
     let cache = match path {
         "/index.html" | "/sw.js" => "no-store",
         p if p.starts_with("/assets/") => "public, max-age=31536000, immutable",
         _ => "no-cache",
     };
-    let mut bytes = asset.bytes;
-    if path == "/index.html" {
-        bytes = with_remote_flag(&bytes);
-    }
     Response::builder()
         .header(header::CONTENT_TYPE, mime)
         .header(header::CACHE_CONTROL, cache)
         .body(Body::from(bytes))
         .unwrap()
-}
-
-fn with_remote_flag(html: &[u8]) -> Vec<u8> {
-    String::from_utf8_lossy(html)
-        .replacen("<head>", "<head><script>window.__CC_REMOTE__=true</script>", 1)
-        .into_bytes()
-}
-
-/// Proxies to the Vite dev server (devUrl). None when it isn't running, so the built `dist/` is
-/// served instead.
-#[cfg(debug_assertions)]
-async fn from_dev_server(app: &AppHandle, uri: &Uri) -> Option<Response> {
-    let base = app.config().build.dev_url.clone()?;
-    let url = format!("{}{}", base.as_str().trim_end_matches('/'), uri.path_and_query().map_or("/", |p| p.as_str()));
-    let html = uri.path() == "/" || uri.path() == "/index.html";
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut res = ureq::get(&url).call().ok()?;
-        let mime = res.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("application/octet-stream").to_string();
-        let mut body = res.body_mut().with_config().limit(256 * 1024 * 1024).read_to_vec().ok()?;
-        if html {
-            body = with_remote_flag(&body);
-        }
-        Some(
-            Response::builder()
-                .header(header::CONTENT_TYPE, mime)
-                .header(header::CACHE_CONTROL, if html { "no-store" } else { "no-cache" })
-                .body(Body::from(body))
-                .unwrap(),
-        )
-    })
-    .await
-    .ok()
-    .flatten()
-}
-
-/// Passes Vite's HMR websocket through to the dev server, so a phone picks up code changes the
-/// moment they're saved (and reloads by itself after a restart) instead of showing stale code.
-#[cfg(debug_assertions)]
-async fn dev_socket(app: &AppHandle, req: axum::extract::Request) -> Result<Response, String> {
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-    let base = app.config().build.dev_url.clone().ok_or("no dev server")?;
-    let host = format!("{}:{}", base.host_str().unwrap_or("localhost"), base.port_or_known_default().unwrap_or(80));
-    let mut upstream = tokio::net::TcpStream::connect(&host).await.map_err(|e| e.to_string())?;
-
-    // Same handshake, addressed to Vite as if the page had been opened there.
-    let target = req.uri().path_and_query().map_or("/", |p| p.as_str());
-    let origin = base.origin().ascii_serialization();
-    let mut head = format!("GET {target} HTTP/1.1\r\nHost: {host}\r\nOrigin: {origin}\r\n");
-    for (name, value) in req.headers() {
-        if name != header::HOST && name != header::ORIGIN && name != header::COOKIE {
-            head.push_str(&format!("{name}: {}\r\n", value.to_str().unwrap_or_default()));
-        }
-    }
-    head.push_str("\r\n");
-    upstream.write_all(head.as_bytes()).await.map_err(|e| e.to_string())?;
-
-    // Vite's answer: headers up to the blank line, then possibly the first frames.
-    let mut buf = Vec::new();
-    let end = loop {
-        let mut chunk = [0u8; 4096];
-        let n = upstream.read(&mut chunk).await.map_err(|e| e.to_string())?;
-        if n == 0 {
-            return Err("dev server closed the connection".into());
-        }
-        buf.extend_from_slice(&chunk[..n]);
-        if let Some(i) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
-            break i + 4;
-        }
-    };
-    let text = String::from_utf8_lossy(&buf[..end]).to_string();
-    let mut lines = text.split("\r\n");
-    let status = lines.next().and_then(|l| l.split(' ').nth(1)).and_then(|c| c.parse::<u16>().ok()).unwrap_or(502);
-    let mut res = Response::builder().status(status);
-    for line in lines.filter(|l| !l.is_empty()) {
-        if let Some((k, v)) = line.split_once(':') {
-            res = res.header(k.trim(), v.trim());
-        }
-    }
-    if status != 101 {
-        return res.body(Body::empty()).map_err(|e| e.to_string());
-    }
-    let early = buf[end..].to_vec();
-    tauri::async_runtime::spawn(async move {
-        let Ok(upgraded) = hyper::upgrade::on(req).await else { return };
-        let mut phone = hyper_util::rt::TokioIo::new(upgraded);
-        if phone.write_all(&early).await.is_ok() {
-            let _ = tokio::io::copy_bidirectional(&mut phone, &mut upstream).await;
-        }
-    });
-    res.body(Body::empty()).map_err(|e| e.to_string())
 }

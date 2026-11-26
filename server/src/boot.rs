@@ -3,14 +3,13 @@
 //! after another before the game was on screen.
 
 use serde_json::{json, Value};
-use tauri::State;
+use crate::ctx::State;
 
 use crate::db::{self, Db};
 use crate::{puzzles, stats};
 
 /// `prefer`: the game the device had open last time (kept if it still exists), else the latest.
 /// Games abandoned before the student moved go first, as they did on every launch.
-#[tauri::command]
 pub fn app_boot(db: State<Db>, prefer: Option<i64>) -> Result<Value, String> {
     db::db_prune_empty_games(db.clone(), prefer)?;
     let mut game = match prefer {

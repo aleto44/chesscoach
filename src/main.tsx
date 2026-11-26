@@ -32,6 +32,7 @@ import { initOpeningSession } from "./openings/session";
 import { initEndgameSession } from "./endgames/session";
 import { initGuessSession } from "./guess/session";
 import { initPlanSession } from "./plans/session";
+import { initLive } from "./live";
 import { initLiveEval } from "./engine/live";
 import { boot } from "./boot";
 import { launchedFrom, mark } from "./perf";
@@ -71,6 +72,8 @@ function start() {
   initEndgameSession();
   initGuessSession();
   initPlanSession();
+  // After the sessions restored themselves, so it knows which ones this device is in.
+  initLive();
   initSounds();
   initNav();
   initLiveEval();

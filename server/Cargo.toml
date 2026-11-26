@@ -1,0 +1,25 @@
+[package]
+name = "chesscoach-server"
+version = "0.2.0"
+description = "Chess Coach's server: database, coach and HTTP API"
+authors = ["alexj"]
+edition = "2024"
+
+[lib]
+name = "chesscoach_server"
+
+[[bin]]
+name = "chesscoach-server"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+axum = "0.8"
+tokio = { version = "1", features = ["net", "sync", "time", "io-util", "rt-multi-thread", "macros", "fs"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+uuid = { version = "1", features = ["v4"] }
+rusqlite = { version = "0.41.1", features = ["bundled", "functions"] }
+ureq = "3"
+zstd = "0.13"
+csv = "1"

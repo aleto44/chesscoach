@@ -14,7 +14,7 @@ use axum::routing::post;
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::AppHandle;
+use crate::ctx::AppHandle;
 use tokio::sync::oneshot;
 
 use crate::{relay, tools};
@@ -68,7 +68,7 @@ pub async fn start(app: AppHandle) -> std::io::Result<Mcp> {
             post(handle).get(|| async { StatusCode::METHOD_NOT_ALLOWED }),
         )
         .with_state(inner.clone());
-    tauri::async_runtime::spawn(async move {
+    tokio::spawn(async move {
         if let Err(e) = axum::serve(listener, router).await {
             eprintln!("mcp server stopped: {e}");
         }

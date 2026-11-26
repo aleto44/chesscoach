@@ -3,8 +3,7 @@
 
 use std::path::PathBuf;
 
-use tauri::ipc::Response;
-use tauri::{AppHandle, Manager};
+use crate::ctx::AppHandle;
 
 const EXTENSIONS: &[&str] = &["mp3", "wav", "ogg", "m4a", "webm"];
 
@@ -15,17 +14,11 @@ fn sounds_dir(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 /// The folder custom sounds go in (created if missing).
-#[tauri::command]
 pub fn sounds_folder(app: AppHandle) -> Result<String, String> {
     Ok(sounds_dir(&app)?.to_string_lossy().into_owned())
 }
 
-/// Raw bytes of the custom file for `name` (e.g. "move"), or an empty response if there is none.
-#[tauri::command]
-pub fn custom_sound(app: AppHandle, name: String) -> Result<Response, String> {
-    read_sound(&app, &name).map(Response::new)
-}
-
+/// Raw bytes of the custom file for `name` (e.g. "move"), or nothing if there is none.
 pub fn read_sound(app: &AppHandle, name: &str) -> Result<Vec<u8>, String> {
     if !name.chars().all(|c| c.is_ascii_lowercase() || c == '-') {
         return Err("bad sound name".into());

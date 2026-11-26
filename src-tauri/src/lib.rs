@@ -1,204 +1,33 @@
-mod auth;
-mod boot;
-mod coach;
-mod coach_data;
-mod db;
-mod devlog;
-mod import;
-mod loads;
-mod mcp;
-mod puzzles;
-mod relay;
-mod remote;
-mod sounds;
-mod stats;
-mod tailscale;
-mod tools;
+//! The desktop app: a window over the bundled frontend, which talks to Chess Coach's server
+//! (`server/`) over HTTP, like the phone does. Nothing is stored here but the window's own web
+//! storage (the server address and token, offline caches).
+//!
+//! The server address and token can also come from `%USERPROFILE%\.chesscoach\server.json`
+//! (`{"url": "...", "token": "..."}`), handed to the page as `window.__CC_SERVER__`. That's how the
+//! app gets set up without typing a pairing code; Settings can change it too.
 
-use std::sync::Mutex;
+use tauri::WebviewWindowBuilder;
 
-use tauri::{AppHandle, Manager, State};
-
-use relay::Relay;
-
-use coach::{ClaudeCli, CoachBackend};
-use mcp::{Mcp, ToolResult};
-
-/// The coach process and the client (see `relay`) it belongs to.
-#[derive(Default)]
-struct Coach(Mutex<Option<(String, Box<dyn CoachBackend>)>>);
-
-/// Sends a user turn for `client`, starting the backend as needed: on first use, after a crash,
-/// or when the turn comes from a different client than the running process belongs to (then
-/// the process restarts resuming that client's own conversation).
-pub(crate) fn send_turn(app: &AppHandle, client: &str, text: &str, resume: Option<&str>) -> Result<(), String> {
-    let coach = app.state::<Coach>();
-    let mut backend = coach.0.lock().unwrap();
-    if let Some((owner, b)) = backend.as_mut() {
-        if owner == client && b.send(text).is_ok() {
-            return Ok(());
-        }
-    }
-    backend.take();
-    app.state::<Relay>().set_owner(client);
-    let model = app.state::<db::Db>().setting("coachModel");
-    let model = model.as_ref().and_then(|m| m.as_str()).filter(|m| !m.is_empty());
-    let mut fresh = ClaudeCli::spawn(app, client, &app.state::<Mcp>().url, resume, model)?;
-    fresh.send(text)?;
-    *backend = Some((client.to_string(), Box::new(fresh)));
-    Ok(())
-}
-
-/// Ends `client`'s coach process; another client's is left alone.
-pub(crate) fn reset_coach(app: &AppHandle, client: &str) {
-    let coach = app.state::<Coach>();
-    let mut backend = coach.0.lock().unwrap();
-    if backend.as_ref().is_some_and(|(owner, _)| owner == client) {
-        backend.take();
-    }
-}
-
-/// Tells the other devices that `client` saved changes to a game, so they reload it.
-pub(crate) fn notify_game_changed(app: &AppHandle, client: &str, game_id: i64) {
-    relay::emit_all(app, "game-changed", serde_json::json!({ "gameId": game_id, "from": client }));
-}
-
-/// Tells every device that puzzle or drill progress changed, so they refresh the rating and due
-/// counts they loaded at startup. The device that made the change refreshes too: one cheap call.
-pub(crate) fn notify_data_changed(app: &AppHandle, kind: &str) {
-    relay::emit_all(app, "data-changed", serde_json::json!({ "kind": kind }));
-}
-
-/// Tells the other devices that `client` saved a setting, so they take the new value.
-pub(crate) fn notify_setting_changed(app: &AppHandle, client: &str, key: &str, value: &serde_json::Value) {
-    relay::emit_all(app, "setting-changed", serde_json::json!({ "key": key, "value": value, "from": client }));
-}
-
-#[tauri::command]
-fn game_changed(app: AppHandle, game_id: i64) {
-    notify_game_changed(&app, relay::DESKTOP, game_id);
-}
-
-#[tauri::command]
-fn coach_send(app: AppHandle, text: String, resume: Option<String>) -> Result<(), String> {
-    send_turn(&app, relay::DESKTOP, &text, resume.as_deref())
-}
-
-/// A one-off explanation outside the game's conversation (see coach::explain).
-#[tauri::command]
-async fn coach_explain(app: AppHandle, prompt: String) -> Result<String, String> {
-    coach::explain(&app, prompt).await
-}
-
-/// Utility › Load game: a chessboard read from an image (see coach::read_board).
-#[tauri::command]
-async fn coach_read_board(app: AppHandle, image: String, media_type: String) -> Result<String, String> {
-    coach::read_board(&app, image, media_type).await
-}
-
-#[tauri::command]
-fn coach_reset(app: AppHandle) {
-    reset_coach(&app, relay::DESKTOP);
-}
-
-#[tauri::command]
-fn tool_result(mcp: State<Mcp>, id: u64, result: ToolResult) {
-    mcp.resolve(id, result);
+fn server_config() -> serde_json::Value {
+    let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"));
+    home.map(|h| std::path::PathBuf::from(h).join(".chesscoach").join("server.json"))
+        .and_then(|p| std::fs::read(p).ok())
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or(serde_json::Value::Null)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(Coach::default())
-        .manage(auth::Login::default())
-        .manage(puzzles::Import::default())
-        .manage(Relay::default())
         .setup(|app| {
-            let mcp = tauri::async_runtime::block_on(mcp::start(app.handle().clone()))?;
-            app.manage(mcp);
-            let dir = app.path().app_data_dir()?;
-            std::fs::create_dir_all(&dir)?;
-            app.manage(db::Db::open(&dir.join("chesscoach.db"))?);
-            app.manage(remote::Remote::load(&dir));
-            let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move { remote::start_if_enabled(&handle).await });
+            let config = app.config().app.windows.iter().find(|w| w.label == "main").cloned().unwrap_or_default();
+            let script = format!("window.__CC_SERVER__ = {};", server_config());
+            WebviewWindowBuilder::from_config(app.handle(), &config)?
+                .initialization_script(&script)
+                .build()?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            coach_send,
-            coach_reset,
-            coach_explain,
-            coach_read_board,
-            tool_result,
-            auth::auth_status,
-            auth::auth_login,
-            auth::auth_submit_code,
-            auth::auth_cancel,
-            auth::auth_logout,
-            auth::plan_usage,
-            sounds::sounds_folder,
-            sounds::custom_sound,
-            game_changed,
-            remote::remote_info,
-            remote::remote_set_enabled,
-            remote::remote_new_code,
-            remote::remote_tailscale_serve,
-            boot::app_boot,
-            db::db_create_game,
-            db::db_update_game,
-            db::db_set_moves,
-            db::db_upsert_tangent,
-            db::db_upsert_chat,
-            db::db_clear_chat,
-            db::db_list_games,
-            db::db_load_game,
-            db::db_delete_game,
-            db::db_prune_empty_games,
-            db::db_get_settings,
-            db::db_set_setting,
-            db::db_course_progress,
-            db::db_player_rating,
-            stats::db_save_analysis,
-            stats::db_unanalyzed_games,
-            stats::db_profile,
-            stats::db_query_games,
-            stats::db_training_games,
-            stats::db_record_observation,
-            stats::db_add_drills,
-            stats::db_due_drills,
-            stats::db_drill_counts,
-            stats::db_set_drill_category,
-            stats::db_set_drill_lesson,
-            stats::db_drills_without_lesson,
-            stats::db_grade_drill,
-            stats::db_retire_drill,
-            stats::db_drill_overview,
-            stats::db_weakness,
-            stats::db_rating_history,
-            coach_data::db_coach_query,
-            import::import_fetch,
-            import::db_import_known,
-            import::db_import_game,
-            import::db_import_accounts,
-            import::db_import_finish,
-            import::db_import_remove,
-            loads::db_loads,
-            loads::db_save_load,
-            loads::db_update_load,
-            loads::db_open_load,
-            loads::db_remove_load,
-            stats::puzzle_history,
-            puzzles::puzzle_status,
-            puzzles::puzzle_find,
-            puzzles::puzzle_get,
-            puzzles::puzzle_record,
-            puzzles::puzzle_void,
-            devlog::dev_log,
-            puzzles::puzzle_import_start,
-            puzzles::puzzle_import_cancel,
-            puzzles::puzzle_import_progress,
-        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

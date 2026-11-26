@@ -8,7 +8,7 @@ use rusqlite::functions::FunctionFlags;
 use rusqlite::types::ValueRef;
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{json, Map, Value};
-use tauri::State;
+use crate::ctx::State;
 
 use crate::db::Db;
 
@@ -112,10 +112,9 @@ fn run(conn: &Connection, sql: &str) -> Result<Value, String> {
 }
 
 /// `query_data`: one read-only SELECT, or the schema when `sql` is empty.
-#[tauri::command]
 pub async fn db_coach_query(db: State<'_, Db>, sql: Option<String>) -> Result<Value, String> {
     let path = db.conn().path().map(str::to_string).ok_or("the database has no file")?;
-    tauri::async_runtime::spawn_blocking(move || {
+    tokio::task::spawn_blocking(move || {
         let conn = open(&path)?;
         let sql = sql.unwrap_or_default();
         if sql.trim().is_empty() {

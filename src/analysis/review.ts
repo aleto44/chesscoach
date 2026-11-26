@@ -12,6 +12,7 @@ import { useStore, type Color, type GameMeta } from "../store";
 import { inBook, openingName } from "../openings/book";
 import { addMistakeDrills } from "./drills";
 import { isFollowing } from "../game/sync";
+import { isLocalGame } from "../game/local";
 import { create } from "zustand";
 
 const DEPTH = 13;
@@ -327,7 +328,9 @@ export async function analyzeGame(
   });
   onAnnotated?.(annotations);
 
-  if (hasBackend()) {
+  // A game played offline is reviewed again once it's on the server (the backlog), which saves
+  // the review and makes its drills there.
+  if (hasBackend() && !isLocalGame(g.gameId)) {
     const args = {
       gameId: g.gameId,
       openingName: openingName(g.line.sans)?.name ?? null,

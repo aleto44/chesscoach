@@ -5,6 +5,7 @@ import type { Line } from "./chess/line";
 import { fromEngineElo } from "./engine/stockfish";
 import type { RatingPool } from "./rating";
 import { useStore, type ChatItem, type GameMeta, type ImportedFrom, type ImportSite, type Tangent } from "./store";
+import { isLocalGame, patchLocalGame, saveLocalGame } from "./game/local";
 
 export { hasBackend };
 
@@ -84,6 +85,8 @@ export const db = {
     invoke<number>("db_create_game", { game }).then((id) => (notifyChanged(id), id)),
   /** Resolves once the change is saved, retrying while the computer is out of reach. */
   updateGame: (id: number, patch: GamePatch) => {
+    // A game played offline keeps its changes with it until it's sent (game/local.ts).
+    if (isLocalGame(id)) return Promise.resolve(patchLocalGame(id, patch));
     pendingPatches[id] = { ...pendingPatches[id], ...patch };
     savePendingPatches();
     return writePatch(id);
@@ -269,6 +272,15 @@ export function initPersistence() {
   });
 }
 
+/** Sends the whole open game again (it just got its server id after being played offline). */
+export function resaveAll() {
+  const s = useStore.getState();
+  dirtyMoves = true;
+  for (const id in s.tangents) dirtyTangents.add(id);
+  for (const c of s.chat) dirtyChat.add(c.id);
+  return flush();
+}
+
 /** Drops unsaved changes (the game they belong to is being deleted). */
 export function discardPending() {
   clearTimeout(timer);
@@ -299,6 +311,17 @@ export async function flush() {
   const s = useStore.getState();
   const gameId = s.gameId;
   if (gameId === null) return;
+  if (isLocalGame(gameId)) {
+    saveLocalGame(gameId, {
+      moves: moveRows(s.game, s.meta.studentColor, s.clocks),
+      tangents: Object.values(s.tangents).map(tangentRow),
+      chat: s.chat.map((item, seq) => ({ id: item.id, seq, kind: item.kind, data: item })),
+    });
+    dirtyMoves = false;
+    dirtyTangents.clear();
+    dirtyChat.clear();
+    return;
+  }
   // Each write with what to mark dirty again if it doesn't reach the computer.
   const writes: { write: Promise<unknown>; redo: () => void }[] = [];
   if (dirtyMoves)
@@ -344,6 +367,7 @@ let flushRetries = 0;
 
 /** Lets the student's other devices (phone, desktop) know to reload this game (see game/sync.ts). */
 export function notifyChanged(gameId: number) {
+  if (isLocalGame(gameId)) return;
   reliably("announcing the change", () => invoke("game_changed", { gameId })).catch((e) =>
     console.warn("could not announce the change", e),
   );

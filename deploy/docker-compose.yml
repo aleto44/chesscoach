@@ -1,0 +1,29 @@
+# Chess Coach on laptop-server (/srv/services/chesscoach). Deployed by scripts/deploy.ps1 from the
+# repo (deploy/), which also copies the source to ./src for the build.
+#
+# Phones open https://laptop-server.tail3adf5e.ts.net (tailscale serve on the host, port 443 ->
+# 8765). The desktop app talks to the same address. Port 8765 is published for that proxy and for
+# the home LAN; the firewall's DOCKER-USER block keeps it off the internet.
+services:
+  chesscoach:
+    build:
+      context: ./src
+      dockerfile: deploy/Dockerfile
+    image: chesscoach:local
+    container_name: chesscoach
+    restart: unless-stopped
+    ports:
+      - 8765:8765
+    volumes:
+      # chesscoach.db, puzzles.db, remote.json (pairing), sounds/
+      - ./data:/data
+      # The coach's Claude sign-in: `docker exec -it chesscoach claude auth login` (or Settings in the app).
+      - ./claude:/claude
+    environment:
+      CHESSCOACH_PUBLIC_URL: https://laptop-server.tail3adf5e.ts.net
+      TZ: America/New_York
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

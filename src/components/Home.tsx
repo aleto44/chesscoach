@@ -28,6 +28,7 @@ import { MasteryRule, StarBadge, XpBar } from "./Mastery";
 import { TimerScreen } from "./Timer";
 import { LoadGame } from "./LoadGame";
 import { clockLabel, started as clockStarted, useTimer } from "../utility/timer";
+import { describe, join, joinable, useLive } from "../live";
 import { saveSetting, useSettings } from "../settings";
 
 /** Drills and puzzles would leave a rated game's clock (or position) sitting mid-game. */
@@ -131,6 +132,25 @@ function ResumeGame() {
   );
 }
 
+/**
+ * Sessions going on another device (a puzzle set, a drill run, a trainer): one tap carries on
+ * with it here. The app never jumps into them by itself.
+ */
+function LiveContinue() {
+  const records = useLive();
+  return (
+    <>
+      {joinable(records).map((r) => (
+        <button key={r.kind} className="resume" onClick={() => join(r)}>
+          <span className="resume-label">{r.device.startsWith("phone") ? "On your phone" : "On your computer"}</span>
+          <span className="resume-what">{describe(r)}</span>
+          <span className="resume-go">Continue ›</span>
+        </button>
+      ))}
+    </>
+  );
+}
+
 function MainMenu() {
   const drills = useDrillCounts();
   const pdb = usePuzzleDb();
@@ -143,6 +163,7 @@ function MainMenu() {
         Chess Coach
       </h1>
       <ResumeGame />
+      <LiveContinue />
       <div className="menu-grid main">
         <Tile big icon="♟" title="Games" sub="Play the computer, rated or practice" onClick={() => go("games")} />
         <Tile
@@ -208,7 +229,7 @@ function UtilityMenu() {
 
 function GamesMenu() {
   const [dialog, setDialog] = useState<"rated" | "play" | null>(null);
-  const { data: rating } = useRead<PlayerRating>("db_player_rating", {}, "Your rating is kept on the computer.");
+  const { data: rating } = useRead<PlayerRating>("db_player_rating", {}, "Your rating is kept on the server.");
   const hasGame = useStore((s) => s.gameId !== null || s.game.sans.length > 0);
   const close = () => setDialog(null);
   return (
@@ -272,14 +293,14 @@ function useDrillOverview(limit: number) {
   return useRead<DrillOverview>(
     "db_drill_overview",
     { limit },
-    "Drills are saved on the computer; open the app there or from the home server.",
+    "Drills are saved on the server, which can't be reached right now.",
     version,
   );
 }
 
 /**
  * A read-only query for a screen. On a phone the last answer shows at once (snapshot.ts) while
- * the computer is asked again; an error only shows when there's nothing to show instead.
+ * the server is asked again; an error only shows when there's nothing to show instead.
  */
 /** `refresh`: bump it to ask again. */
 export function useRead<T>(cmd: string, args: Record<string, unknown>, offline: string, refresh = 0) {
@@ -690,7 +711,7 @@ interface PuzzleHistoryData {
 }
 
 function usePuzzleHistory(limit: number) {
-  return useRead<PuzzleHistoryData>("puzzle_history", { limit }, "Puzzles are saved on the computer; open the app there or from the home server.");
+  return useRead<PuzzleHistoryData>("puzzle_history", { limit }, "Puzzles are saved on the server, which can't be reached right now.");
 }
 
 function PuzzlesMenu() {

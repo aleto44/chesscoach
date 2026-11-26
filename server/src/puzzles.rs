@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager, State};
+use crate::ctx::{AppHandle, State};
 
 use crate::db::Db;
 use crate::relay;
@@ -172,7 +172,6 @@ pub fn build(compressed: impl Read, dest: &Path, mut progress: impl FnMut(&'stat
 }
 
 /// Starts downloading the puzzle set in the background. Progress arrives as `puzzle-import` events.
-#[tauri::command]
 pub fn puzzle_import_start(app: AppHandle, import: State<Import>) -> Result<(), String> {
     if import.running.swap(true, Ordering::SeqCst) {
         return Err("already downloading".into());
@@ -232,12 +231,10 @@ fn download(app: &AppHandle, cancel: &AtomicBool, emit: &dyn Fn(Progress)) -> Re
 }
 
 /// The download's latest progress (or its last outcome), if one has run since the app started.
-#[tauri::command]
 pub fn puzzle_import_progress(import: State<Import>) -> Option<Value> {
     import.last.lock().unwrap().as_ref().and_then(|p| serde_json::to_value(p).ok())
 }
 
-#[tauri::command]
 pub fn puzzle_import_cancel(import: State<Import>) {
     import.cancel.store(true, Ordering::SeqCst);
 }
@@ -274,7 +271,6 @@ pub struct Filter {
 }
 
 /// What's downloaded, the student's puzzle rating and the tags to filter by.
-#[tauri::command]
 pub fn puzzle_status(db: State<Db>) -> Result<Value, String> {
     let conn = db.conn();
     let (rating, attempts) = student_rating(&conn)?;
@@ -297,7 +293,6 @@ pub fn puzzle_status(db: State<Db>) -> Result<Value, String> {
 }
 
 /// Random unseen puzzles in the rating window matching the filter.
-#[tauri::command]
 pub fn puzzle_find(db: State<Db>, filter: Filter) -> Result<Vec<Puzzle>, String> {
     let conn = db.conn();
     if !attached(&conn) {
@@ -360,7 +355,6 @@ pub fn puzzle_find(db: State<Db>, filter: Filter) -> Result<Vec<Puzzle>, String>
 }
 
 /// One puzzle by its Lichess id (a missed-puzzle drill replays the opponent's move that set it up).
-#[tauri::command]
 pub fn puzzle_get(db: State<Db>, id: String) -> Result<Option<Puzzle>, String> {
     let conn = db.conn();
     if !attached(&conn) {
@@ -400,9 +394,8 @@ fn student_rating(conn: &Connection) -> Result<(i64, i64), String> {
 
 /// Records an attempt. Only the first try at a puzzle moves the rating (Elo, K 40 for the first
 /// 30 rated puzzles, then 20). Returns the rating before and after.
-#[tauri::command]
 pub fn puzzle_record(
-    app: tauri::AppHandle,
+    app: crate::ctx::AppHandle,
     db: State<Db>,
     id: String,
     rating: i64,
@@ -418,8 +411,7 @@ pub fn puzzle_record(
 /// Takes back the latest try at a puzzle (a misclick the student voids): the rating and theme XP
 /// are replayed from the tries, so dropping the row undoes both, and the puzzle counts as unseen
 /// again. The drill the miss made goes too, unless it was already practised.
-#[tauri::command]
-pub fn puzzle_void(app: tauri::AppHandle, db: State<Db>, id: String, fen: String) -> Result<(), String> {
+pub fn puzzle_void(app: crate::ctx::AppHandle, db: State<Db>, id: String, fen: String) -> Result<(), String> {
     let r = void(&db, &id, &fen);
     crate::notify_data_changed(&app, "puzzles");
     crate::notify_data_changed(&app, "drills");

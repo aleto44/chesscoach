@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 
 use serde_json::json;
-use tauri::{AppHandle, Manager};
+use crate::ctx::AppHandle;
 
 use crate::relay;
 
@@ -158,7 +158,7 @@ pub async fn read_board(app: &AppHandle, image: String, media_type: String) -> R
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let model = app.state::<crate::db::Db>().setting("coachModel");
     let model = model.as_ref().and_then(|m| m.as_str()).filter(|m| !m.is_empty()).map(str::to_string);
-    tauri::async_runtime::spawn_blocking(move || {
+    tokio::task::spawn_blocking(move || {
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let mut cmd = claude_command();
         // An image needs a content block, so the message goes in as stream-json (which needs stream-json out).
@@ -212,7 +212,7 @@ pub async fn explain(app: &AppHandle, prompt: String) -> Result<String, String> 
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let model = app.state::<crate::db::Db>().setting("coachModel");
     let model = model.as_ref().and_then(|m| m.as_str()).filter(|m| !m.is_empty()).map(str::to_string);
-    tauri::async_runtime::spawn_blocking(move || {
+    tokio::task::spawn_blocking(move || {
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let mut cmd = claude_command();
         // Outside the project, with no tools or MCP servers: a pure question and answer.

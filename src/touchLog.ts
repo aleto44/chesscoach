@@ -1,4 +1,4 @@
-import { hasBackend, invoke, isRemote } from "./backend";
+import { hasBackend, invoke, isPhone } from "./backend";
 
 /**
  * A touch log for phone-only bugs, which scripted touches can't reproduce (Chrome's own gestures
@@ -34,7 +34,7 @@ export function initTouchLog() {
   if (flag !== null) localStorage.setItem(KEY, flag === "0" ? "" : "1");
   // `?touchlog` shows it on screen (and sends it); SEND_FROM_PHONES sends it without.
   const onScreen = !!localStorage.getItem(KEY);
-  if (!onScreen && !(SEND_FROM_PHONES && import.meta.env.DEV && isRemote)) return;
+  if (!onScreen && !(SEND_FROM_PHONES && import.meta.env.DEV && isPhone)) return;
 
   const pre = document.createElement("pre");
   pre.style.cssText =

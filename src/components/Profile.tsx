@@ -16,7 +16,7 @@ import { LineChart, Legend, type ChartSeries } from "./Chart";
 import { BLOCKED, Tile, useRead, useSessionsBlocked } from "./Home";
 import { ImportDialog } from "./ImportDialog";
 
-const OFFLINE = "Your games are on the computer; open the app there or from the home server.";
+const OFFLINE = "Your games are on the server, which can't be reached right now.";
 
 // ---- The menu ----
 

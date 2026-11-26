@@ -30,7 +30,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     <Modal title="Import games" onClose={onClose} className="import-dialog">
       <p className="muted small">
         Your real games show how you really play. Each imported game gets the same review as a rated game here, its
-        mistakes become drills, and it counts toward your Profile. Games stay on this computer. Daily games and variants
+        mistakes become drills, and it counts toward your Profile. Games are kept on your server. Daily games and variants
         are left out.
       </p>
 

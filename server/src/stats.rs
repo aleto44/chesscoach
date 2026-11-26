@@ -5,7 +5,7 @@
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::State;
+use crate::ctx::State;
 
 use crate::db::Db;
 
@@ -59,7 +59,6 @@ pub struct AnalyzedMove {
     tags: Vec<String>,
 }
 
-#[tauri::command]
 pub fn db_save_analysis(
     db: State<Db>,
     game_id: i64,
@@ -103,7 +102,6 @@ pub fn db_save_analysis(
 
 /// Finished games with moves that haven't been analyzed yet, newest first (a fresh import of many
 /// games shows its latest ones first).
-#[tauri::command]
 pub fn db_unanalyzed_games(db: State<Db>) -> Result<Vec<i64>, String> {
     let conn = db.conn();
     let mut stmt = conn
@@ -120,7 +118,6 @@ pub fn db_unanalyzed_games(db: State<Db>) -> Result<Vec<i64>, String> {
 // ---- Profile ----
 
 /// Aggregates over the student's rated games (their unaided play). Practice games are only counted.
-#[tauri::command]
 pub fn db_profile(db: State<Db>) -> Result<Value, String> {
     let conn = db.conn();
     // Student moves in finished, analyzed rated games.
@@ -218,7 +215,6 @@ pub fn db_profile(db: State<Db>) -> Result<Value, String> {
 }
 
 /// The puzzle menu's history: the latest attempts, newest first, with the stats the profile uses.
-#[tauri::command]
 pub fn puzzle_history(db: State<Db>, limit: i64) -> Result<Value, String> {
     let conn = db.conn();
     let attempts = rows(
@@ -236,7 +232,6 @@ pub fn puzzle_history(db: State<Db>, limit: i64) -> Result<Value, String> {
 }
 
 /// The drill menu: cards per kind and the latest attempts, newest first.
-#[tauri::command]
 pub fn db_drill_overview(db: State<Db>, limit: i64) -> Result<Value, String> {
     let conn = db.conn();
     let kinds = rows(
@@ -259,7 +254,6 @@ pub fn db_drill_overview(db: State<Db>, limit: i64) -> Result<Value, String> {
 /// Analyzed, finished games with their moves and evals, newest first, for the trainers that work
 /// from the student's own positions (convert/defend, find the plan, opening leaks). `real_only`
 /// keeps rated and imported games (the student's unaided play); `max_ply` cuts each game short.
-#[tauri::command]
 pub fn db_training_games(db: State<Db>, real_only: bool, max_ply: Option<i64>, limit: i64) -> Result<Value, String> {
     let conn = db.conn();
     let games = rows(
@@ -288,7 +282,6 @@ pub fn db_training_games(db: State<Db>, real_only: bool, max_ply: Option<i64>, l
 }
 
 /// Games with their student mistakes, newest first. `mode` is 'rated', 'practice' or 'all'.
-#[tauri::command]
 pub fn db_query_games(db: State<Db>, mode: String, limit: i64, game_id: Option<i64>) -> Result<Value, String> {
     let conn = db.conn();
     let games = rows(
@@ -318,7 +311,6 @@ pub fn db_query_games(db: State<Db>, mode: String, limit: i64, game_id: Option<i
     Ok(json!(out))
 }
 
-#[tauri::command]
 pub fn db_record_observation(
     db: State<Db>,
     game_id: Option<i64>,
@@ -349,7 +341,6 @@ fn scope_sql(source: &str) -> &'static str {
 
 /// What goes wrong in the student's real games (rated games here and imported ones, analyzed),
 /// over the `last` most recent. Practice games are left out: help was on. Moves are the student's.
-#[tauri::command]
 pub fn db_weakness(db: State<Db>, source: String, last: i64) -> Result<Value, String> {
     weakness(&db.conn(), &source, last)
 }
@@ -452,7 +443,6 @@ pub(crate) fn weakness(conn: &rusqlite::Connection, source: &str, last: i64) -> 
 /// Every rating the student has, over time, oldest first, each point [time, rating]: the in-app
 /// bullet, blitz and rapid ratings (chess.com scale), the puzzle rating (Lichess scale; the frontend converts it), and
 /// the student's own rating in imported games (chess.com scale already), per site and speed.
-#[tauri::command]
 pub fn db_rating_history(db: State<Db>) -> Result<Value, String> {
     rating_history(&db.conn())
 }
@@ -553,8 +543,7 @@ pub struct Drill {
 }
 
 /// Adds drills, skipping ones that already exist. Returns how many were new.
-#[tauri::command]
-pub fn db_add_drills(app: tauri::AppHandle, db: State<Db>, drills: Vec<NewDrill>) -> Result<usize, String> {
+pub fn db_add_drills(app: crate::ctx::AppHandle, db: State<Db>, drills: Vec<NewDrill>) -> Result<usize, String> {
     let r = add_drills(&db, drills);
     crate::notify_data_changed(&app, "drills");
     r
@@ -582,7 +571,6 @@ fn add_drills(db: &Db, drills: Vec<NewDrill>) -> Result<usize, String> {
 /// first). `category` keeps one sort ('hung', 'puzzle', ...): the drills menu's categories. `tag`
 /// picks the mistake drills with that review tag (e.g. "hung-piece"), due or not: the weakness
 /// dashboard's "drill these".
-#[tauri::command]
 pub fn db_due_drills(db: State<Db>, limit: i64, all: Option<bool>, tag: Option<String>, category: Option<String>) -> Result<Vec<Drill>, String> {
     let conn = db.conn();
     let mut stmt = conn
@@ -623,7 +611,6 @@ pub fn db_due_drills(db: State<Db>, limit: i64, all: Option<bool>, tag: Option<S
 }
 
 /// Stores what a drill teaches (worked out after the drill was made, for drills from before lessons).
-#[tauri::command]
 pub fn db_set_drill_lesson(db: State<Db>, id: i64, lesson: String, category: Option<String>) -> Result<(), String> {
     db.conn()
         .execute("UPDATE drills SET lesson = ?2, category = coalesce(?3, category) WHERE id = ?1", params![id, lesson, category])
@@ -632,7 +619,6 @@ pub fn db_set_drill_lesson(db: State<Db>, id: i64, lesson: String, category: Opt
 }
 
 /// Stores what sort of position a drill is (for drills stored before categories).
-#[tauri::command]
 pub fn db_set_drill_category(db: State<Db>, id: i64, category: String) -> Result<(), String> {
     db.conn()
         .execute("UPDATE drills SET category = ?2 WHERE id = ?1", params![id, category])
@@ -642,7 +628,6 @@ pub fn db_set_drill_category(db: State<Db>, id: i64, category: String) -> Result
 
 /// Mistake drills whose lesson isn't worked out yet, or was worked out by an older `version` of the
 /// reasoning (src/analysis/lesson.ts LESSON_VERSION), for the computer to (re)do.
-#[tauri::command]
 pub fn db_drills_without_lesson(db: State<Db>, limit: i64, version: Option<i64>) -> Result<Vec<Drill>, String> {
     let conn = db.conn();
     let mut stmt = conn
@@ -679,7 +664,6 @@ pub fn db_drills_without_lesson(db: State<Db>, limit: i64, version: Option<i64>)
     Ok(drills)
 }
 
-#[tauri::command]
 pub fn db_drill_counts(db: State<Db>) -> Result<Value, String> {
     let conn = db.conn();
     Ok(rows(
@@ -694,8 +678,7 @@ pub fn db_drill_counts(db: State<Db>) -> Result<Value, String> {
 
 /// Records an attempt and schedules the next review (SM-2: a miss starts the card over tomorrow;
 /// a hit multiplies the interval by the card's ease).
-#[tauri::command]
-pub fn db_grade_drill(app: tauri::AppHandle, db: State<Db>, id: i64, correct: bool, played: String, ms: Option<i64>) -> Result<String, String> {
+pub fn db_grade_drill(app: crate::ctx::AppHandle, db: State<Db>, id: i64, correct: bool, played: String, ms: Option<i64>) -> Result<String, String> {
     let r = grade_drill(&db, id, correct, played, ms);
     crate::notify_data_changed(&app, "drills");
     r
@@ -738,8 +721,7 @@ fn grade_drill(db: &Db, id: i64, correct: bool, played: String, ms: Option<i64>)
     Ok(due)
 }
 
-#[tauri::command]
-pub fn db_retire_drill(app: tauri::AppHandle, db: State<Db>, id: i64) -> Result<(), String> {
+pub fn db_retire_drill(app: crate::ctx::AppHandle, db: State<Db>, id: i64) -> Result<(), String> {
     let r = db.conn().execute("UPDATE drills SET retired = 1 WHERE id = ?1", [id]).map(|_| ()).map_err(err);
     crate::notify_data_changed(&app, "drills");
     r

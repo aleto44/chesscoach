@@ -3,7 +3,7 @@
 
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use crate::ctx::State;
 
 use crate::db::{err, Db};
 
@@ -107,18 +107,15 @@ pub(crate) fn save(conn: &Connection, l: NewLoad) -> Result<i64, String> {
     Ok(id)
 }
 
-#[tauri::command]
 pub fn db_loads(db: State<Db>, limit: Option<i64>) -> Result<Vec<LoadEntry>, String> {
     list(&db.conn(), limit.unwrap_or(KEEP))
 }
 
-#[tauri::command]
 pub fn db_save_load(db: State<Db>, load: NewLoad) -> Result<i64, String> {
     save(&db.conn(), load)
 }
 
 /// A fix made on the preview board (a misread square, the side to move, the orientation).
-#[tauri::command]
 pub fn db_update_load(db: State<Db>, id: i64, start_fen: String, sans: Vec<String>, orientation: String) -> Result<(), String> {
     let sans = serde_json::to_string(&sans).map_err(err)?;
     db.conn()
@@ -128,7 +125,6 @@ pub fn db_update_load(db: State<Db>, id: i64, start_fen: String, sans: Vec<Strin
 }
 
 /// Opening an entry again moves it to the top; returns its full picture, if it has one.
-#[tauri::command]
 pub fn db_open_load(db: State<Db>, id: i64) -> Result<Option<String>, String> {
     let conn = db.conn();
     let at = next_at(&conn)?;
@@ -137,7 +133,6 @@ pub fn db_open_load(db: State<Db>, id: i64) -> Result<Option<String>, String> {
 }
 
 /// One entry, or all of them with no id.
-#[tauri::command]
 pub fn db_remove_load(db: State<Db>, id: Option<i64>) -> Result<(), String> {
     let conn = db.conn();
     match id {

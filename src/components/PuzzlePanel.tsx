@@ -2,7 +2,7 @@ import type { DrawShape } from "chessground/draw";
 import type { Key } from "chessground/types";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { hasBackend, isRemote } from "../backend";
+import { hasBackend } from "../backend";
 import { useAuth } from "../coach/auth";
 import { sendToCoach } from "../coach/bridge";
 import {
@@ -739,7 +739,7 @@ function InstallPanel() {
         </p>
         <p className="muted">
           A one-time download of about {MB(310e6)} MB. The app keeps the best-rated puzzles in a file of about 400 MB on
-          {isRemote ? " your computer (not this phone), so it's shared with the desktop app" : " this computer"}.
+           the server, so every device shares it.
         </p>
         {running ? (
           <>

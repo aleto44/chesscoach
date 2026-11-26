@@ -7,7 +7,7 @@ use std::fs::File;
 use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
-use tauri::{AppHandle, Manager, State};
+use crate::ctx::{AppHandle, State};
 
 use crate::coach::claude_command;
 use crate::relay;
@@ -32,9 +32,8 @@ impl Drop for Login {
 }
 
 /// `claude auth status` as JSON, e.g. {"loggedIn": true, "authMethod": "claude.ai", ...}.
-#[tauri::command]
 pub async fn auth_status() -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(|| {
+    tokio::task::spawn_blocking(|| {
         let out = claude_command()
             .args(["auth", "status"])
             .output()
@@ -53,7 +52,6 @@ pub async fn auth_status() -> Result<Value, String> {
 
 /// Starts `claude auth login`. Output arrives as `auth-output` chunks (the code prompt has no
 /// newline, so this streams raw text), then `auth-exit` with the exit code.
-#[tauri::command]
 pub fn auth_login(app: AppHandle, login: State<Login>) -> Result<(), String> {
     let mut slot = login.0.lock().unwrap();
     if let Some((mut old, _)) = slot.take() {
@@ -129,7 +127,6 @@ pub fn auth_login(app: AppHandle, login: State<Login>) -> Result<(), String> {
 }
 
 /// Sends the code from the sign-in page to the waiting `claude auth login`.
-#[tauri::command]
 pub fn auth_submit_code(login: State<Login>, code: String) -> Result<(), String> {
     let mut slot = login.0.lock().unwrap();
     let Some((_, stdin)) = slot.as_mut() else {
@@ -142,16 +139,14 @@ pub fn auth_submit_code(login: State<Login>, code: String) -> Result<(), String>
     sent
 }
 
-#[tauri::command]
 pub fn auth_cancel(login: State<Login>) {
     if let Some((mut child, _)) = login.0.lock().unwrap().take() {
         let _ = child.kill();
     }
 }
 
-#[tauri::command]
 pub async fn auth_logout() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| {
+    tokio::task::spawn_blocking(|| {
         let out = claude_command()
             .args(["auth", "logout"])
             .output()
@@ -168,10 +163,9 @@ pub async fn auth_logout() -> Result<(), String> {
 
 /// Plan usage as the CLI reports it (`/usage` runs locally: no model call, no cost). Returns the
 /// text, e.g. "Current session: 24% used · resets Nov 3, 10:19pm (America/New_York)".
-#[tauri::command]
 pub async fn plan_usage(app: AppHandle) -> Result<String, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
+    tokio::task::spawn_blocking(move || {
         let out = claude_command()
             .current_dir(dir)
             .args(["-p", "--tools", "", "--output-format", "json", "/usage"])

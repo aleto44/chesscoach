@@ -1,5 +1,6 @@
 // Starting, loading and finishing games. Each game owns its chat, tangents and coach session.
-import { invoke } from "../backend";
+import { invoke, Unreachable } from "../backend";
+import { createLocalGame } from "./local";
 import { Chess } from "chess.js";
 import { cancelQuizzes } from "../coach/quiz";
 import { POOL_LABEL, signed, type RatingPool } from "../rating";
@@ -50,16 +51,20 @@ export async function newGame(opts: NewGameOptions) {
   const timeControl = opts.studentColor === "both" || !opts.opponentElo ? null : (opts.timeControl ?? null);
   const openingFocus = opts.opponentElo && opts.openingFocus?.length ? opts.openingFocus : null;
   const meta: GameMeta = { ...FREE_PLAY, ...opts, mode, timeControl, openingFocus };
-  const gameId = hasBackend()
-    ? await db.createGame({
-        startFen: START_FEN,
-        studentColor: opts.studentColor,
-        opponent: opponentKey(opts.opponentElo),
-        mode,
-        timeControl: timeControl && `${timeControl.initial}+${timeControl.increment}`,
-        openingFocus: openingFocus ?? [],
-      })
-    : null;
+  const create = {
+    startFen: START_FEN,
+    studentColor: opts.studentColor,
+    opponent: opponentKey(opts.opponentElo),
+    mode,
+    timeControl: timeControl && `${timeControl.initial}+${timeControl.increment}`,
+    openingFocus: openingFocus ?? [],
+  };
+  // The engines are on this device, so a game plays the same while the server is away: it's kept
+  // here and sent once the server is back (game/local.ts).
+  const gameId = await db.createGame(create).catch((e) => {
+    if (e instanceof Unreachable) return createLocalGame(create);
+    throw e;
+  });
   withoutSaving(() =>
     useStore.setState({
       gameId,
@@ -223,8 +228,13 @@ async function leaveGame(keep: number | null = null) {
   cancelQuizzes();
   await flush();
   if (!hasBackend()) return;
-  await invoke("coach_reset");
-  await db.pruneEmptyGames(keep);
+  try {
+    await invoke("coach_reset");
+    await db.pruneEmptyGames(keep);
+  } catch (e) {
+    // Offline: nothing to stop or tidy on the server; it's done next time.
+    if (!(e instanceof Unreachable)) throw e;
+  }
 }
 
 /** Deletes a game for good. Deleting the open game moves on to the latest remaining one. */

@@ -1,52 +1,41 @@
 # Playing on your phone
 
-The computer stays the home of everything: the database, your Claude login and the coach
-process. The phone is a client. The desktop app runs a small web server (`src-tauri/src/remote.rs`)
-that serves the same frontend plus an HTTP version of the Tauri commands, and the phone opens
-it in Chrome and installs it to the home screen as a PWA.
-
-Engines (Stockfish, Maia) run on the phone in the browser, just like in the desktop window.
+Chess Coach's server (`server/`, in Docker on laptop-server; see `docs/server-migration.md`) is the
+home of everything: the database, the Claude login and the coach. The phone and the desktop app are
+both clients of it. The phone opens the web app the server serves, in Chrome, and installs it to the
+home screen as a PWA. Engines (Stockfish, Maia) run on the phone in the browser.
 
 ## Setup
 
-1. On the computer: **Settings → Play from my phone**. It shows an address and a pairing code.
-   Windows may ask whether to allow Chess Coach through the firewall; allow it on private networks.
-2. On the phone (same Wi-Fi): open the address in Chrome, enter the code. The phone keeps a
-   pairing cookie for a year. **New code** in Settings unpairs every phone.
-3. Keep the desktop app running (it can be minimized).
+1. Tailscale on the phone, signed in to the same account as the server. Leave it on.
+2. On the phone, open **https://laptop-server.tail3adf5e.ts.net** (`tailscale serve` on the server
+   gives it an https address, which Chrome needs to install the app and use the microphone).
+3. Enter the pairing code. A paired device shows it in **Settings → Server**; on the server,
+   `docker exec chesscoach chesscoach-server pairing-code --data /data` prints it. **New code** there
+   unpairs every other device.
+4. Browser menu → **Add to Home screen** / **Install**.
 
-## From anywhere (and installing as an app): Tailscale
+## Offline
 
-Tailscale (free) joins your phone and the computer into a private network that only your own
-devices can reach, over cellular or any Wi-Fi, with no router changes. `tailscale serve` then gives
-the computer an `https://<computer>.<tailnet>.ts.net` address for the app. Nothing is opened to the
-public internet, and https is also what Chrome needs to install a real PWA.
+Whatever runs on the phone keeps working while the server is out of reach: games against the
+engines (rated too), puzzles and drills from the pack the phone keeps, opening courses, the endgame
+trainer, guess the move. Results wait in an outbox and go to the server, oldest first, when it's
+back; games played offline are sent, rated and reviewed then. The coach and imports need the server.
 
-1. Install Tailscale on the computer and the phone (tailscale.com/download) and sign in with the
-   same account on both. Leave it on on the phone.
-2. On the computer: **Settings → Play from my phone → Anywhere → Set up**. That runs
-   `tailscale serve --bg 8765` for you (it keeps working after restarts). The first time, Tailscale
-   may ask you to turn on https for your tailnet: Settings shows the link; approve it, then press
-   **Set up** again.
-3. On the phone, open the `https://….ts.net` address Settings shows, enter the pairing code (each
-   address pairs separately), then browser menu → **Add to Home screen** / **Install**.
+## Desktop and phone together
 
-For this to work while you're out:
-
-- The computer has to be on, awake and running Chess Coach. Set Windows to never sleep while
-  plugged in (Settings → System → Power), or the phone can't reach it.
-- Under `tauri dev` the phone loads the unbundled dev frontend, which is many small files: the first
-  load over cellular can take a few seconds. A release build (`npm run tauri build`) serves bundles.
+Whatever is in progress (a game, a puzzle set, a drill run, a trainer) is mirrored live through the
+server: open the other device and **Continue** on Home picks it up, and from then on a move on either
+shows on both. Leaving a session on one device leaves it only there.
 
 ## How it fits together
 
-- `POST /api/invoke/<command>`: the Tauri commands, same names and camelCase args.
-- `GET /api/events`: Tauri events as server-sent events. A dropped connection (screen off)
-  resumes where it left off, so coach replies and tool calls aren't lost.
+- `POST /api/invoke/<command>`: the commands, camelCase args, JSON in and out.
+- `GET /api/events`: server-sent events. A dropped connection (screen off) resumes where it left
+  off, so coach replies and tool calls aren't lost; after a longer gap the app rereads (`resync`).
 - The coach belongs to whichever device last sent it a message. Its replies and tool calls go only
   there; switching devices restarts the coach process on that device's own conversation.
-- `src/backend.ts` picks Tauri IPC or HTTP at runtime; the page served to phones carries
-  `window.__CC_REMOTE__`.
-- Under `tauri dev`, pages come from the Vite dev server (live, with hot reload through the server);
-  a release build serves the bundled frontend.
-- `CHESSCOACH_PORT` changes the port (default 8765).
+- The phone proves it's paired with a cookie; the desktop app, whose page comes from its own bundle,
+  sends the token as `Authorization: Bearer` (and `?token=` on the event stream).
+- Phone touch bugs: set `SEND_FROM_PHONES` in `src/touchLog.ts` with a server running from the repo
+  (`cargo run -p chesscoach-server`); each phone streams its touches to `phone-debug.log`.

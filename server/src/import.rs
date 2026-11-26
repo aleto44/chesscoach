@@ -8,7 +8,7 @@ use std::time::Duration;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tauri::State;
+use crate::ctx::State;
 
 use crate::db::{err, Db, MoveRow};
 
@@ -52,9 +52,8 @@ fn check_user(user: &str) -> Result<&str, String> {
 /// The site's own game objects (each with its PGN), newest first, at most `max`. Daily /
 /// correspondence games and variants are left out: they aren't the student's over-the-board play.
 /// `since` (ms since the epoch) leaves out games that ended before it, for a refresh.
-#[tauri::command]
 pub async fn import_fetch(site: String, user: String, max: usize, since: Option<i64>) -> Result<Vec<Value>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+    tokio::task::spawn_blocking(move || {
         let user = check_user(&user)?.to_string();
         let max = max.clamp(1, 300);
         match site.as_str() {
@@ -140,7 +139,6 @@ fn fetch_lichess(user: &str, max: usize, since: Option<i64>) -> Result<Vec<Value
 }
 
 /// Ids of the games already imported from `site`, so they aren't read again.
-#[tauri::command]
 pub fn db_import_known(db: State<Db>, site: String) -> Result<Vec<String>, String> {
     let conn = db.conn();
     let mut stmt = conn.prepare("SELECT external_id FROM games WHERE source = ?1").map_err(err)?;
@@ -162,7 +160,6 @@ pub struct ImportAccount {
 
 /// The student's accounts, each with its games; then, per site, the games imported before
 /// accounts were recorded, while any are left.
-#[tauri::command]
 pub fn db_import_accounts(db: State<Db>) -> Result<Vec<ImportAccount>, String> {
     import_accounts(&db.conn())
 }
@@ -201,7 +198,6 @@ pub(crate) fn import_accounts(conn: &rusqlite::Connection) -> Result<Vec<ImportA
 /// After an import or refresh went through: remembers the account (in the site's own spelling),
 /// stamps the refresh, and claims the games in `seen` that were imported before accounts were
 /// recorded, now that it's known whose they are.
-#[tauri::command]
 pub fn db_import_finish(db: State<Db>, site: String, account: String, seen: Vec<String>) -> Result<(), String> {
     import_finish(&mut db.conn(), &site, &account, &seen)
 }
@@ -236,7 +232,6 @@ pub(crate) fn import_finish(conn: &mut rusqlite::Connection, site: &str, account
 /// mistakes, and the coach's notes on them, since none of it is the student's play if the account
 /// was the wrong one. `account` None removes the games imported before accounts were recorded.
 /// Returns the ids of the deleted games.
-#[tauri::command]
 pub fn db_import_remove(db: State<Db>, site: String, account: Option<String>) -> Result<Vec<i64>, String> {
     import_remove(&mut db.conn(), &site, account.as_deref())
 }
@@ -292,7 +287,6 @@ pub struct ImportedGame {
 }
 
 /// Saves one imported game with its moves. None when it was already there.
-#[tauri::command]
 pub fn db_import_game(db: State<Db>, game: ImportedGame, moves: Vec<MoveRow>) -> Result<Option<i64>, String> {
     import_game(&mut db.conn(), game, moves)
 }

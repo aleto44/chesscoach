@@ -1,43 +1,87 @@
-// How the frontend reaches the Rust side: Tauri IPC in the desktop window, or HTTP to the home
-// server (src-tauri/src/remote.rs) when the app is opened on a phone. Same commands, same events.
-import { invoke as tauriInvoke } from "@tauri-apps/api/core";
-import { listen as tauriListen } from "@tauri-apps/api/event";
+// How the frontend reaches Chess Coach's server (server/, docs/server-migration.md): HTTP for
+// commands and server-sent events for what the server announces. Every window is a client of it:
+// the phone's web app (served by the server itself) and the desktop app (a Tauri window over the
+// bundled frontend, which reaches the server at the address it was given).
 import { openUrl as tauriOpenUrl } from "@tauri-apps/plugin-opener";
 import { create } from "zustand";
 import { mark } from "./perf";
 
 declare global {
   interface Window {
-    __CC_REMOTE__?: boolean;
+    /** Set by the desktop app from %USERPROFILE%\.chesscoach\server.json (src-tauri/src/lib.rs). */
+    __CC_SERVER__?: { url?: string; token?: string } | null;
   }
 }
 
-export const isTauri = "__TAURI_INTERNALS__" in window;
-/** Served by the home server, i.e. running on a phone (or any other browser). */
-export const isRemote = !isTauri && !!window.__CC_REMOTE__;
-export const hasBackend = () => isTauri || isRemote;
+/** Inside the desktop app (the Tauri window), as opposed to a phone's browser. */
+export const isShell = "__TAURI_INTERNALS__" in window;
+/** For jobs only one device should run (backfills, auto-import): the desktop app runs them. */
+export const isTauri = isShell;
+/** A phone (or any browser): touch first, the page comes from the server, installable as an app. */
+export const isPhone = !isShell;
+/** Every window talks to the server over HTTP now. */
+export const isRemote = true;
+export const hasBackend = () => true;
+/** Must match the server's API_VERSION (server/src/remote.rs). */
+export const API_VERSION = 2;
 
-/** Remote only: whether this browser holds a pairing cookie the server accepts. */
+const SERVER_KEY = "cc-server";
+const TOKEN_KEY = "cc-token";
+const stored = (key: string) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The server's address. A phone's page comes from the server, so it's the page's own origin ("").
+ * The desktop app's page is its own bundle, so it uses the address saved in Settings or given by
+ * server.json. Under `npm run dev` in a browser, Vite passes /api on to the server.
+ */
+export function serverUrl(): string {
+  if (!isShell) return "";
+  return (stored(SERVER_KEY) ?? window.__CC_SERVER__?.url ?? "").replace(/\/+$/, "");
+}
+const token = () => stored(TOKEN_KEY) ?? window.__CC_SERVER__?.token ?? null;
+const api = (path: string) => `${serverUrl()}${path}`;
+const authHeaders = (): Record<string, string> => {
+  const t = token();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
+
+/** Desktop app: points it at a server (and forgets the old token, which belongs to that server). */
+export function setServer(url: string) {
+  try {
+    localStorage.setItem(SERVER_KEY, url.trim().replace(/\/+$/, ""));
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Storage off: server.json still works.
+  }
+}
+
+/** Whether this device holds a token or cookie the server accepts. */
 export const usePairing = create<{ status: "unknown" | "paired" | "unpaired" }>(() => ({ status: "unknown" }));
 
-/** Stable per tab, so a reload keeps owning the coach. */
+/** Stable per window, so a reload keeps owning the coach. */
 export const clientId = (() => {
-  if (!isRemote) return "desktop";
+  const prefix = isShell ? "desktop" : "phone";
   try {
     const saved = sessionStorage.getItem("cc-client");
     if (saved) return saved;
-    const id = `phone-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
+    const id = `${prefix}-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
     sessionStorage.setItem("cc-client", id);
     return id;
   } catch {
-    return `phone-${Math.random().toString(36).slice(2)}`;
+    return `${prefix}-${Math.random().toString(36).slice(2)}`;
   }
 })();
 
-/** The phone couldn't reach the computer (or the server failed): trying again may work. */
+/** The server couldn't be reached (or failed): trying again may work. */
 export class Unreachable extends Error {}
 
-/** Phones: whether the computer answered the last call (offline.ts works from its pack when not). */
+/** Whether the server answered the last call (offline.ts works from its pack when not). */
 export const useConnection = create<{ reachable: boolean }>(() => ({ reachable: true }));
 const reachable = (r: boolean) => {
   if (useConnection.getState().reachable === r) return;
@@ -47,14 +91,14 @@ const reachable = (r: boolean) => {
 
 let probing: number | null = null;
 /**
- * While the computer is away, asks it every few seconds whether it's back (/api/ping, which the
+ * While the server is away, asks it every few seconds whether it's back (/api/ping, which the
  * service worker leaves alone), so the status and the outbox catch up without the student acting.
  */
 function probe() {
   if (probing !== null) return;
   probing = window.setInterval(async () => {
     try {
-      const res = await fetch("/api/ping", { cache: "no-store" });
+      const res = await fetch(api("/api/ping"), { cache: "no-store" });
       if (res.status >= 500) return;
     } catch {
       return;
@@ -66,25 +110,27 @@ function probe() {
 }
 
 export async function invoke<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
-  if (isTauri) return tauriInvoke<T>(cmd, args);
-  if (!isRemote) throw new Error("No backend: open the app from the desktop window or the home server.");
+  if (isShell && !serverUrl() && !import.meta.env.DEV) {
+    usePairing.setState({ status: "unpaired" });
+    throw new Error("No server address yet.");
+  }
   let res: Response;
   try {
-    res = await fetch(`/api/invoke/${cmd}`, {
+    res = await fetch(api(`/api/invoke/${cmd}`), {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Client": clientId },
+      headers: { "Content-Type": "application/json", "X-Client": clientId, ...authHeaders() },
       body: JSON.stringify(args),
     });
   } catch (e) {
     reachable(false);
-    throw new Unreachable(`${cmd}: can't reach your computer (${e})`);
+    throw new Unreachable(`${cmd}: can't reach the server (${e})`);
   }
-  // A proxy in front (Tailscale serve) answers 502 when the computer itself is away.
+  // A proxy in front (Tailscale serve) answers 502 when the server itself is away.
   reachable(res.status !== 502 && res.status !== 503 && res.status !== 504);
   if (res.status >= 500) throw new Unreachable(`${cmd} failed (${res.status})`);
   if (res.status === 401) {
     usePairing.setState({ status: "unpaired" });
-    throw new Error("This device isn't paired with your computer.");
+    throw new Error("This device isn't paired with the server.");
   }
   if (!res.ok) throw new Error((await res.text()) || `${cmd} failed (${res.status})`);
   if (res.headers.get("Content-Type")?.startsWith("application/octet-stream")) return (await res.arrayBuffer()) as T;
@@ -97,18 +143,20 @@ let source: EventSource | null = null;
 
 let opened = false;
 /**
- * Tells listeners of "resync" that this phone may have missed what the computer announced: the
- * stream was opened again (asleep, or the computer restarted, which forgets the backlog) or the
+ * Tells listeners of "resync" that this device may have missed what the server announced: the
+ * stream was opened again (asleep, or the server restarted, which forgets the backlog) or the
  * page came back to the foreground. They reread what they keep (settings, puzzle rating, drills).
  */
 function resync() {
   handlers.get("resync")?.forEach((h) => h({ payload: null }));
 }
-if (isRemote) document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && opened && resync());
+document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && opened && resync());
 
 function connect() {
   source?.close();
-  source = new EventSource(`/api/events?client=${encodeURIComponent(clientId)}`);
+  const t = token();
+  const auth = t ? `&token=${encodeURIComponent(t)}` : "";
+  source = new EventSource(api(`/api/events?client=${encodeURIComponent(clientId)}${auth}`));
   source.onopen = () => {
     mark("live updates connected");
     if (opened) resync();
@@ -130,25 +178,25 @@ function connect() {
 }
 
 export async function listen<T>(event: string, handler: (e: { payload: T }) => void): Promise<() => void> {
-  if (isTauri) return tauriListen<T>(event, handler);
   if (!handlers.has(event)) handlers.set(event, new Set());
   handlers.get(event)!.add(handler);
   return () => handlers.get(event)?.delete(handler);
 }
 
 export function openUrl(url: string) {
-  if (isTauri) return tauriOpenUrl(url);
+  if (isShell) return tauriOpenUrl(url);
   window.open(url, "_blank", "noopener");
 }
 
-/** Remote only: asks the server whether this device is paired and, once it is, opens the event stream. */
+/** Asks the server whether this device is paired and, once it is, opens the event stream. */
 export async function checkPairing(): Promise<boolean> {
-  if (!isRemote) return true;
   try {
+    const info = await invoke<{ apiVersion: number }>("server_info");
     await invoke("db_drill_counts");
+    useServerVersion.setState({ apiVersion: info.apiVersion });
   } catch {
     if (usePairing.getState().status === "unpaired") return false;
-    // The computer is off or unreachable; try again shortly.
+    // The server is off or unreachable; try again shortly.
     window.setTimeout(checkPairing, 5000);
     return false;
   }
@@ -157,12 +205,24 @@ export async function checkPairing(): Promise<boolean> {
   return true;
 }
 
+/**
+ * The server's API version, once it answered. A desktop app built for another version says so
+ * (TopBar) rather than writing what the server doesn't expect.
+ */
+export const useServerVersion = create<{ apiVersion: number | null }>(() => ({ apiVersion: null }));
+
 export async function pair(code: string): Promise<void> {
-  const res = await fetch("/api/pair", {
+  const res = await fetch(api("/api/pair"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ code }),
   });
   if (!res.ok) throw new Error((await res.text()) || `Pairing failed (${res.status})`);
+  const { token: t } = (await res.json()) as { token: string };
+  try {
+    localStorage.setItem(TOKEN_KEY, t);
+  } catch {
+    // A phone still has the cookie.
+  }
   await checkPairing();
 }

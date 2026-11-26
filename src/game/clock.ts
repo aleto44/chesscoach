@@ -4,6 +4,7 @@ import { Chess } from "chess.js";
 import { sideToMove } from "../chess/line";
 import { useStore, type Color, type TimeControl } from "../store";
 import { finish } from "./session";
+import { isFollowing } from "./sync";
 import { useEndgame } from "../endgames/session";
 import { useOpening } from "../openings/session";
 import { play } from "../sound";
@@ -69,6 +70,8 @@ function flag(side: Color) {
 export function initClock() {
   useStore.subscribe((s, prev) => {
     if (s.game === prev.game || s.gameId !== prev.gameId || !s.meta.timeControl) return;
+    // Following the device being played on: its clocks come with the game it saved.
+    if (isFollowing()) return;
     const n = s.game.sans.length;
     const before = prev.game.sans.length;
     const now = Date.now();

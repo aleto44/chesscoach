@@ -104,7 +104,7 @@ board shows it, even from an earlier position: here *Ba3* from the message below
 - ✏️ **Draw on every board.** Right-click drag on desktop, two fingers on a phone.
 - ⌨️ **Type your moves** (`e4`, `Nf3`, `O-O`, then Enter) or say them.
 - 🔍 **An analysis board on top of anything**, with what-if branches for both sides.
-- 📱 **Your phone becomes a client.** Puzzles and drills keep working offline.
+- 📱 **Desktop and phone, in sync.** Both talk to your own server; start a puzzle on one, carry on on the other. Engine games, puzzles and drills keep working offline.
 
 ---
 
@@ -221,12 +221,13 @@ and on puzzles or drills until you've answered.
 <td width="34%"><img src="docs/screenshots/phone.png" alt="Chess Coach on a phone" /></td>
 <td>
 
-The desktop app serves the same app to your phone. Pair it with a code, add it to your home screen,
-and play, solve puzzles and drill from the couch. Engines run on the phone itself, and **puzzles and
-drills keep working offline**: your answers sync when the computer is back.
+Your server serves the same app to your phone. Pair it with a code, add it to your home screen,
+and play, solve puzzles and drill from the couch. Engines run on the phone itself, and **games,
+puzzles and drills keep working offline**: everything syncs when the server is back. Whatever is in
+progress on one device can be continued on the other.
 
-With [Tailscale](https://tailscale.com/) it works from anywhere, privately, over HTTPS, with one
-button in Settings. See [docs/phone.md](docs/phone.md).
+With [Tailscale](https://tailscale.com/) it works from anywhere, privately, over HTTPS. See
+[docs/phone.md](docs/phone.md) and [docs/server-migration.md](docs/server-migration.md).
 
 </td>
 </tr>
@@ -241,7 +242,7 @@ Setup is short. You need:
 | Requirement | Why |
 | --- | --- |
 | [Node.js](https://nodejs.org/) 20+ | Frontend and setup scripts |
-| [Rust](https://rustup.rs/) (stable) | The Tauri desktop shell |
+| [Rust](https://rustup.rs/) (stable) | The server and the Tauri desktop shell |
 | [Claude Code](https://claude.com/claude-code), signed in | Powers the coach and uses your existing Claude login, so there are no API keys to manage |
 
 On Windows, Tauri also needs WebView2 (already installed on Windows 10/11) and the
@@ -262,8 +263,16 @@ npm install
 ```
 
 ```bash
+cargo run -p chesscoach-server -- --data data
+```
+
+```bash
 npm run tauri dev
 ```
+
+The first runs the server (database in `./data`, port 8765); the second opens the desktop app, which
+reaches it through the dev server. To use a server elsewhere, put its address and token in
+`%USERPROFILE%\.chesscoach\server.json` (`{"url": "...", "token": "..."}`) or pair from the app.
 
 That's it. `npm install` sets everything up for you: it patches the board library, copies
 **Stockfish** into place and downloads the **Maia** model (~46 MB). The Lichess puzzle database
@@ -285,7 +294,9 @@ npm run tauri build
 | | |
 | --- | --- |
 | `src/` | React + TypeScript frontend (boards, trainers, review, chat) |
-| `src-tauri/` | Rust backend: SQLite storage, coach process, puzzle DB, imports, phone server |
+| `server/` | Rust server: SQLite storage, coach process, puzzle DB, imports, the HTTP API, live sync |
+| `src-tauri/` | The desktop app: a Tauri window over the bundled frontend, talking to the server |
+| `deploy/`, `scripts/deploy.ps1` | The server's Docker image and its deploy to laptop-server |
 | `src/engine/` | Stockfish and Maia, running in the browser (WASM / ONNX) |
 | `src/rating.ts` | Rating scale conversions (everything shown is on the chess.com scale) |
 

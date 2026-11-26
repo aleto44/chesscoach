@@ -1,10 +1,15 @@
-// Phones: puzzles and drills keep working while the computer is out of reach (no signal, the
-// computer asleep). While it's reachable the phone keeps a pack: a batch of puzzles at the
-// student's level and the drill cards. Out of reach, the puzzle and drill calls answer from the
-// pack, and what the student did (attempts, grades, new drills) waits in an outbox, kept across
-// reloads, until the computer can take it, in the order it happened.
+// Offline mode, on the desktop app and phones alike (docs/server-migration.md, phase 7): whatever
+// runs on the device keeps working while the server is out of reach (no signal, the laptop off).
+// While it's reachable the device keeps a pack: a batch of puzzles around the student's level and
+// the drill cards (the desktop keeps a bigger one). Out of reach, the puzzle and drill calls answer
+// from the pack, and what the student did (attempts, grades, new drills) waits in an outbox, kept
+// across reloads, until the server can take it, in the order it happened. Games played offline are
+// kept whole and sent the same way (game/local.ts).
 import { create } from "zustand";
-import { invoke, isRemote, Unreachable, useConnection } from "./backend";
+import { invoke, isRemote, isShell, Unreachable, useConnection } from "./backend";
+import { syncLocalGames } from "./game/local";
+import { resaveAll, withoutSaving } from "./db";
+import { useStore } from "./store";
 import type { Drill } from "./analysis/drills";
 import type { Puzzle } from "./puzzles/puzzles";
 import type { NodeProgress } from "./openings/progress";
@@ -13,7 +18,8 @@ const PACK_KEY = "cc-offline-pack";
 const OUTBOX_KEY = "cc-offline-outbox";
 /** How often the pack is renewed while the computer is reachable. */
 const PACK_EVERY_MS = 30 * 60_000;
-const PACK_PUZZLES = 80;
+/** Puzzles kept for offline use: the desktop has room for more. */
+const PACK_PUZZLES = isShell ? 400 : 150;
 
 interface Pack {
   at: number;
@@ -192,18 +198,34 @@ export function gradedOffline(id: number, correct: boolean): string {
 }
 export const retiredOffline = (id: number) => usedDrills.add(id);
 
-/** Keeps the pack fresh and the outbox moving whenever the phone is back with the computer. */
+/**
+ * Sends the games played offline. The open one takes its server id and is saved again in full, so
+ * moves made while it was being sent aren't lost; then the review backlog reviews them (drills).
+ */
+export async function sendLocalGames() {
+  const sent = await syncLocalGames((local, server) => {
+    if (useStore.getState().gameId !== local) return;
+    withoutSaving(() => useStore.setState({ gameId: server }));
+    void resaveAll();
+  });
+  if (!sent.size) return;
+  const { analyzeBacklog } = await import("./analysis/review");
+  analyzeBacklog();
+}
+
+/** Keeps the pack fresh and the outbox moving whenever this device is back with the server. */
 export function initOffline() {
   if (!isRemote) return;
+  const caughtUp = () => flushOutbox().then(sendLocalGames);
   useConnection.subscribe((c, prev) => {
     if (c.reachable && !prev.reachable) {
-      void flushOutbox();
+      void caughtUp();
       void refreshPack();
     }
   });
-  window.addEventListener("online", () => void flushOutbox());
+  window.addEventListener("online", () => void caughtUp());
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void flushOutbox().then(() => refreshPack());
+    if (document.visibilityState === "visible") void caughtUp().then(() => refreshPack());
   });
-  void flushOutbox();
+  void caughtUp();
 }

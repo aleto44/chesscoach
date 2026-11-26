@@ -38,3 +38,6 @@ crash-console.log
 trap-preview.html
 label-preview.html
 label-preview.json
+
+# Cargo workspace build output (server/ and src-tauri/)
+/target

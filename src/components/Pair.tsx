@@ -1,9 +1,14 @@
 import { useState } from "react";
-import { pair } from "../backend";
+import { isShell, pair, serverUrl, setServer } from "../backend";
 
-/** First visit from a phone: trade the code shown in Settings on the computer for a pairing cookie. */
+/**
+ * A device that isn't paired with the server yet: trade the code a paired device shows in Settings
+ * (or `chesscoach-server pairing-code` on the server) for the server's token. The desktop app also
+ * needs the server's address; a phone opened the page from the server, so it has it.
+ */
 export function Pair() {
   const [code, setCode] = useState("");
+  const [address, setAddress] = useState(serverUrl() || "https://laptop-server");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -11,6 +16,7 @@ export function Pair() {
     e.preventDefault();
     setBusy(true);
     try {
+      if (isShell && address.trim() !== serverUrl()) setServer(address);
       await pair(code);
       window.location.reload();
     } catch (err) {
@@ -29,8 +35,18 @@ export function Pair() {
           Chess Coach
         </h1>
         <p className="muted">
-          On your computer, open Settings, turn on <b>Play from my phone</b>, and enter the code shown there.
+          On a device that's already set up, open Settings and enter the code shown under <b>Server</b>.
         </p>
+        {isShell && (
+          <input
+            className="text-input pair-input"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Server address"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        )}
         <input
           className="text-input pair-input"
           value={code}
@@ -42,8 +58,8 @@ export function Pair() {
           spellCheck={false}
           autoFocus
         />
-        <button className="primary" type="submit" disabled={busy || code.replace(/[^A-Z0-9]/gi, "").length < 8}>
-          Pair this phone
+        <button className="primary" type="submit" disabled={busy || code.replace(/[^A-Z0-9]/gi, "").length < 8 || (isShell && !address.trim())}>
+          Pair this device
         </button>
         {error && <p className="error small">{error}</p>}
       </form>
