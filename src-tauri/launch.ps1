@@ -22,7 +22,7 @@ Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 function Show-Popup([string]$text, [int]$icon = 48) {
     [void](New-Object -ComObject WScript.Shell).Popup($text, 0, 'Chess Coach', $icon)
 }
-function Write-Log([string]$text) { Add-Content -Path $log -Value "$(Get-Date -Format s) $text" }
+function Write-Log([string]$text) { Add-Content -Encoding utf8 -Path $log -Value "$(Get-Date -Format s) $text" }
 
 if ($After) { Wait-Process -Id $After -Timeout 30 -ErrorAction SilentlyContinue }
 elseif (Get-Process chesscoach -ErrorAction SilentlyContinue | Where-Object Path -eq $exe) {
@@ -51,17 +51,17 @@ if ($needs) {
     try {
         Write-Log "updating to $($deployed.commit) (shell $($deployed.shell))"
         if (-not (Test-Path (Join-Path $build '.git'))) {
-            git clone -q --no-checkout $repoUrl $build 2>&1 | Out-File -Append $log
+            git clone -q --no-checkout $repoUrl $build 2>&1 | Out-File -Append -Encoding utf8 $log
         }
-        git -C $build fetch -q origin main 2>&1 | Out-File -Append $log
-        git -C $build checkout -q -f --detach $deployed.commit 2>&1 | Out-File -Append $log
+        git -C $build fetch -q origin main 2>&1 | Out-File -Append -Encoding utf8 $log
+        git -C $build checkout -q -f --detach $deployed.commit 2>&1 | Out-File -Append -Encoding utf8 $log
         if ($LASTEXITCODE -ne 0) { throw "couldn't check out $($deployed.commit)" }
         # The workspace's release profile is tuned for the server (full LTO); the window doesn't need it.
         $env:CC_SHELL_VERSION = $deployed.shell
         $env:CARGO_PROFILE_RELEASE_LTO = 'thin'
         $env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS = '16'
         Push-Location $build
-        cmd /c "cargo build --release -p chesscoach 2>&1" | Out-File -Append $log
+        cmd /c "cargo build --release -p chesscoach 2>&1" | Out-File -Append -Encoding utf8 $log
         $code = $LASTEXITCODE
         Pop-Location
         if ($code -ne 0) { throw "cargo build failed (exit $code)" }
