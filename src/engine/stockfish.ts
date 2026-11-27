@@ -10,28 +10,79 @@ export interface EngineLine {
   pv: string[]; // UCI
 }
 
+/**
+ * A command still waiting for its answer: kept whole (setup lines included) so it can be sent again
+ * to a fresh worker.
+ */
+interface Job {
+  cmds: string[];
+  done: (line: string) => boolean;
+  onInfo?: (line: string) => void;
+  resolve: () => void;
+}
+
+/** Longer than any search here; a worker silent this long is dead (a phone's browser can kill it). */
+const SILENT_MS = 45_000;
+
 /** Stockfish (WASM, single-threaded) behind a job queue so concurrent tool calls don't interleave. */
 class Engine {
-  private worker = new Worker("/stockfish/stockfish-19-lite-single.js");
-  private onLine: ((line: string) => void) | null = null;
+  private worker!: Worker;
+  private job: Job | null = null;
+  private heardAt = 0;
   private queue: Promise<unknown>;
 
   constructor() {
-    this.worker.onmessage = (e) => this.onLine?.(String(e.data));
-    this.queue = this.run("uci", (l) => l === "uciok")
-      .then(() => this.run("isready", (l) => l === "readyok"))
+    this.start();
+    this.queue = this.run(["uci"], (l) => l === "uciok")
+      .then(() => this.run(["isready"], (l) => l === "readyok"))
       .then(() => mark("stockfish ready"));
+    // A crashed or killed worker never answers, and everything queued behind it (a game's review)
+    // would wait forever: start a new one and send the job again. Ticks far apart mean the page
+    // itself was frozen (a locked phone), which isn't the worker's silence.
+    let tick = performance.now();
+    setInterval(() => {
+      const now = performance.now();
+      if (now - tick > 5_000) this.heardAt = now;
+      tick = now;
+      // Only a search is expected to talk; the first handshake waits for the download.
+      if (this.job?.cmds.some((c) => c.startsWith("go ")) && now - this.heardAt > SILENT_MS) this.restart("went silent");
+    }, 1_000);
   }
 
-  private run(cmd: string, done: (line: string) => boolean, onInfo?: (line: string) => void) {
+  private start() {
+    this.worker = new Worker("/stockfish/stockfish-19-lite-single.js");
+    this.worker.onmessage = (e) => {
+      this.heardAt = performance.now();
+      const line = String(e.data);
+      const job = this.job;
+      if (!job) return;
+      if (job.done(line)) {
+        this.job = null;
+        job.resolve();
+      } else job.onInfo?.(line);
+    };
+    this.worker.onerror = (e) => {
+      e.preventDefault();
+      this.restart(`crashed: ${e.message}`);
+    };
+  }
+
+  private restart(why: string) {
+    console.warn(`stockfish ${why}; restarting it`);
+    this.worker.terminate();
+    this.start();
+    this.heardAt = performance.now();
+    // The new worker needs its handshake first; its answers aren't the job's.
+    const job = this.job;
+    if (job && job.cmds[0] !== "uci") ["uci", "isready"].forEach((c) => this.worker.postMessage(c));
+    if (job) job.cmds.forEach((c) => this.worker.postMessage(c));
+  }
+
+  private run(cmds: string[], done: (line: string) => boolean, onInfo?: (line: string) => void) {
     return new Promise<void>((resolve) => {
-      this.onLine = (line) => {
-        if (done(line)) {
-          this.onLine = null;
-          resolve();
-        } else onInfo?.(line);
-      };
-      this.worker.postMessage(cmd);
+      this.job = { cmds, done, onInfo, resolve };
+      this.heardAt = performance.now();
+      cmds.forEach((c) => this.worker.postMessage(c));
     });
   }
 
@@ -39,9 +90,8 @@ class Engine {
     const job = this.queue.then(async () => {
       const lines = new Map<number, EngineLine>();
       const flip = fen.split(" ")[1] === "b" ? -1 : 1;
-      this.worker.postMessage(`setoption name MultiPV value ${multipv}`);
-      this.worker.postMessage(`position fen ${fen}`);
-      await this.run(`go depth ${depth}`, (l) => l.startsWith("bestmove"), (l) => {
+      const cmds = [`setoption name MultiPV value ${multipv}`, `position fen ${fen}`, `go depth ${depth}`];
+      await this.run(cmds, (l) => l.startsWith("bestmove"), (l) => {
         const m = l.match(/^info .*?depth (\d+) .*?multipv (\d+) score (cp|mate) (-?\d+).*? pv (.+)$/);
         if (!m) return;
         const value = Number(m[4]) * flip;
@@ -62,11 +112,14 @@ class Engine {
   bestMove(fen: string, elo: number | null, movetime: number): Promise<string | null> {
     const job = this.queue.then(async () => {
       let best: string | null = null;
-      this.worker.postMessage("setoption name MultiPV value 1");
-      this.worker.postMessage(`setoption name UCI_LimitStrength value ${elo !== null}`);
-      if (elo !== null) this.worker.postMessage(`setoption name UCI_Elo value ${elo}`);
-      this.worker.postMessage(`position fen ${fen}`);
-      await this.run(`go movetime ${movetime}`, (l) => {
+      const cmds = [
+        "setoption name MultiPV value 1",
+        `setoption name UCI_LimitStrength value ${elo !== null}`,
+        ...(elo !== null ? [`setoption name UCI_Elo value ${elo}`] : []),
+        `position fen ${fen}`,
+        `go movetime ${movetime}`,
+      ];
+      await this.run(cmds, (l) => {
         if (!l.startsWith("bestmove")) return false;
         const move = l.split(" ")[1];
         best = move && move !== "(none)" ? move : null;

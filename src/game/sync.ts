@@ -26,6 +26,13 @@ export function initSync() {
       );
     }, 250);
   });
+  // A phone that slept through an announcement (the other device saved the game's review, or a
+  // move) would keep showing the old copy: reread the open game. Not the game being played here,
+  // whose newest move may still be on its way to the server.
+  listen("resync", () => {
+    const { gameId: open, meta } = useStore.getState();
+    if (open !== null && open > 0 && (meta.result || following)) reloadGame(open).catch((e) => console.error("could not reread the game", e));
+  });
   // Touching this device makes it the one being played on again.
   const lead = () => (following = false);
   window.addEventListener("pointerdown", lead, true);

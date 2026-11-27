@@ -2,7 +2,7 @@
 // classifies each move by how much winning chance it gave away (chess.com's thresholds), labels it the
 // way chess.com's review does (brilliant, great, miss, ...), tags the mistakes with simple
 // patterns, saves it all to SQLite and turns the student's mistakes into drills.
-import { invoke } from "../backend";
+import { invoke, listen } from "../backend";
 import { Chess } from "chess.js";
 import { buildLine, moveLabel, sideToMove, START_FEN, type Line } from "../chess/line";
 import { db, hasBackend, notifyChanged, reliably } from "../db";
@@ -384,6 +384,14 @@ export function initReview() {
     ) {
       enqueueCurrent();
     }
+  });
+  // Back after a sleep or a lost connection: the open game's review may never have finished (the
+  // phone was locked mid-analysis). Give the reread a moment to bring in one saved meanwhile.
+  listen("resync", () => {
+    setTimeout(() => {
+      const s = useStore.getState();
+      if (s.gameId !== null && s.meta.result && !isFollowing() && !queued.has(s.gameId) && !fullyAnalyzed(s)) enqueueCurrent();
+    }, 3_000);
   });
   analyzeBacklog();
 }
