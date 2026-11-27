@@ -130,9 +130,6 @@ export function Chat() {
         <textarea
           value={draft}
           disabled={!signedIn || locked}
-          placeholder={
-            locked ? "The coach is off until this rated game ends" : "Ask the coach…  (Enter to send, Shift+Enter for a new line, /clear for a fresh chat)"
-          }
           onChange={(e) => setDraft(e.target.value)}
           onFocus={() => phone && sheet === "closed" && openSheet("half")}
           onKeyDown={(e) => {
