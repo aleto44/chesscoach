@@ -1,12 +1,27 @@
 # Chess Coach: instructions for AI assistants
 
 Chess Coach is a server (`server/`, Rust: the SQLite database, the coach and an HTTP API, run in Docker on
-laptop-server) with two clients of the same React + TypeScript + Vite frontend (`src/`): a desktop app
-(`src-tauri/`, a thin Tauri window over the bundled frontend) and the phone's web app, served by the
-server. Both talk HTTP to the server (`src/backend.ts`); see `docs/server-migration.md` for how it fits
-together and `scripts/deploy.ps1` to ship server changes. It has practice and rated games against Maia /
+laptop-server) with two clients of the same React + TypeScript + Vite frontend (`src/`), which the server
+serves: a desktop app (`src-tauri/`, a thin Tauri window opened at the server) and the phone's web app.
+Both talk HTTP to the server (`src/backend.ts`); see `docs/server-migration.md` for how it fits together.
+It has practice and rated games against Maia /
 Stockfish, a post-game review, spaced-repetition drills, a Lichess puzzle trainer, and an AI coach in the
 chat column.
+
+## Deploying: main is what runs
+
+Everything that runs (the server, the phone, the desktop app) is the latest commit on `main` on
+GitHub, deployed by laptop-server within a minute of a push (`docs/deployment.md`). Nothing runs from a
+working tree. So:
+
+- To ship a change, commit it to `main` and push. That's the deploy. `scripts/deploy.ps1` (desktop) or
+  `chesscoach-deploy now` (server) only skips the minute's wait and shows the result.
+- Pull before starting work (the desktop and the server's `/srv/dev/chesscoach` both commit to `main`)
+  and check before pushing (`npx tsc --noEmit`, the relevant `check-*.mjs`): a pushed commit goes live.
+- After a push, confirm it went live: `chesscoach-deploy status` on the server, or `/api/version`.
+- Clients update themselves: the page offers "Update" when the frontend changed, and the desktop
+  program "Restart to update" when `src-tauri/` changed (`src/update.ts`, `src-tauri/launch.ps1`).
+- `npm run dev` (port 1420) is only a preview for trying changes before committing.
 
 ## Ratings: always chess.com Elo for the user
 

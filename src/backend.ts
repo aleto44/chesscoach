@@ -1,8 +1,7 @@
 // How the frontend reaches Chess Coach's server (server/, docs/server-migration.md): HTTP for
-// commands and server-sent events for what the server announces. Every window is a client of it:
-// the phone's web app (served by the server itself) and the desktop app (a Tauri window over the
-// bundled frontend, which reaches the server at the address it was given).
-import { openUrl as tauriOpenUrl } from "@tauri-apps/plugin-opener";
+// commands and server-sent events for what the server announces. Every window is a client of it,
+// and every one loads this page from the server: the phone's web app and the desktop app (a Tauri
+// window opened at the server's address, docs/deployment.md).
 import { create } from "zustand";
 import { mark } from "./perf";
 
@@ -14,7 +13,7 @@ declare global {
 }
 
 /** Inside the desktop app (the Tauri window), as opposed to a phone's browser. */
-export const isShell = "__TAURI_INTERNALS__" in window;
+export const isShell = "__CC_SHELL__" in window || "__TAURI_INTERNALS__" in window;
 /** For jobs only one device should run (backfills, auto-import): the desktop app runs them. */
 export const isTauri = isShell;
 /** A phone (or any browser): touch first, the page comes from the server, installable as an app. */
@@ -37,8 +36,8 @@ const stored = (key: string) => {
 
 /**
  * The server's address. A phone's page comes from the server, so it's the page's own origin ("").
- * The desktop app's page is its own bundle, so it uses the address saved in Settings or given by
- * server.json. Under `npm run dev` in a browser, Vite passes /api on to the server.
+ * The desktop app uses the address saved in Settings or given by server.json, which is where its
+ * page comes from too. Under `npm run dev` in a browser, Vite passes /api on to the server.
  */
 export function serverUrl(): string {
   if (!isShell) return "";
@@ -183,8 +182,9 @@ export async function listen<T>(event: string, handler: (e: { payload: T }) => v
   return () => handlers.get(event)?.delete(handler);
 }
 
+/** Opens a link outside the app. The desktop program sends any page it's asked to leave for to the browser. */
 export function openUrl(url: string) {
-  if (isShell) return tauriOpenUrl(url);
+  if (isShell) return location.assign(url);
   window.open(url, "_blank", "noopener");
 }
 

@@ -1,0 +1,11 @@
+# Deploys main of the chesscoach repo when it moves (deploy/auto-deploy.sh, docs/deployment.md).
+[Unit]
+Description=Chess Coach: deploy main if it moved
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=alex
+Environment=HOME=/home/alex
+ExecStart=/usr/local/bin/chesscoach-deploy auto

@@ -57,7 +57,7 @@ export default defineConfig(() => ({
       // 3. tell Vite to ignore watching the Rust crates
       ignored: ["**/src-tauri/**", "**/server/**", "**/target/**"],
     },
-    // A page opened from Vite (in a browser, or the desktop app under `tauri dev` without a server
+    // A page opened from Vite (a preview in a browser, docs/deployment.md, without a server
     // address) reaches the server through here. CHESSCOACH_SERVER picks which one.
     proxy: { "/api": { target: process.env.CHESSCOACH_SERVER ?? "http://localhost:8765", changeOrigin: true } },
   },

@@ -1,7 +1,7 @@
 [package]
 name = "chesscoach"
 version = "0.2.0"
-description = "Chess Coach for the desktop: a window over the bundled app, talking to the server"
+description = "Chess Coach for the desktop: a window opened at the server, which serves the app"
 authors = ["alexj"]
 edition = "2024"
 
@@ -11,6 +11,12 @@ edition = "2024"
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "chesscoach_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+# Built with plain `cargo build` by launch.ps1 (no Tauri CLI), so the release mode Tauri's CLI would
+# switch on is on by default.
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

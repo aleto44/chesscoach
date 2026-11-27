@@ -267,25 +267,19 @@ cargo run -p chesscoach-server -- --data data
 ```
 
 ```bash
-npm run tauri dev
+npm run dev
 ```
 
-The first runs the server (database in `./data`, port 8765); the second opens the desktop app, which
-reaches it through the dev server. To use a server elsewhere, put its address and token in
-`%USERPROFILE%\.chesscoach\server.json` (`{"url": "...", "token": "..."}`) or pair from the app.
+The first runs the server (database in `./data`, port 8765); the second serves the frontend at
+http://localhost:1420, which reaches it. `CHESSCOACH_SERVER` points it at another server instead.
 
 That's it. `npm install` sets everything up for you: it patches the board library, copies
 **Stockfish** into place and downloads the **Maia** model (~46 MB). The Lichess puzzle database
 downloads inside the app the first time you open Puzzles.
 
-> **Windows shortcut:** `scripts/start-dev.ps1` launches the app, reinstalls packages when they
-> change and restarts the app if it crashes. Point a desktop shortcut at it.
-
-To build an installer instead:
-
-```bash
-npm run tauri build
-```
+The app itself always runs what's on `main`: laptop-server deploys every push, and the phone and
+the desktop app load it from there (`docs/deployment.md`). The desktop app is installed by
+`src-tauri/launch.ps1` in `%USERPROFILE%\.chesscoachpp`, which keeps it up to date.
 
 ---
 
@@ -295,8 +289,8 @@ npm run tauri build
 | --- | --- |
 | `src/` | React + TypeScript frontend (boards, trainers, review, chat) |
 | `server/` | Rust server: SQLite storage, coach process, puzzle DB, imports, the HTTP API, live sync |
-| `src-tauri/` | The desktop app: a Tauri window over the bundled frontend, talking to the server |
-| `deploy/`, `scripts/deploy.ps1` | The server's Docker image and its deploy to laptop-server |
+| `src-tauri/` | The desktop app: a Tauri window opened at the server, and its launcher/updater |
+| `deploy/` | The server's Docker image and the automatic deploy of `main` on laptop-server |
 | `src/engine/` | Stockfish and Maia, running in the browser (WASM / ONNX) |
 | `src/rating.ts` | Rating scale conversions (everything shown is on the chess.com scale) |
 

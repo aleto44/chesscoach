@@ -10,6 +10,7 @@ import { checkPairing, usePairing } from "./backend";
 import { Pair } from "./components/Pair";
 import { CrashScreen } from "./components/Crash";
 import { registerServiceWorker } from "./pwa";
+import { watchForUpdates } from "./update";
 import { initAuth } from "./coach/auth";
 import { initBridge } from "./coach/bridge";
 import { initUsage } from "./coach/usage";
@@ -101,6 +102,7 @@ initTheme();
 initVisuals();
 initTouchLog();
 registerServiceWorker();
+watchForUpdates();
 // On a phone, nothing works until it's paired with the computer. A phone that was paired before
 // starts the app straight away (waiting for the computer to answer first kept a phone that had
 // just come back to the app on a blank page) and only shows pairing if the computer says no.

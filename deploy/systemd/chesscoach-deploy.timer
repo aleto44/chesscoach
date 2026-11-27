@@ -1,0 +1,10 @@
+# Checks GitHub for a new commit on main every minute (chesscoach-deploy.service).
+[Unit]
+Description=Chess Coach: check main for a new commit every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1min
+
+[Install]
+WantedBy=timers.target

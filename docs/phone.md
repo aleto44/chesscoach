@@ -35,7 +35,7 @@ shows on both. Leaving a session on one device leaves it only there.
   off, so coach replies and tool calls aren't lost; after a longer gap the app rereads (`resync`).
 - The coach belongs to whichever device last sent it a message. Its replies and tool calls go only
   there; switching devices restarts the coach process on that device's own conversation.
-- The phone proves it's paired with a cookie; the desktop app, whose page comes from its own bundle,
+- The phone proves it's paired with a cookie; the desktop app, given its token by server.json,
   sends the token as `Authorization: Bearer` (and `?token=` on the event stream).
 - Phone touch bugs: set `SEND_FROM_PHONES` in `src/touchLog.ts` with a server running from the repo
   (`cargo run -p chesscoach-server`); each phone streams its touches to `phone-debug.log`.

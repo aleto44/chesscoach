@@ -12,14 +12,14 @@ described in `/srv/README.md` on laptop-server (read it first: layout, snapshots
   window. There's no separate `core/` crate: with the desktop shell holding no backend, nothing else
   needed the modules.
 - **Run it locally:** `cargo run -p chesscoach-server -- --data data [--web dist]`, then
-  `npm run tauri dev` or `npm run dev` (Vite passes `/api` to `localhost:8765`, or `CHESSCOACH_SERVER`).
-- **Deploy:** `scripts/deploy.ps1` (sends the working tree, `docker compose up -d --build` on the
-  server, waits until healthy). The first build took about 5 minutes; later ones reuse the cache.
+  `npm run dev` (Vite passes `/api` to `localhost:8765`, or `CHESSCOACH_SERVER`).
+- **Deploy:** push to `main`; the server deploys it within a minute (`docs/deployment.md`, since
+  2026-11-27). The first build took about 5 minutes; later ones reuse the cache.
 - **Server commands:** `docker exec chesscoach chesscoach-server pairing-code --data /data` (the code
   a new device pairs with); `... backup DEST.db --data /data` (used by `snapshot.conf`).
 - **The desktop app** reads its server address and token from `%USERPROFILE%\.chesscoach\server.json`
-  (`{"url", "token"}`), or from pairing in the app (kept in its web storage). It's started the same way
-  as before (`scripts/start-dev.ps1`).
+  (`{"url", "token"}`). It opens the page the server serves, and is installed and updated by
+  `launch.ps1` (`docs/deployment.md`).
 - **The coach's Claude sign-in** lives in `/srv/services/chesscoach/claude` (the container's
   `CLAUDE_CONFIG_DIR`). Sign in from Settings in the app; server-watch warns (`coach_login`) when it's
   signed out or ends within 7 days.
@@ -183,7 +183,7 @@ every activity kind. Also test the stale-write and offline-reconnect cases.
   - `pre()` runs `docker exec chesscoach chesscoach-server backup /data/snap.db` and copies that into `$DUMP`.
   - `puzzles.db` stays out: it can be downloaded again.
 - server-watch: the container watch covers it. Also add the coach's Claude sign-in expiry.
-- **Deploy** with `scripts/deploy.ps1`:
+- **Deploy** with `scripts/deploy.ps1` (replaced on 2026-11-27 by deploys from `main`, `docs/deployment.md`):
   1. Send the working tree (`git ls-files -co --exclude-standard`, so uncommitted work deploys
      too) over SSH.
   2. `docker compose up -d --build`.
@@ -204,7 +204,8 @@ he's ready, so nothing in this migration removes it.
 ### 6. Desktop app
 - `src-tauri` becomes a thin shell: a window over the bundled frontend, plus a config for the server
   address (default `https://laptop-server.<tailnet>.ts.net`) and the pairing token.
-- Started the same way as today (`scripts/start-dev.ps1`) while developing.
+- Started the same way as today (`scripts/start-dev.ps1`) while developing. (Since 2026-11-27 the window
+  opens the server's page instead, and `launch.ps1` installs it: `docs/deployment.md`.)
 - Before switching, the shell checks that its frontend version matches the server's API version, so a
   stale desktop build can't write in a format the server doesn't expect.
 

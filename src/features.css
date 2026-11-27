@@ -956,6 +956,20 @@ button.link {
   background: color-mix(in srgb, var(--warn) 16%, transparent);
   white-space: nowrap;
 }
+.update-chip {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 0;
+  color: var(--accent);
+  background: var(--accent-soft);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.update-chip:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
 .tail-chip {
   font-size: 12px;
   padding: 3px 10px;

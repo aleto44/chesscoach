@@ -8,6 +8,7 @@ import { useGuess } from "../guess/session";
 import { usePlan } from "../plans/session";
 import { NewGameDialog } from "./GameDialogs";
 import { API_VERSION, isPhone, isRemote, useConnection, useServerVersion } from "../backend";
+import { applyUpdate, useUpdate } from "../update";
 import { useOutbox } from "../offline";
 import { SettingsDialog } from "./SettingsDialog";
 import { AnalysisButton } from "./Analysis";
@@ -65,6 +66,7 @@ export function TopBar() {
         <span className="spacer" />
         <OfflineChip />
         <VersionChip />
+        <UpdateChip />
         <VoiceButton />
         {/* Desktop draws with right-click drag; only the phone app needs the pencil. */}
         {isPhone && <DrawButton />}
@@ -116,8 +118,8 @@ function OfflineChip() {
 }
 
 /**
- * The desktop app carries its own copy of the frontend. One built for another server version
- * could write what the server doesn't expect, so it says so (deploy and rebuild to fix).
+ * A page kept from before a deploy (the service worker's copy, opened offline) can be built for
+ * another server version and write what the server doesn't expect, so it says so.
  */
 function VersionChip() {
   const server = useServerVersion((v) => v.apiVersion);
@@ -126,6 +128,25 @@ function VersionChip() {
     <span className="offline-chip" role="status" title={`This app speaks version ${API_VERSION} and the server ${server}. Update the one that's older.`}>
       Update needed
     </span>
+  );
+}
+
+/**
+ * A newer version is deployed for this device's part: one click reloads the page, or restarts the
+ * desktop program when the program itself changed (src/update.ts).
+ */
+function UpdateChip() {
+  const { page, program, deployed } = useUpdate();
+  if (!page && !program) return null;
+  const what = deployed?.subject ? `: ${deployed.subject}` : "";
+  return (
+    <button
+      className="update-chip"
+      onClick={() => void applyUpdate()}
+      title={program ? `Restarts Chess Coach to install the new version${what}` : `Reloads with the new version${what}`}
+    >
+      {program ? "Restart to update" : "Update"}
+    </button>
   );
 }
 

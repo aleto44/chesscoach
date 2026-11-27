@@ -1,5 +1,5 @@
-# Chess Coach on laptop-server (/srv/services/chesscoach). Deployed by scripts/deploy.ps1 from the
-# repo (deploy/), which also copies the source to ./src for the build.
+# Chess Coach on laptop-server (/srv/services/chesscoach). Deployed by deploy/auto-deploy.sh from
+# main, which puts the commit's source in ./src and its version in ./.env (docs/deployment.md).
 #
 # Phones open https://laptop-server.tail3adf5e.ts.net (tailscale serve on the host, port 443 ->
 # 8765). The desktop app talks to the same address. Port 8765 is published for that proxy and for
@@ -9,6 +9,8 @@ services:
     build:
       context: ./src
       dockerfile: deploy/Dockerfile
+      args:
+        CC_UI: ${CC_UI:-dev}
     image: chesscoach:local
     container_name: chesscoach
     restart: unless-stopped
@@ -22,6 +24,12 @@ services:
     environment:
       CHESSCOACH_PUBLIC_URL: https://laptop-server.tail3adf5e.ts.net
       TZ: America/New_York
+      # What's deployed, for /api/version.
+      CC_COMMIT: ${CC_COMMIT:-}
+      CC_SUBJECT: ${CC_SUBJECT:-}
+      CC_DEPLOYED_AT: ${CC_DEPLOYED_AT:-}
+      CC_UI: ${CC_UI:-dev}
+      CC_SHELL: ${CC_SHELL:-}
     logging:
       driver: json-file
       options:

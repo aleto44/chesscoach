@@ -6,10 +6,11 @@
 //! - `POST /api/invoke/{cmd}` runs a command (JSON args in, JSON result out).
 //! - `GET /api/events` streams events (server-sent events).
 //! - `GET /api/ping` answers without pairing, for "is the server there?".
-//! - Everything else is the built frontend (`--web`), for phones.
+//! - `GET /api/version` answers without pairing: what's deployed (docs/deployment.md).
+//! - Everything else is the built frontend (`--web`), for every client.
 //!
 //! A client proves it's paired with the cookie (phones), an `Authorization: Bearer` header (the
-//! desktop app, whose page comes from its own bundle and so can't hold the server's cookie) or,
+//! desktop app, which gets its token from server.json rather than pairing) or,
 //! for the event stream, `?token=`. Tailscale and the server's firewall are the outer wall.
 
 use std::collections::HashMap;
@@ -136,6 +137,7 @@ pub async fn serve(app: AppHandle, port: u16) -> Result<(), String> {
         .route("/api/events", get(events))
         .route("/api/invoke/{cmd}", post(invoke))
         .route("/api/ping", get(|| async { StatusCode::NO_CONTENT }))
+        .route("/api/version", get(version))
         .fallback(get(asset))
         .layer(axum::middleware::from_fn(cors))
         .with_state(app);
@@ -143,8 +145,8 @@ pub async fn serve(app: AppHandle, port: u16) -> Result<(), String> {
     axum::serve(listener, router).await.map_err(|e| e.to_string())
 }
 
-/// The desktop app's page comes from its own bundle (another origin), so the API answers any
-/// origin. That's safe because nothing rides on cookies cross-origin: the desktop sends its token.
+/// `npm run dev` previews (and older desktop builds) load the page from another origin, so the API
+/// answers any origin. That's safe because nothing rides on cookies cross-origin: they send a token.
 async fn cors(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let preflight = req.method() == Method::OPTIONS;
     let mut res = if preflight { StatusCode::NO_CONTENT.into_response() } else { next.run(req).await };
@@ -157,6 +159,23 @@ async fn cors(req: axum::extract::Request, next: axum::middleware::Next) -> Resp
 }
 
 // HTTP handlers.
+
+/// What's deployed (deploy/auto-deploy.sh sets these from the commit it built). Clients compare
+/// `ui` with the page they run and the desktop compares `shell` with its program, so each offers
+/// an update only when its own part changed. No sign-in: the repo is public, and it's tailnet-only.
+async fn version() -> Response {
+    let var = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+    let mut res = Json(json!({
+        "commit": var("CC_COMMIT"),
+        "subject": var("CC_SUBJECT"),
+        "deployedAt": var("CC_DEPLOYED_AT"),
+        "ui": var("CC_UI"),
+        "shell": var("CC_SHELL"),
+    }))
+    .into_response();
+    res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    res
+}
 
 #[derive(Deserialize)]
 struct PairRequest {

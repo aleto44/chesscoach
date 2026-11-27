@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-# Chess Coach's server image (docs/server-migration.md, phase 4). Built on laptop-server by
-# scripts/deploy.ps1 from the repo's working tree: `docker compose up -d --build`.
+# Chess Coach's server image (docs/deployment.md). Built on laptop-server by deploy/auto-deploy.sh
+# from the commit on main it deploys.
 
 # 1. The server binary. Only server/ is built (the desktop shell's Tauri crate isn't needed here),
 #    so the workspace is cut down to it. Cache mounts keep the registry and target between builds.
@@ -16,8 +16,9 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
     cargo build --release -p chesscoach-server && cp target/release/chesscoach-server /chesscoach-server
 
-# 2. The frontend phones load (the desktop app bundles its own copy). npm ci also fetches the
-#    engines' models into public/ (postinstall); that layer only reruns when the dependencies change.
+# 2. The frontend every client loads (phones and the desktop app). npm ci also fetches the engines'
+#    models into public/ (postinstall); that layer only reruns when the dependencies change.
+#    `npm run build` type-checks first, so a commit that doesn't compile never deploys.
 FROM node:24-bookworm-slim AS web
 WORKDIR /build
 COPY package.json package-lock.json ./
@@ -25,6 +26,10 @@ COPY patches ./patches
 COPY scripts/copy-stockfish.mjs scripts/setup-maia.mjs scripts/setup-vosk.mjs ./scripts/
 RUN npm ci
 COPY . .
+# Which frontend this is (auto-deploy.sh: a hash of what the frontend is built from). The page
+# compares it with the server's /api/version to know when it's out of date (src/update.ts).
+ARG CC_UI=dev
+ENV VITE_UI_VERSION=$CC_UI
 RUN npm run build
 
 # 3. The runtime: the server, the frontend and the `claude` CLI for the coach. Runs as uid 1000
